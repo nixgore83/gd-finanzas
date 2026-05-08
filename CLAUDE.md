@@ -16,7 +16,7 @@ no lo "arregles" en silencio: avisalo.
 ## Stack
 
 - **Framework:** Next.js 15 (App Router) + TypeScript estricto
-- **DB + Auth + Storage:** Supabase (Postgres en us-east-1)
+- **DB + Auth + Storage:** Supabase (Postgres en us-west-2)
 - **ORM:** Drizzle ORM con cliente `postgres-js` (decisión: type-safety end-to-end + migraciones versionadas en Git, supera a supabase-js que se queda corto en queries complejas)
 - **Auth/Storage SDK:** `@supabase/ssr` para auth y storage (Drizzle no cubre eso)
 - **UI:** Tailwind + shadcn/ui

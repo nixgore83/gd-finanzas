@@ -1,8 +1,12 @@
 node_modules/
 .next/
+out/
+build/
+# Env files — block anything that looks like real credentials; only the
+# example template is allowed in the repo.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.log
 .DS_Store
 /data/
@@ -10,3 +14,8 @@ node_modules/
 *.db
 *.db-journal
 .vercel
+coverage/
+.turbo
+test-results/
+playwright-report/
+*.tsbuildinfo
