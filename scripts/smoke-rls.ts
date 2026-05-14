@@ -13,10 +13,11 @@
  */
 
 import postgres from 'postgres';
+import type { TransactionSql } from 'postgres';
 import { loadEnv } from './_env';
 
 type Sql = ReturnType<typeof postgres>;
-type Tx = Parameters<Parameters<Sql['begin']>[0]>[0];
+type Tx = TransactionSql;
 
 const results: { name: string; ok: boolean; detail?: string }[] = [];
 
@@ -30,13 +31,13 @@ async function asAuthenticated<T>(
   userId: string,
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
-  return sql.begin(async (tx) => {
+  return (await sql.begin(async (tx) => {
     await tx`set local role authenticated`;
     await tx.unsafe(
       `set local "request.jwt.claims" = '${JSON.stringify({ sub: userId, role: 'authenticated' })}'`,
     );
     return fn(tx);
-  });
+  })) as T;
 }
 
 async function expectRlsViolation(name: string, p: Promise<unknown>) {
@@ -76,6 +77,7 @@ async function main() {
     const [fake] = await sql<{ id: string }[]>`
       insert into households (name) values ('__smoke_other__') returning id
     `;
+    if (!fake) throw new Error('failed to create fake household');
     const fakeHouseholdId = fake.id;
     console.warn(`[smoke-rls] fake household=${fakeHouseholdId.slice(0, 8)}…`);
 
@@ -87,11 +89,13 @@ async function main() {
 
     // --- INSERT propia ---
     try {
-      const [acc] = await asAuthenticated(sql, nico.id, (tx) => tx<{ id: string }[]>`
+      const inserted = await asAuthenticated(sql, nico.id, (tx) => tx<{ id: string }[]>`
         insert into accounts (household_id, name, type, currency_default, owner_tag)
         values (${nicoHouseholdId}, '__smoke_acc__', 'cash', 'ARS', 'Nico')
         returning id
       `);
+      const acc = inserted[0];
+      if (!acc) throw new Error('insert returned no row');
       record('INSERT account propia', true, `id=${acc.id.slice(0, 8)}…`);
     } catch (err) {
       record('INSERT account propia', false, (err as Error).message);
@@ -123,7 +127,7 @@ async function main() {
       const hs = await asAuthenticated(sql, nico.id, (tx) => tx<{ id: string; name: string }[]>`
         select id, name from households
       `);
-      const onlyOwn = hs.length === 1 && hs[0].id === nicoHouseholdId;
+      const onlyOwn = hs.length === 1 && hs[0]?.id === nicoHouseholdId;
       record('SELECT households: solo propia', onlyOwn, `${hs.length} fila(s)`);
     } catch (err) {
       record('SELECT households: solo propia', false, (err as Error).message);

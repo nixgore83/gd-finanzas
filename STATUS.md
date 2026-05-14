@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 1 — Modelo base + cuentas** (🟡 schema + RLS aplicados ✅; falta CRUD de cuentas + seed instituciones — Hito 1.B)
+**Hito 2 — FX feed BCRA** (próximo a arrancar)
 
 ---
 
@@ -54,7 +54,7 @@ MFA TOTP (2026-05-14):
 - [x] Smoke local: enrollment con app authenticator + verify + dashboard en AAL2 ✅
 - [ ] Smoke local del challenge en re-login: **no probado** por rate limit del SMTP. Riesgo bajo: `verifyMfaCode` está validado por el path de enrollment (es la misma server action); la única lógica nueva es leer el factor verificado existente, cubierta por build/typecheck. Se valida la próxima vez que cualquiera de los dos vuelva a entrar tras expiración de sesión.
 
-### 🟡 Hito 1 — Modelo base + cuentas
+### 🟢 Hito 1 — Modelo base + cuentas
 
 **1.A — Schema + RLS (2026-05-14, hecho):**
 - [x] 13 tablas Drizzle en `db/schema/*` (un archivo por entidad): institutions, accounts, categories, tags, transaction_tags, transactions, recurrences, forecasts, budgets, fx_rates, imports, import_lines, financial_goals
@@ -66,12 +66,15 @@ MFA TOTP (2026-05-14):
 - [x] Script smoke RLS: `npm run db:smoke-rls` (8/8 ok)
 - [x] Validación verde: typecheck + lint + 28 tests + build
 
-**1.B — CRUD cuentas + seed instituciones (pendiente):**
-- [ ] Seed inicial de `institutions` (Galicia, ICBC, HSBC US, Balanz, Cocos, BNA según PRD §12)
-- [ ] Form alta/edit account (server action + Zod schema + UI shadcn)
-- [ ] Lista de accounts con archive/unarchive
-- [ ] Página `/accounts` bajo `(protected)`
-- [ ] Smoke manual: crear cuenta con cada `account_type`, archivar, editar
+**1.B — CRUD cuentas + seed instituciones (2026-05-14, hecho):**
+- [x] Seed idempotente de 13 `institutions` (Galicia, ICBC, BBVA, Santander, Macro, BNA, Mercado Pago, Brubank, Naranja X, Balanz, Cocos, IOL, HSBC US) via `npm run db:seed:institutions`
+- [x] Schemas Zod: `lib/schemas/account.ts` con `accountInputSchema` (refine `institutionId` requerido si `type !== 'cash'`), `parseAccountFormData` helper, `ACCOUNT_TYPE_LABELS` para UI; 10 tests
+- [x] Helper `lib/auth/session.ts` con `requireHouseholdSession()` que valida user + AAL2 + membership; lanza `SessionError` tipado. Pivota el modelo de tenancy: Drizzle se conecta como `postgres` role (bypass RLS) → el `household_id` se setea explícito desde la sesión y todas las queries filtran por él
+- [x] Server actions en `app/actions/accounts/`: `createAccount`, `updateAccount`, `setAccountArchived`. Cada una valida sesión, parsea input, ejecuta UPDATE/INSERT con WHERE doble (id + householdId), revalida path
+- [x] UI bajo `app/(protected)/accounts/`: `page.tsx` (lista con toggle activas/archivadas), `new/page.tsx` (form alta), `[id]/page.tsx` (form edit), `account-form.tsx` (client component compartido). Toggle archive con form inline + server action wrapper
+- [x] shadcn `Select` agregado a mano (`@radix-ui/react-select`); 4 dropdowns en el form (tipo, moneda, institución, titular)
+- [x] Smoke manual: crear cash sin institución ✅, crear bank_savings con institución ✅, validación rechaza credit_card sin institución ✅, editar ✅, archivar/reactivar ✅
+- [x] Validación verde: typecheck + lint + 38 tests + build + `db:smoke-rls` 8/8
 
 ### ⏳ Hito 2 — FX feed BCRA
 Cron diario, caching, helper `getFxRate(date, ccy)`.
@@ -123,6 +126,16 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 1.B
+
+- **Drizzle bypassea RLS** porque la conexión va con `postgres` role (pooler). RLS queda como defensa en profundidad; la lógica de tenancy real vive en `requireHouseholdSession()` + WHERE explícito en cada query. Pattern típico en Supabase + Drizzle; alternativa (conexión con `authenticated` role + JWT claim por request) agrega complejidad sin upside hoy.
+- **MFA enforcement también en server actions** vía `requireHouseholdSession()` que llama a `getMfaState()`. Costo: 1 round trip extra a Supabase por action. Beneficio: si alguien tiene cookies AAL1 y POSTea directo a una action, lo rechazamos. Defensa en profundidad sobre el gate del layout.
+- **Server action de archive devuelve typed result**, pero el `<form action={…}>` server-rendered necesita `Promise<void>`. Wrap con un `'use server'` inline en la page. Alternativa (mover a client component) sería overkill para un botón sin feedback.
+- **Soft delete única opción** para accounts. PRD usa `archived` flag. Hard delete rompería FKs en transactions futuras y perdería histórico. La UI lista activas por default; toggle "Todas" muestra archivadas con badge.
+- **`type` y `currency_default` editables después de creación**. Riesgo bajo, ya que cambiar el tipo no muta los datos existentes (la columna es solo descriptiva). PRD no lo prohíbe.
+- **`owner_tag` validado en Zod** con `['Nico', 'Pau', 'Hogar']`, no en DB. Si en el futuro cambia el roster (3er familiar, etc.), se ajusta en `lib/schemas/account.ts` sin migración.
+- **Institución como Select con opción "Ninguna"** que mapea a `null`. UX más clara que un checkbox "Sin institución" + condicionalmente esconder el Select.
 - **`getUser()` en cada request**, no `getSession()`, para validar el JWT contra Supabase.
 - **RLS por SQL plano**, versionado en `db/policies/*.sql`. Drizzle no genera policies; las aplicamos vía script idempotente.
 - **`current_household_id()` con SECURITY DEFINER + LIMIT 1.** En V1 cada user pertenece a un único household.
