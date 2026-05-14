@@ -3,12 +3,12 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-07 por Claude
+**Última actualización:** 2026-05-14 por Claude
 
 ---
 
 ## Hito en curso
-**Hito 0 — Setup** (🟢 funcional local, falta deploy a Vercel)
+**Hito 0 — Setup** (🟡 deploy a Vercel hecho, falta confirmar smoke test del magic link en prod)
 
 ---
 
@@ -34,13 +34,13 @@
 - [x] Smoke test local: magic link → callback → dashboard funcional
 - [x] Validación verde: `typecheck && lint && test && build`
 
-Pendiente — deploy a producción:
-- [ ] `gh repo create gd-finanzas --private --source=. --remote=origin --push`
-- [ ] Vercel: importar repo, cargar env vars, deploy
-- [ ] Supabase: agregar `https://<dominio>/auth/callback` a redirect URLs y actualizar Site URL
-- [ ] Actualizar `NEXT_PUBLIC_SITE_URL` en Vercel al dominio real → redeploy
-- [ ] Smoke test producción
-- [ ] Verificar logs de Vercel: ningún email/token loggeado
+Deploy a producción (2026-05-14):
+- [x] Repo en GitHub creado y pusheado a `nixgore83/gd-finanzas`
+- [x] Vercel: proyecto `gd-finanzas-z4dl`, env vars cargadas en Production, deploy verde
+- [x] Supabase: Site URL = `https://gd-finanzas-z4dl.vercel.app`, redirect URLs incluyen `/auth/callback` para prod y `localhost:3000` para dev
+- [x] `NEXT_PUBLIC_SITE_URL` corregido en Vercel (primer valor cargado generaba `redirect_to` a la raíz → Supabase fallback al Site URL → token nunca llegaba a `/auth/callback`)
+- [x] Audit de logs: solo dos `console.error` en `app/auth/callback/route.ts:17` y `app/actions/auth/send-magic-link.ts:45`, ambos loggean solo `error.code` (y `status`), sin email/token/PII
+- [ ] **Smoke test producción del magic link** — pendiente por rate limit del SMTP built-in de Supabase (2 mails/hora). Reintentar después del 2026-05-14 ~13:00 ART. Verificar que el link del mail tenga `redirect_to=https://gd-finanzas-z4dl.vercel.app/auth/callback` (con el path, no solo el dominio raíz).
 
 ### ⏳ Hito 1 — Modelo base + cuentas
 Schema completo (accounts, categories, tags, transactions, ...), CRUD de cuentas, seed de instituciones. **Bloqueante:** habilitar MFA TOTP antes de cargar datos reales.
@@ -85,6 +85,8 @@ Cerrar taxonomía.
 - **`shadcn/ui` instalado a mano** (sin CLI) para evitar prompts interactivos. Solo `Button/Input/Label/Card/Sonner` por ahora; resto se agrega bajo demanda.
 - **`postgres-js` con `prepare: false`** porque `DATABASE_URL` apunta al pooler de Supabase (transaction mode).
 - **API keys nuevas de Supabase** (`sb_publishable_*` / `sb_secret_*`), no las viejas JWT (`anon` / `service_role`). Variables en código: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY`. El SDK acepta ambas, usamos los nombres nuevos por convención del proyecto.
+- **Env vars en Vercel marcadas como "Sensitive"** (las 7). Decisión: en Vercel, una vez marcadas como Sensitive no se pueden desmarcar — solo borrar y recrear. Las dejamos así; impacto operativo cero (los valores no se ven en la UI después, pero se pueden re-escribir). Las dos `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` quedaron sin Sensitive (no son secretas).
+- **Scope de env vars: solo Production** para las 7 (los Preview deployments no funcionarían tal cual; cuando los usemos, hay que clonar al scope Preview). En Hobby no se puede editar el scope post-creación.
 
 ## Pendientes / a discutir
 - (Pre-Hito 1) Habilitar MFA TOTP en Supabase + UI de enrollment.
@@ -92,6 +94,6 @@ Cerrar taxonomía.
 - Region Supabase confirmada: **us-west-2** (Oregon). El PRD/CLAUDE.md original decía us-east-1; cambiamos a us-west-2 al crear el proyecto. Latencia +50ms desde AR, no relevante para uso doméstico.
 
 ## Notas
-- Vercel deploy: _(pegar URL cuando exista)_
+- Vercel deploy: https://gd-finanzas-z4dl.vercel.app
 - Repo GitHub: https://github.com/nixgore83/gd-finanzas (privado)
 - Supabase project ref: `kezrkqbubupdnlhhhwdi` (us-west-2)
