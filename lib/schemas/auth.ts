@@ -6,6 +6,11 @@ export const emailSchema = z
   .toLowerCase()
   .email({ message: 'Email inválido' });
 
+export const mfaCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, { message: 'Código inválido' });
+
 export function getAllowedEmails(): readonly string[] {
   const raw = process.env.ALLOWED_EMAILS ?? '';
   return raw

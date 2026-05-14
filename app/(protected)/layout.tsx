@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { createClient } from '@/lib/supabase/server';
+import { getMfaState } from '@/lib/auth/mfa';
 import { getDb } from '@/lib/db/client';
 import { householdMembers, profiles } from '@/db/schema';
 
@@ -11,6 +12,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   } = await supabase.auth.getUser();
 
   if (!user) redirect('/login');
+
+  const mfaState = await getMfaState(supabase);
+  if (mfaState === 'enroll') redirect('/auth/mfa/enroll');
+  if (mfaState === 'challenge') redirect('/auth/mfa/challenge');
 
   const db = getDb();
   const [membership] = await db

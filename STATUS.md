@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 0 — Setup** (🟡 deploy a Vercel hecho, falta confirmar smoke test del magic link en prod)
+**Hito 0 — Setup** (🟢 deploy a Vercel + MFA TOTP funcional en local; smoke test del magic link en prod queda pendiente para reintento manual)
 
 ---
 
@@ -40,10 +40,22 @@ Deploy a producción (2026-05-14):
 - [x] Supabase: Site URL = `https://gd-finanzas-z4dl.vercel.app`, redirect URLs incluyen `/auth/callback` para prod y `localhost:3000` para dev
 - [x] `NEXT_PUBLIC_SITE_URL` corregido en Vercel (primer valor cargado generaba `redirect_to` a la raíz → Supabase fallback al Site URL → token nunca llegaba a `/auth/callback`)
 - [x] Audit de logs: solo dos `console.error` en `app/auth/callback/route.ts:17` y `app/actions/auth/send-magic-link.ts:45`, ambos loggean solo `error.code` (y `status`), sin email/token/PII
-- [ ] **Smoke test producción del magic link** — pendiente por rate limit del SMTP built-in de Supabase (2 mails/hora). Reintentar después del 2026-05-14 ~13:00 ART. Verificar que el link del mail tenga `redirect_to=https://gd-finanzas-z4dl.vercel.app/auth/callback` (con el path, no solo el dominio raíz).
+- [ ] **Smoke test producción del magic link** — pendiente por rate limit del SMTP built-in de Supabase (2 mails/hora, no editable en free). Reintentar la próxima vez que haya que iniciar sesión en prod. Verificar que el link del mail tenga `redirect_to=https://gd-finanzas-z4dl.vercel.app/auth/callback` (con el path, no solo el dominio raíz).
+
+MFA TOTP (2026-05-14):
+- [x] TOTP habilitado en Supabase (Authentication → Multi-Factor → TOTP "Enabled")
+- [x] `mfaCodeSchema` (6 dígitos numéricos) en `lib/schemas/auth.ts`
+- [x] Helper `getMfaState()` en `lib/auth/mfa.ts` (returns `'enroll' | 'challenge' | 'ok'` según AAL)
+- [x] Server actions `enrollMfaFactor()` y `verifyMfaCode()` en `app/actions/auth/mfa/`
+- [x] Páginas `/auth/mfa/enroll` y `/auth/mfa/challenge` bajo el grupo `(auth)` (mismo layout centrado que `/login`)
+- [x] Gate en `(protected)/layout.tsx`: tras el check de `user`, llama `getMfaState()` y redirige a enroll/challenge según corresponda
+- [x] `/login` ahora redirige al estado MFA correcto si ya hay sesión (no asume `/dashboard`)
+- [x] Tests: 11 de schemas (incluye `mfaCodeSchema`) + 4 del helper `getMfaState`
+- [x] Smoke local: enrollment con app authenticator + verify + dashboard en AAL2 ✅
+- [ ] Smoke local del challenge en re-login: **no probado** por rate limit del SMTP. Riesgo bajo: `verifyMfaCode` está validado por el path de enrollment (es la misma server action); la única lógica nueva es leer el factor verificado existente, cubierta por build/typecheck. Se valida la próxima vez que cualquiera de los dos vuelva a entrar tras expiración de sesión.
 
 ### ⏳ Hito 1 — Modelo base + cuentas
-Schema completo (accounts, categories, tags, transactions, ...), CRUD de cuentas, seed de instituciones. **Bloqueante:** habilitar MFA TOTP antes de cargar datos reales.
+Schema completo (accounts, categories, tags, transactions, ...), CRUD de cuentas, seed de instituciones.
 
 ### ⏳ Hito 2 — FX feed BCRA
 Cron diario, caching, helper `getFxRate(date, ccy)`.
@@ -76,7 +88,11 @@ Cerrar taxonomía.
 
 - **Tenancy m:n (`households` + `household_members`)**, no `profiles.household_id` directo. Permite invitar a un contador en V2 sin migración. Costo cero hoy.
 - **Whitelist con respuesta genérica.** Email no autorizado ve el mismo mensaje que uno autorizado; no se filtra qué cuentas existen. `shouldCreateUser: false` en `signInWithOtp` complementa el invite-only del dashboard.
-- **MFA diferido a Hito 1** — bloqueante antes de cargar datos reales.
+- **MFA TOTP gate en layout, no en middleware.** Todas las rutas con datos viven bajo `(protected)`. Sumamos un check de AAL ahí; es suficiente y más simple que un middleware global. Aceptamos que `/auth/mfa/*` haga su propio check de sesión (lo hacen).
+- **Un factor TOTP por usuario, sin recovery codes en V1.** Supabase no los genera nativamente. Si pierden el device, ver el procedimiento administrativo más abajo.
+- **AAL2 persiste mientras dure la sesión** (default ~1 semana en magic-link). Sin re-challenge por acción sensible. Vivir con eso en V1.
+- **`verifyMfaCode` unificado** para los dos casos (verify-enroll y verify-challenge). Supabase trata ambos flujos idénticamente: un `challenge + verify` exitoso sube AAL. Una sola server action, menos duplicación.
+- **El campo `totp` del `listFactors()` viene tipado solo con verificados** (`Factor<'totp', 'verified'>[]`). Los pendientes están en `all`. Lo usamos así en `enrollMfaFactor()` para limpiar unverified previos.
 - **`getUser()` en cada request**, no `getSession()`, para validar el JWT contra Supabase.
 - **RLS por SQL plano**, versionado en `db/policies/*.sql`. Drizzle no genera policies; las aplicamos vía script idempotente.
 - **`current_household_id()` con SECURITY DEFINER + LIMIT 1.** En V1 cada user pertenece a un único household.
@@ -89,9 +105,28 @@ Cerrar taxonomía.
 - **Scope de env vars: solo Production** para las 7 (los Preview deployments no funcionarían tal cual; cuando los usemos, hay que clonar al scope Preview). En Hobby no se puede editar el scope post-creación.
 
 ## Pendientes / a discutir
-- (Pre-Hito 1) Habilitar MFA TOTP en Supabase + UI de enrollment.
 - (Pre-Hito 4) Sesión con Nico para cerrar taxonomía de categorías.
 - Region Supabase confirmada: **us-west-2** (Oregon). El PRD/CLAUDE.md original decía us-east-1; cambiamos a us-west-2 al crear el proyecto. Latencia +50ms desde AR, no relevante para uso doméstico.
+- **Custom SMTP** (Resend/Postmark) — considerar cuando el rate limit de 2 mails/hora del SMTP built-in moleste. Hoy con 2 users y login esporádico no es urgente. Si lo hacemos antes, sirve también para futuros mails transaccionales.
+
+## Procedimientos administrativos
+
+### Reset de MFA (si un usuario pierde su device)
+Conectarse al pooler con `DIRECT_URL` (psql o Studio) y ejecutar:
+
+```sql
+-- 1) Identificar al user
+SELECT id, email FROM auth.users WHERE email = 'nico@example.com';
+-- 2) Ver factores existentes
+SELECT id, factor_type, status, created_at
+FROM auth.mfa_factors
+WHERE user_id = '<user-id-del-paso-1>';
+-- 3) Borrar todos sus factores
+DELETE FROM auth.mfa_factors WHERE user_id = '<user-id-del-paso-1>';
+```
+
+Después de eso, el próximo login del user lo manda automáticamente a `/auth/mfa/enroll`.
+**No registrar este SQL en consola compartida** — usar Supabase Studio o un terminal local con `DIRECT_URL`.
 
 ## Notas
 - Vercel deploy: https://gd-finanzas-z4dl.vercel.app

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getMfaState } from '@/lib/auth/mfa';
 import { LoginForm } from './login-form';
 
 export const metadata = {
@@ -11,7 +12,13 @@ export default async function LoginPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (user) redirect('/dashboard');
+
+  if (user) {
+    const state = await getMfaState(supabase);
+    if (state === 'enroll') redirect('/auth/mfa/enroll');
+    if (state === 'challenge') redirect('/auth/mfa/challenge');
+    redirect('/dashboard');
+  }
 
   return <LoginForm />;
 }
