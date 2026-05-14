@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 0 — Setup** (🟢 deploy a Vercel + MFA TOTP funcional en local; smoke test del magic link en prod queda pendiente para reintento manual)
+**Hito 1 — Modelo base + cuentas** (🟡 schema + RLS aplicados ✅; falta CRUD de cuentas + seed instituciones — Hito 1.B)
 
 ---
 
@@ -54,8 +54,24 @@ MFA TOTP (2026-05-14):
 - [x] Smoke local: enrollment con app authenticator + verify + dashboard en AAL2 ✅
 - [ ] Smoke local del challenge en re-login: **no probado** por rate limit del SMTP. Riesgo bajo: `verifyMfaCode` está validado por el path de enrollment (es la misma server action); la única lógica nueva es leer el factor verificado existente, cubierta por build/typecheck. Se valida la próxima vez que cualquiera de los dos vuelva a entrar tras expiración de sesión.
 
-### ⏳ Hito 1 — Modelo base + cuentas
-Schema completo (accounts, categories, tags, transactions, ...), CRUD de cuentas, seed de instituciones.
+### 🟡 Hito 1 — Modelo base + cuentas
+
+**1.A — Schema + RLS (2026-05-14, hecho):**
+- [x] 13 tablas Drizzle en `db/schema/*` (un archivo por entidad): institutions, accounts, categories, tags, transaction_tags, transactions, recurrences, forecasts, budgets, fx_rates, imports, import_lines, financial_goals
+- [x] 11 pgEnums en `db/schema/enums.ts` (currency, account_type, category_kind, transaction_kind, transaction_subtype, transaction_source, recurrence_frequency, forecast_status, import_type, import_status, import_line_status)
+- [x] Migración `0001_parallel_groot.sql` generada y aplicada (349 líneas, FKs e índices incluidos)
+- [x] RLS policies `0002_v1_core_rls.sql` aplicadas: tablas household-scoped (accounts/categories/tags/transactions/recurrences/budgets/imports/financial_goals) usan `current_household_id()`; tablas derivadas (transaction_tags/forecasts/import_lines) via EXISTS sobre el padre; institutions y fx_rates con SELECT abierto a authenticated y escritura solo service_role
+- [x] Triggers `set_updated_at` en accounts/categories/recurrences/transactions/financial_goals (reusa función existente del Hito 0)
+- [x] Helper money: `lib/schemas/money.ts` con `toMoneyString`, `parseMoney`, `moneySchema`, `positiveMoneySchema` usando `decimal.js` y `ROUND_HALF_UP` (13 tests)
+- [x] Script smoke RLS: `npm run db:smoke-rls` (8/8 ok)
+- [x] Validación verde: typecheck + lint + 28 tests + build
+
+**1.B — CRUD cuentas + seed instituciones (pendiente):**
+- [ ] Seed inicial de `institutions` (Galicia, ICBC, HSBC US, Balanz, Cocos, BNA según PRD §12)
+- [ ] Form alta/edit account (server action + Zod schema + UI shadcn)
+- [ ] Lista de accounts con archive/unarchive
+- [ ] Página `/accounts` bajo `(protected)`
+- [ ] Smoke manual: crear cuenta con cada `account_type`, archivar, editar
 
 ### ⏳ Hito 2 — FX feed BCRA
 Cron diario, caching, helper `getFxRate(date, ccy)`.
@@ -93,6 +109,20 @@ Cerrar taxonomía.
 - **AAL2 persiste mientras dure la sesión** (default ~1 semana en magic-link). Sin re-challenge por acción sensible. Vivir con eso en V1.
 - **`verifyMfaCode` unificado** para los dos casos (verify-enroll y verify-challenge). Supabase trata ambos flujos idénticamente: un `challenge + verify` exitoso sube AAL. Una sola server action, menos duplicación.
 - **El campo `totp` del `listFactors()` viene tipado solo con verificados** (`Factor<'totp', 'verified'>[]`). Los pendientes están en `all`. Lo usamos así en `enrollMfaFactor()` para limpiar unverified previos.
+
+## Decisiones tomadas en Hito 1.A
+
+- **Instituciones como tabla lookup** (`institutions`), no texto libre en accounts. Cleaner data, sin typos acumulados, evolución futura más fácil (ej. agregar parser config para Hito 8).
+- **`household_id` denormalizado en cada tabla con datos del usuario** para RLS performance (policies con WHERE simple en vez de JOIN). Tablas derivadas (transaction_tags, forecasts, import_lines) usan EXISTS sobre el padre — simplicidad sobre performance en V1.
+- **`institutions` y `fx_rates` globales** (sin `household_id`). Data pública compartida. Escritura solo via service_role (cron BCRA / seed admin).
+- **Native Postgres enums** para todos los del PRD; `fx_rate_source` queda text (admite `BCRA_minorista` / `BCRA_last_available` / `manual_override` / futuras).
+- **`transactions.category_id` nullable** porque las transfers no tienen categoría. App valida que `category_id` esté presente cuando `kind != 'transfer'`.
+- **`accounts.owner_tag` text**, no enum. PRD usa "Nico"/"Pau"/"Hogar" como valores actuales pero acoplar la DB a nombres propios es fea decisión; validamos en Zod a nivel server action.
+- **Dinero como `numeric(18, 2)`** salvo `fx_rate_used` y columnas de fx_rates que usan `numeric(18, 6)` (4 decimales de margen sobre las cotizaciones BCRA típicas).
+- **`fx_rates` con PK compuesta `(date, currency_pair)`** según PRD. Sin `id` artificial.
+- **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
+- **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
+- **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
 - **`getUser()` en cada request**, no `getSession()`, para validar el JWT contra Supabase.
 - **RLS por SQL plano**, versionado en `db/policies/*.sql`. Drizzle no genera policies; las aplicamos vía script idempotente.
 - **`current_household_id()` con SECURITY DEFINER + LIMIT 1.** En V1 cada user pertenece a un único household.

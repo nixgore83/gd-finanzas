@@ -21,7 +21,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed:household": "tsx scripts/seed-household.ts",
-    "db:confirm-emails": "tsx scripts/confirm-emails.ts"
+    "db:confirm-emails": "tsx scripts/confirm-emails.ts",
+    "db:smoke-rls": "tsx scripts/smoke-rls.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
