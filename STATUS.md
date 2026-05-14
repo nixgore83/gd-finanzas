@@ -93,5 +93,5 @@ Cerrar taxonomía.
 
 ## Notas
 - Vercel deploy: _(pegar URL cuando exista)_
-- Repo GitHub: _(pegar URL cuando exista)_
-- Supabase project ref: _(pegar cuando exista)_
+- Repo GitHub: https://github.com/nixgore83/gd-finanzas (privado)
+- Supabase project ref: `kezrkqbubupdnlhhhwdi` (us-west-2)
