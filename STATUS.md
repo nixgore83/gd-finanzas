@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 3 — Transacciones manuales** (3.A + 3.B hechos; faltan transferencias y tags)
+**Hito 3 — Transacciones manuales** (3.A + 3.B + 3.C hechos; falta tags + filtros + paginación = 3.D)
 
 ---
 
@@ -127,11 +127,22 @@ MFA TOTP (2026-05-14):
 - [x] Lista: columna de acciones con "Editar" + DeleteButton
 - [x] Validación verde: typecheck + lint + 60 tests + build + `db:smoke-rls` 8/8
 
-**3.C — Pendiente: transferencias**
-- [ ] Soporte `kind='transfer'` con 2 cuentas (origen, destino) y `transfer_pair_id` linkeando ambas filas
-- [ ] Categorías nullable para transfers (schema ya lo permite)
-- [ ] Validación: cuentas distintas, mismo householdId
-- [ ] Extender `deleteTransaction` para borrar la pata pareja si `transfer_pair_id` está seteado
+**3.C — Transferencias entre cuentas (2026-05-17, hecho):**
+- [x] `lib/schemas/transfer.ts`: `transferInputSchema` con refine (cuentas distintas), `amountFrom` y `amountTo` siempre obligatorios, `fxRateOverride` opcional; 9 tests
+- [x] `app/actions/transactions/_build-transfer.ts`: helper que carga ambas cuentas, valida pertenencia + archived, resuelve FX (override o BCRA), arma fromLeg (signo negativo) y toLeg (signo positivo) en su moneda original; genera `transfer_pair_id` o reusa el existente en edit
+- [x] `create-transfer.ts`: INSERT batch de 2 filas con mismo `pairId`, `kind='transfer'`, `category_id=null`
+- [x] `update-transfer.ts`: valida que las cuentas no se intentaron cambiar (DevTools guard) + `db.transaction(DELETE pair → INSERT 2 nuevas)`. Mantiene `pairId`. Cambia `created_at` (decisión consciente: no usamos timestamps históricos en V1)
+- [x] `delete.ts` extendido: si la fila tiene `transfer_pair_id`, borra ambas patas en un solo statement
+- [x] UI: `/transactions/new-transfer` + `transfer-form.tsx` (Selects from/to, auto-sync `amountTo = amountFrom` cuando misma moneda y no tocado; helper text cross-currency; edit mode con accounts disabled)
+- [x] `/transactions/[id]/page.tsx` branch por `kind`: si `transfer`, carga ambas patas via `transfer_pair_id`, identifica from/to por signo de `amount_original`, renderiza TransferForm
+- [x] Lista: botón "↔ Transferencia" arriba; badge azul para kind=transfer (`ALL_KIND_LABELS` para display); `Intl.NumberFormat` muestra el signo negativo naturalmente
+- [x] `tx-peek.ts` actualizado: muestra `transfer_pair_id` truncado + `amount_original` con signo
+- [x] Validación verde: typecheck + lint + 69 tests + build + `db:smoke-rls` 8/8
+
+**3.D — Pendiente: tags + filtros + paginación**
+- [ ] Multi-select de tags en el form (insert en `transaction_tags`)
+- [ ] Filtros de lista: por kind, account, category, rango de fecha
+- [ ] Paginación cuando supere los 50 por mes
 
 **3.D — Pendiente: tags + filtros + paginación**
 - [ ] Multi-select de tags en el form (insert en `transaction_tags`)
@@ -193,6 +204,17 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 3.C
+
+- **Convención de signo en transferencias**: pata "out" persiste con `amount_original`, `amount_usd` y `amount_ars` **negativos**. Pata "in", positivos. Mismo `transfer_pair_id` enlaza ambas. Permite `SUM(amount_usd) WHERE account_id` = balance histórico, y `WHERE kind != 'transfer'` aísla ingreso/gasto sin contaminación.
+- **Cross-currency: dos montos explícitos** (`amountFrom` + `amountTo`), no un rate inventado. Refleja la realidad del MEP/CCL donde el rate efectivo difiere del BCRA. El delta queda implícito en los datos, no persiste como columna. Si V2 quiere "rate MEP", lo calcula on-the-fly.
+- **Auto-sync `amountTo = amountFrom` solo cuando misma moneda y no tocado.** Implementado en el handler de onChange (no en `useEffect`) para satisfacer la regla de lint `react-hooks/set-state-in-effect`.
+- **Edit reemplaza ambas filas (delete + insert dentro de `db.transaction`)** en vez de UPDATE por leg. Trade-off: `created_at` se resetea — acepto porque no usamos timestamps históricos en V1. Si en V2 hace falta auditoría, se vuelve a UPDATE por leg matcheando por signo.
+- **Cuentas read-only en edit de transfer.** Cambiar las cuentas cambia la semántica del par; preferimos forzar borrar + recrear. El server tira `mismatched_accounts` si se intenta via DevTools.
+- **Delete branchea por `transfer_pair_id`**: si non-null, borra ambas patas con un solo statement (`WHERE transfer_pair_id = X`). Si null, comportamiento histórico (`WHERE id = X`). El UI no distingue, solo el server.
+- **Lista muestra cada leg como fila separada.** Natural para un libro contable doble — cada cuenta ve su movimiento. Si UX termina molestando, en 3.D agrupamos por `transfer_pair_id` con un toggle.
+- **`ALL_KIND_LABELS` separado de `TRANSACTION_KIND_LABELS`**: el segundo es para inputs (solo income/expense aceptados por el schema). El primero suma `transfer` para display en la lista. Evita filtrar a `transactionInputSchema.kind` un valor que no acepta.
 
 ## Decisiones tomadas en Hito 3.B
 

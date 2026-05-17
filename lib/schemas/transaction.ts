@@ -20,6 +20,16 @@ export const TRANSACTION_KIND_LABELS: Record<TransactionKind, string> = {
   expense: 'Gasto',
 };
 
+/**
+ * Para display en la lista. Incluye 'transfer' aunque el schema de input no
+ * lo acepte — las transferencias se crean por `transferInputSchema`.
+ */
+export const ALL_KIND_LABELS: Record<'income' | 'expense' | 'transfer', string> = {
+  income: 'Ingreso',
+  expense: 'Gasto',
+  transfer: 'Transferencia',
+};
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const transactionInputSchema = z.object({

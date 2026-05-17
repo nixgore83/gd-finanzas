@@ -17,8 +17,8 @@ const idSchema = z.string().uuid();
  * Hard delete. V1 no usa soft delete para transacciones; auditoría sale del
  * cron + backups del Hito 10.
  *
- * TODO 3.C: cuando entren transferencias, este action tiene que ampliarse
- * para borrar la pata pareja (`transfer_pair_id`) en la misma transacción.
+ * Si la fila tiene `transfer_pair_id`, borra ambas patas del par en un solo
+ * statement (WHERE transfer_pair_id = X + householdId).
  */
 export async function deleteTransaction(formData: FormData): Promise<DeleteTransactionResult> {
   const idParsed = idSchema.safeParse(formData.get('id'));
@@ -35,12 +35,28 @@ export async function deleteTransaction(formData: FormData): Promise<DeleteTrans
 
   const db = getDb();
   try {
-    const result = await db
-      .delete(transactions)
+    const [row] = await db
+      .select({ transferPairId: transactions.transferPairId })
+      .from(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.householdId, session.householdId)))
-      .returning({ id: transactions.id });
+      .limit(1);
 
-    if (result.length === 0) return { ok: false, error: 'not_found' };
+    if (!row) return { ok: false, error: 'not_found' };
+
+    if (row.transferPairId) {
+      await db
+        .delete(transactions)
+        .where(
+          and(
+            eq(transactions.householdId, session.householdId),
+            eq(transactions.transferPairId, row.transferPairId),
+          ),
+        );
+    } else {
+      await db
+        .delete(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.householdId, session.householdId)));
+    }
 
     revalidatePath('/transactions');
     return { ok: true };

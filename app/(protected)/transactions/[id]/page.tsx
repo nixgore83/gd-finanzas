@@ -1,11 +1,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
+import Decimal from 'decimal.js';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { accounts, categories, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { updateTransaction } from '@/app/actions/transactions/update';
+import { updateTransfer } from '@/app/actions/transactions/update-transfer';
 import { TransactionForm } from '../transaction-form';
+import { TransferForm } from '../transfer-form';
 import { DeleteTransactionButton } from '../delete-button';
 
 export const metadata = {
@@ -37,10 +40,6 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     .limit(1);
 
   if (!tx) notFound();
-  if (tx.kind === 'transfer') {
-    // 3.A/3.B no editan transfers. El form solo soporta income/expense.
-    redirect('/transactions');
-  }
 
   const accountRows = await db
     .select({ id: accounts.id, name: accounts.name, currencyDefault: accounts.currencyDefault })
@@ -48,12 +47,83 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));
 
+  if (tx.kind === 'transfer') {
+    if (!tx.transferPairId) redirect('/transactions');
+
+    const legs = await db
+      .select({ id: transactions.id, accountId: transactions.accountId, amountOriginal: transactions.amountOriginal })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, session.householdId),
+          eq(transactions.transferPairId, tx.transferPairId),
+        ),
+      );
+
+    if (legs.length !== 2) redirect('/transactions');
+    const fromLeg = legs.find((l) => l.amountOriginal.startsWith('-'));
+    const toLeg = legs.find((l) => !l.amountOriginal.startsWith('-'));
+    if (!fromLeg || !toLeg) redirect('/transactions');
+
+    // amountFrom / amountTo se muestran como POSITIVOS en el form.
+    // Buscamos los amount_original de cada pata para obtener su valor abs.
+    const [fromRow] = await db
+      .select({ amountOriginal: transactions.amountOriginal })
+      .from(transactions)
+      .where(and(eq(transactions.id, fromLeg.id), eq(transactions.householdId, session.householdId)))
+      .limit(1);
+    const [toRow] = await db
+      .select({ amountOriginal: transactions.amountOriginal })
+      .from(transactions)
+      .where(and(eq(transactions.id, toLeg.id), eq(transactions.householdId, session.householdId)))
+      .limit(1);
+    if (!fromRow || !toRow) redirect('/transactions');
+
+    const amountFromAbs = new Decimal(fromRow.amountOriginal).abs().toFixed(2);
+    const amountToAbs = new Decimal(toRow.amountOriginal).abs().toFixed(2);
+
+    return (
+      <div className="mx-auto max-w-xl space-y-4">
+        <TransferForm
+          accounts={accountRows}
+          action={updateTransfer}
+          submitLabel="Guardar cambios"
+          title="Editar transferencia"
+          description={`Editando "${tx.description}". Las cuentas no se pueden cambiar (borrá y recreá si hace falta).`}
+          hiddenId={tx.id}
+          disableAccounts
+          initial={{
+            date: tx.date,
+            accountFromId: fromLeg.accountId,
+            accountToId: toLeg.accountId,
+            amountFrom: amountFromAbs,
+            amountTo: amountToAbs,
+            description: tx.description,
+            notes: tx.notes,
+          }}
+          initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
+        />
+
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Borrar transferencia</p>
+              <p className="text-xs text-muted-foreground">
+                Borra ambas patas del par. Hard delete, no se puede deshacer.
+              </p>
+            </div>
+            <DeleteTransactionButton id={tx.id} variant="destructive" size="default" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // income / expense
   const categoryRows = await db
     .select({ id: categories.id, name: categories.name, kind: categories.kind })
     .from(categories)
-    .where(
-      and(eq(categories.householdId, session.householdId), eq(categories.archived, false)),
-    )
+    .where(and(eq(categories.householdId, session.householdId), eq(categories.archived, false)))
     .orderBy(asc(categories.name));
 
   return (

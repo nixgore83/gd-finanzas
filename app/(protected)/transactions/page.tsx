@@ -4,7 +4,7 @@ import { asc, desc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, categories, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { TRANSACTION_KIND_LABELS, type TransactionKind } from '@/lib/schemas/transaction';
+import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { Button } from '@/components/ui/button';
 import { DeleteTransactionButton } from './delete-button';
 
@@ -66,9 +66,14 @@ export default async function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Transacciones</h1>
-        <Button asChild>
-          <Link href="/transactions/new">+ Nueva transacción</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/transactions/new-transfer">↔ Transferencia</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/transactions/new">+ Nueva transacción</Link>
+          </Button>
+        </div>
       </div>
 
       {accountCount.length === 0 ? (
@@ -107,10 +112,12 @@ export default async function TransactionsPage() {
                       className={
                         row.kind === 'income'
                           ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'
-                          : 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
+                          : row.kind === 'expense'
+                            ? 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
+                            : 'rounded bg-sky-50 px-1.5 py-0.5 text-xs text-sky-700'
                       }
                     >
-                      {TRANSACTION_KIND_LABELS[row.kind as TransactionKind] ?? row.kind}
+                      {ALL_KIND_LABELS[row.kind as keyof typeof ALL_KIND_LABELS] ?? row.kind}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{row.accountName ?? '—'}</td>
