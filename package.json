@@ -23,7 +23,10 @@
     "db:seed:household": "tsx scripts/seed-household.ts",
     "db:seed:institutions": "tsx scripts/seed-institutions.ts",
     "db:confirm-emails": "tsx scripts/confirm-emails.ts",
-    "db:smoke-rls": "tsx scripts/smoke-rls.ts"
+    "db:smoke-rls": "tsx scripts/smoke-rls.ts",
+    "fx:list-vars": "tsx scripts/fx-list-variables.ts",
+    "fx:backfill": "tsx scripts/fx-backfill.ts",
+    "fx:smoke": "tsx scripts/fx-smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

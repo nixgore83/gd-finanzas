@@ -8,6 +8,8 @@ const serverEnvSchema = z.object({
   DIRECT_URL: z.string().url(),
   NEXT_PUBLIC_SITE_URL: z.string().url(),
   ALLOWED_EMAILS: z.string().min(1),
+  CRON_SECRET: z.string().min(16),
+  BCRA_FX_MINORISTA_VARIABLE_ID: z.coerce.number().int().positive(),
 });
 
 const clientEnvSchema = z.object({

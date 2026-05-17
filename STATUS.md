@@ -3,12 +3,12 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-14 por Claude
+**Última actualización:** 2026-05-17 por Claude
 
 ---
 
 ## Hito en curso
-**Hito 2 — FX feed BCRA** (próximo a arrancar)
+**Hito 2 — FX feed BCRA** (código completo, API v4 validada, pendiente backfill + activación en Vercel)
 
 ---
 
@@ -76,8 +76,34 @@ MFA TOTP (2026-05-14):
 - [x] Smoke manual: crear cash sin institución ✅, crear bank_savings con institución ✅, validación rechaza credit_card sin institución ✅, editar ✅, archivar/reactivar ✅
 - [x] Validación verde: typecheck + lint + 38 tests + build + `db:smoke-rls` 8/8
 
-### ⏳ Hito 2 — FX feed BCRA
-Cron diario, caching, helper `getFxRate(date, ccy)`.
+### 🟡 Hito 2 — FX feed BCRA
+
+**2.A — Cliente BCRA + helper + backfill manual (2026-05-15, hecho):**
+- [x] `lib/fx/bcra.ts`: `listBcraVariables()` y `fetchBcraSeries({ idVariable, desde, hasta, limit })` contra `https://api.bcra.gob.ar/estadisticas/v3.0/Monetarias`, con Zod del payload, timeout 15s y `BcraApiError` tipado
+- [x] `lib/fx/resolve.ts`: función pura `resolveFxRate(rows, targetDate, currencyPair)` con fallback al día previo y flag `BCRA_last_available`; 7 tests cubriendo match exacto, fallback, finde largo, anterior a todo, vacío, filtrado por pair, posteriores
+- [x] `lib/fx/get-fx-rate.ts`: helper `getFxRate({ date, currency })` que consulta `fx_rates` via Drizzle (`getDb()`), aplica `resolveFxRate`, devuelve `{ rate: Decimal, source, effectiveDate }`. Atajo identity para ARS (rate=1, source=`identity`). Throw `FxRateNotFoundError` si no hay nada en los últimos 30 días <= target
+- [x] `scripts/fx-list-variables.ts` + `npm run fx:list-vars`: lista variables BCRA filtrando por `/tipo de cambio|dólar|usd/i` para descubrir el idVariable minorista
+- [x] `scripts/fx-backfill.ts` + `npm run fx:backfill`: backfill manual con flags `--variable --from --to --pair --source`; UPSERT batch contra `fx_rates` por PK `(date, currency_pair)`. Defaults: 30 días, pair `USD/ARS`, source `BCRA_minorista`
+- [x] Validación verde: typecheck + lint + 45 tests + build
+
+**2.B — Cron Vercel (2026-05-17, hecho):**
+- [x] `app/api/cron/fx/route.ts`: GET con auth `Authorization: Bearer ${CRON_SECRET}`, fetch BCRA con ventana de 7 días hacia atrás, UPSERT con Drizzle `onConflictDoUpdate`. Loggea solo conteos. Devuelve 401 si falla auth, 502 si BCRA falla
+- [x] `vercel.json` con cron diario `0 14 * * *` (14:00 UTC ≈ 11:00 AR) apuntando a `/api/cron/fx`
+- [x] `lib/env.ts` + `.env.example`: `CRON_SECRET` (≥16 chars) y `BCRA_FX_MINORISTA_VARIABLE_ID` (coerce a int positivo)
+- [x] Validación verde: typecheck + lint + 45 tests + build (route registrada como `ƒ /api/cron/fx`)
+
+**2.C — Migración a API v4 (2026-05-17, hecho):**
+- [x] La v3.0 devolvió 400 con `"Método correspondiente a la v3 ha sido deprecado."`; migrado a `https://api.bcra.gob.ar/estadisticas/v4.0`
+- [x] El endpoint de serie v4 anida los puntos en `results[].detalle[]`; `fetchBcraSeries()` ahora aplana antes de devolver — la firma pública (`BcraSeriesPoint[]`) no cambió, los callers (script de backfill, route del cron) no se tocaron
+- [x] `npm run fx:list-vars` corrió OK contra v4: **idVariable=4 = "Tipo de cambio minorista (promedio vendedor)"** (Principales Variables)
+- [x] Validación verde: typecheck + lint + 45 tests + build
+
+**2.D — Pendiente (operacional, fuera de código):**
+- [ ] Setear `BCRA_FX_MINORISTA_VARIABLE_ID=4` y `CRON_SECRET=$(openssl rand -hex 32)` en `.env.local` y en Vercel (Production scope, marcar Sensitive el secret)
+- [ ] Backfill inicial: `npm run fx:backfill -- --variable 4 --from 2026-01-01 --to 2026-05-17`
+- [ ] Smoke manual de `getFxRate` (USD día con cotización, USD sábado → fallback `BCRA_last_available`, ARS → identity rate=1)
+- [ ] Push y deploy a Vercel para registrar el cron de `vercel.json`
+- [ ] Primer disparo del cron: verificar response 200 + filas nuevas en `fx_rates` + log "[cron/fx] upserted N puntos"
 
 ### ⏳ Hito 3 — Transacciones manuales
 Form alta + lista + edit + delete + transferencias.
@@ -126,6 +152,34 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 2.C
+
+- **API BCRA v4.0**, no v3.0. La v3 fue deprecada por el BCRA (devuelve 400 con mensaje explícito). El upgrade fue transparente para los callers porque el cliente aplana la estructura anidada `results[].detalle[]` antes de exponerla.
+- **`idVariable=4` (minorista "promedio vendedor") = nuestro "minorista mid"**. El BCRA no publica comprador/vendedor separados para el minorista en esta API — solo el promedio diario informado por las entidades financieras (Com. B 9791). Es lo más cercano a "mid" disponible; el PRD lo asume así.
+- **Paginación del listado: hoy ignoramos las variables fuera del primer page de 1000**. El BCRA tiene 1220 variables; las que nos importan (TC, en `Principales Variables`) caen todas en el primer 1000. Si en V2 necesitamos algo de la cola, iteramos con `offset`.
+- **No tocamos la firma pública de `fetchBcraSeries()`** al migrar a v4. Los callers siguen recibiendo `BcraSeriesPoint[]` plano. El parseo del shape v4 vive solo dentro del cliente.
+
+## Decisiones tomadas en Hito 2.B
+
+- **Schedule diario 14:00 UTC (≈11 AR)**, no nocturno. El BCRA publica la Comunicación B durante la mañana AR; correr al mediodía nos da margen. Si llegara a fallar un día, la ventana de 7 días del lookback auto-recupera al día siguiente sin intervención.
+- **Lookback de 7 días en cada corrida**, no solo del día previo. BCRA a veces publica correcciones retroactivas; reupsertar la ventana es cheap (numeric idempotente) y self-heals corridas fallidas.
+- **Auth con string equality**, no `timingSafeEqual`. Bearer secret de 32 chars hex, único entry point, 2 usuarios. El ahorro de complejidad supera el riesgo de timing attack en este perfil de tráfico.
+- **Drizzle `onConflictDoUpdate` en el route handler**, en vez de SQL crudo como en el backfill script. Mismo destino, pero el route vive en el lado app del proyecto y prefiere las abstracciones de Drizzle para mantenerse parejo con el resto del código server-side.
+- **Route handler usa `DATABASE_URL` (pooler, transaction mode)**, no `DIRECT_URL`. Es un INSERT batch corto sin transacciones de larga duración, el pooler lo aguanta perfecto. Reutiliza `getDb()` ya cacheado.
+- **`BCRA_FX_MINORISTA_VARIABLE_ID` en env**, no constante en código. Permite cambiar a mayorista (Com. A 3500) sin redeploy si el día de mañana lo necesitamos para una conciliación.
+
+## Decisiones tomadas en Hito 2.A
+
+- **Cliente BCRA usa fetch nativo + Zod**, sin axios ni otro wrapper. Zero deps nuevas; el shape del payload está estrictamente validado y falla rápido si la API cambia.
+- **Source en `fx_rates` es texto libre** (no enum). Permite acumular variantes (`BCRA_minorista` / `BCRA_mayorista` / `manual_override`) sin migración. Validamos en Zod cuando importe.
+- **Fallback marca con `BCRA_last_available` independientemente del source original** de la row reusada. Razón: el flag indica que **fue un fallback**, no la procedencia de la cotización. Si después necesitamos saber ambas cosas, agregamos un campo derivado.
+- **Ventana fija de 30 días en `getFxRate`** para el lookup hacia atrás. Suficiente para findes largos, feriados y eventuales gaps de la API. Si pasaron 30 días sin cotización, algo está roto operacionalmente y queremos error explícito.
+- **`getFxRate({ currency: 'ARS' })` retorna `rate=1, source='identity'`** sin tocar DB. Hace los call sites uniformes: siempre podés pedir un rate, no importa la moneda. Costo en código y runtime: cero.
+- **Backfill como script CLI con flags**, no como UI ni server action. Es operacional, se corre a mano. El cron viene después y reusa el mismo cliente BCRA.
+- **`idVariable` se descubre con `fx:list-vars`** en lugar de hardcodear desde docs. Reduce riesgo de hardcodear un id que la API renumeró.
+- **El script de backfill usa `postgres-js` directo (no Drizzle)** siguiendo el patrón de `seed-institutions.ts`. Para UPSERTs masivos por SQL, `sql\`\`` es más simple que el query builder de Drizzle.
+- **Tests solo de la función pura `resolveFxRate`.** Mockear Drizzle para testear `getFxRate` agrega complejidad sin upside hoy. Validamos `getFxRate` end-to-end con el smoke manual + el script de backfill.
 
 ## Decisiones tomadas en Hito 1.B
 
