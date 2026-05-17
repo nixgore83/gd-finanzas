@@ -6,6 +6,7 @@ import { accounts, categories, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { TRANSACTION_KIND_LABELS, type TransactionKind } from '@/lib/schemas/transaction';
 import { Button } from '@/components/ui/button';
+import { DeleteTransactionButton } from './delete-button';
 
 export const metadata = {
   title: 'Transacciones · gd-finanzas',
@@ -94,6 +95,7 @@ export default async function TransactionsPage() {
                 <th className="px-3 py-2 text-right font-medium">Monto</th>
                 <th className="px-3 py-2 text-right font-medium">USD</th>
                 <th className="px-3 py-2 font-medium">Descripción</th>
+                <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -120,6 +122,14 @@ export default async function TransactionsPage() {
                     {formatAmount(row.amountUsd, 'USD')}
                   </td>
                   <td className="px-3 py-2">{row.description}</td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/transactions/${row.id}`}>Editar</Link>
+                      </Button>
+                      <DeleteTransactionButton id={row.id} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

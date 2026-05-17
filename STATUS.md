@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 3 — Transacciones manuales** (3.A hecho; faltan edit/delete, transferencias, tags)
+**Hito 3 — Transacciones manuales** (3.A + 3.B hechos; faltan transferencias y tags)
 
 ---
 
@@ -115,11 +115,28 @@ MFA TOTP (2026-05-14):
 - [x] Layout protegido: header con nav links Dashboard / Cuentas / Transacciones
 - [x] Validación verde: typecheck + lint + 57 tests + build + `db:smoke-rls` 8/8
 
-**3.B — Pendiente: edit + delete**
-- [ ] Server action `updateTransaction` con `WHERE id + householdId`
-- [ ] Server action `deleteTransaction` (hard delete; FK `recurrence_id` no aplica todavía, `transfer_pair_id` tampoco — V1 sin soft delete)
-- [ ] `/transactions/[id]` con form prellenado + botón delete con confirm
-- [ ] Override manual de `fx_rate_used` (campo opcional en form, source = `manual_override`)
+**3.B — Edit + delete + manual FX override (2026-05-17, hecho):**
+- [x] `lib/schemas/transaction.ts`: sumado `fxRateOverride` (opcional, canonicaliza a 6 decimales, rechaza ≤0 / no-numérico); 15 tests
+- [x] `app/actions/transactions/_build.ts`: helper compartido `buildTransactionFields(input, householdId)` que valida refs (account + category en household, kind match) y resuelve FX (override → `manual_override`, sino `getFxRate` → fuente real)
+- [x] `app/actions/transactions/create.ts`: refactor para usar `_build`
+- [x] `app/actions/transactions/update.ts`: nuevo (mismo flujo + `WHERE id + householdId`)
+- [x] `app/actions/transactions/delete.ts`: nuevo (hard delete con WHERE doble; TODO 3.C extender para `transfer_pair_id`)
+- [x] `app/(protected)/transactions/[id]/page.tsx`: edit page con form prellenado + bloque de delete destructivo al pie
+- [x] `app/(protected)/transactions/delete-button.tsx`: client component con `confirm()` nativo + toast + router.refresh
+- [x] `transaction-form.tsx` extendido: `initial` + `hiddenId` + input "FX rate (opcional)" + info text de cotización usada actualmente en edit mode
+- [x] Lista: columna de acciones con "Editar" + DeleteButton
+- [x] Validación verde: typecheck + lint + 60 tests + build + `db:smoke-rls` 8/8
+
+**3.C — Pendiente: transferencias**
+- [ ] Soporte `kind='transfer'` con 2 cuentas (origen, destino) y `transfer_pair_id` linkeando ambas filas
+- [ ] Categorías nullable para transfers (schema ya lo permite)
+- [ ] Validación: cuentas distintas, mismo householdId
+- [ ] Extender `deleteTransaction` para borrar la pata pareja si `transfer_pair_id` está seteado
+
+**3.D — Pendiente: tags + filtros + paginación**
+- [ ] Multi-select de tags en el form (insert en `transaction_tags`)
+- [ ] Filtros de lista: por kind, account, category, rango de fecha
+- [ ] Paginación cuando supere los 50 por mes
 
 **3.C — Pendiente: transferencias**
 - [ ] Soporte `kind='transfer'` con 2 cuentas (origen, destino) y `transfer_pair_id` linkeando ambas filas
@@ -132,6 +149,7 @@ MFA TOTP (2026-05-14):
 - [ ] Paginación cuando supere los 50 por mes
 
 ### ⏳ (Sesión categorías con Nico antes de Hito 4)
+
 Cerrar taxonomía.
 
 ### ⏳ Hito 4 — Recurrencias + previsiones
@@ -175,6 +193,16 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 3.B
+
+- **Hard delete sin papelera.** V1 con 2 users y backups semanales (Hito 10) no necesita soft delete. Si hace falta auditoría, PITR de Supabase. Cuando llegue 3.C, el delete tiene que extenderse para borrar la pata pareja vía `transfer_pair_id` — TODO marcado en código.
+- **Helper `_build.ts` compartido entre create y update.** Las dos acciones tienen la misma lógica de validar refs + calcular FX + serializar montos. Duplicarlas era ~60 líneas; el helper centraliza la única lógica de FX/Decimal del sistema.
+- **Override del FX revierte a BCRA si el input queda vacío.** Es un trap UX conocido pero el predecible: si el user no retipea el override en cada edit, se va. Lo documentamos en el helper text del campo. Si se vuelve operacional, en 3.D agregamos pre-fill cuando `source === 'manual_override'`.
+- **En edit, no auto-adoptar la moneda de la cuenta** si cambia la cuenta. Decisión: la moneda original es un dato histórico, no debe cambiar implícitamente. En "nueva", sí (UX más fluida).
+- **Override almacena con 6 decimales** matching el `numeric(18, 6)` de `fx_rate_used`. La función `toFixed(6, ROUND_HALF_UP)` se aplica en el schema, no en el caller. Garantiza canonicalización de entrada antes del helper.
+- **`DeleteTransactionButton` como client component con `confirm()` nativo**, no dialog modal. Es 1 línea en el código y suficiente para V1; un Dialog de shadcn agrega 3 archivos por una funcionalidad de seguridad menor.
+- **Edit page redirige a `/transactions` si la tx es de tipo `transfer`.** El form solo soporta income/expense en 3.B. Para 3.C habrá un edit-transfer separado.
 
 ## Decisiones tomadas en Hito 3.A
 

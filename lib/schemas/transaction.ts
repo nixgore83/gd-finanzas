@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import Decimal from 'decimal.js';
 import { positiveMoneySchema } from './money';
 import { CURRENCIES } from './account';
 
@@ -40,6 +41,24 @@ export const transactionInputSchema = z.object({
     .nullable()
     .optional()
     .transform((v) => (v && v.length > 0 ? v : null)),
+  fxRateOverride: z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((v, ctx) => {
+      if (v === undefined || v === null) return null;
+      const trimmed = v.trim();
+      if (trimmed === '') return null;
+      try {
+        const d = new Decimal(trimmed);
+        if (!d.isFinite() || d.lessThanOrEqualTo(0)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'FX inválido' });
+          return z.NEVER;
+        }
+        return d.toFixed(6, Decimal.ROUND_HALF_UP);
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'FX inválido' });
+        return z.NEVER;
+      }
+    }),
 });
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;
@@ -57,5 +76,6 @@ export function parseTransactionFormData(formData: FormData) {
     currencyOriginal: formData.get('currencyOriginal'),
     description: formData.get('description'),
     notes,
+    fxRateOverride: formData.get('fxRateOverride'),
   });
 }

@@ -36,6 +36,22 @@ type ActionResult =
   | { ok: true; id?: string }
   | { ok: false; error: string; fields?: Record<string, string> };
 
+type Initial = {
+  date: string;
+  accountId: string;
+  categoryId: string;
+  kind: TransactionKind;
+  amountOriginal: string;
+  currencyOriginal: 'ARS' | 'USD';
+  description: string;
+  notes: string | null;
+};
+
+type FxInfo = {
+  fxRateUsed: string;
+  fxRateSource: string;
+};
+
 type Props = {
   accounts: AccountOption[];
   categories: CategoryOption[];
@@ -43,6 +59,9 @@ type Props = {
   submitLabel: string;
   title: string;
   description: string;
+  initial?: Initial;
+  hiddenId?: string;
+  initialFxInfo?: FxInfo;
 };
 
 function todayIso(): string {
@@ -56,27 +75,37 @@ export function TransactionForm({
   submitLabel,
   title,
   description,
+  initial,
+  hiddenId,
+  initialFxInfo,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [kind, setKind] = useState<TransactionKind>('expense');
   const firstAccount = accounts[0];
-  const [accountId, setAccountId] = useState<string>(firstAccount?.id ?? '');
+  const initialKind: TransactionKind = initial?.kind ?? 'expense';
+  const [kind, setKind] = useState<TransactionKind>(initialKind);
+
+  const [accountId, setAccountId] = useState<string>(
+    initial?.accountId ?? firstAccount?.id ?? '',
+  );
+
   const filteredCategories = useMemo(
     () => categories.filter((c) => c.kind === kind),
     [categories, kind],
   );
-  const [categoryId, setCategoryId] = useState<string>(filteredCategories[0]?.id ?? '');
+  const [categoryId, setCategoryId] = useState<string>(
+    initial?.categoryId ?? filteredCategories[0]?.id ?? '',
+  );
+
   const [currencyOriginal, setCurrencyOriginal] = useState<'ARS' | 'USD'>(
-    firstAccount?.currencyDefault ?? 'ARS',
+    initial?.currencyOriginal ?? firstAccount?.currencyDefault ?? 'ARS',
   );
 
   function handleKindChange(next: string) {
     const nextKind = next as TransactionKind;
     setKind(nextKind);
-    // Reset category if no longer compatible.
     const stillValid = categories.some((c) => c.id === categoryId && c.kind === nextKind);
     if (!stillValid) {
       const firstForKind = categories.find((c) => c.kind === nextKind);
@@ -86,8 +115,12 @@ export function TransactionForm({
 
   function handleAccountChange(next: string) {
     setAccountId(next);
-    const acc = accounts.find((a) => a.id === next);
-    if (acc) setCurrencyOriginal(acc.currencyDefault);
+    if (!initial) {
+      // En modo "nueva": auto-adopta la moneda de la cuenta elegida.
+      // En modo "edit": no pisar la moneda original guardada.
+      const acc = accounts.find((a) => a.id === next);
+      if (acc) setCurrencyOriginal(acc.currencyDefault);
+    }
   }
 
   function handleSubmit(formData: FormData) {
@@ -95,29 +128,34 @@ export function TransactionForm({
     formData.set('accountId', accountId);
     formData.set('categoryId', categoryId);
     formData.set('currencyOriginal', currencyOriginal);
+    if (hiddenId) formData.set('id', hiddenId);
 
     setErrors({});
     startTransition(async () => {
       const result = await action(formData);
       if (result.ok) {
-        toast.success('Transacción creada');
+        toast.success(hiddenId ? 'Transacción actualizada' : 'Transacción creada');
         router.push('/transactions');
         router.refresh();
         return;
       }
-      if (result.error === 'invalid_input' && result.fields) {
+      if (
+        (result.error === 'invalid_input' ||
+          result.error === 'invalid_refs' ||
+          result.error === 'fx_unavailable') &&
+        result.fields
+      ) {
         setErrors(result.fields);
-        toast.error('Revisá los campos marcados');
+        const labels: Record<string, string> = {
+          invalid_input: 'Revisá los campos marcados',
+          invalid_refs: 'Referencia inválida (cuenta/categoría)',
+          fx_unavailable: 'No hay cotización para esa fecha',
+        };
+        toast.error(labels[result.error] ?? 'Error');
         return;
       }
-      if (result.error === 'invalid_refs' && result.fields) {
-        setErrors(result.fields);
-        toast.error('Referencia inválida (cuenta/categoría)');
-        return;
-      }
-      if (result.error === 'fx_unavailable' && result.fields) {
-        setErrors(result.fields);
-        toast.error('No hay cotización para esa fecha');
+      if (result.error === 'not_found') {
+        toast.error('La transacción no existe o no es tuya');
         return;
       }
       toast.error('No pudimos guardar. Probá de nuevo.');
@@ -157,7 +195,7 @@ export function TransactionForm({
                 name="date"
                 type="date"
                 required
-                defaultValue={todayIso()}
+                defaultValue={initial?.date ?? todayIso()}
                 disabled={isPending}
                 aria-invalid={errors.date ? true : undefined}
               />
@@ -214,6 +252,7 @@ export function TransactionForm({
                 step="0.01"
                 min="0"
                 required
+                defaultValue={initial?.amountOriginal ?? ''}
                 disabled={isPending}
                 placeholder="0.00"
                 aria-invalid={errors.amountOriginal ? true : undefined}
@@ -256,6 +295,7 @@ export function TransactionForm({
               name="description"
               required
               maxLength={200}
+              defaultValue={initial?.description ?? ''}
               disabled={isPending}
               placeholder="Supermercado, sueldo, alquiler…"
               aria-invalid={errors.description ? true : undefined}
@@ -272,6 +312,7 @@ export function TransactionForm({
               name="notes"
               rows={2}
               maxLength={500}
+              defaultValue={initial?.notes ?? ''}
               disabled={isPending}
               className={cn(
                 'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
@@ -279,6 +320,30 @@ export function TransactionForm({
               aria-invalid={errors.notes ? true : undefined}
             />
             {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fxRateOverride">FX rate (opcional — sobrescribe BCRA)</Label>
+            <Input
+              id="fxRateOverride"
+              name="fxRateOverride"
+              type="number"
+              step="0.0001"
+              min="0"
+              disabled={isPending}
+              placeholder="dejar vacío para usar BCRA"
+              aria-invalid={errors.fxRateOverride ? true : undefined}
+            />
+            {initialFxInfo && (
+              <p className="text-xs text-muted-foreground">
+                Cotización usada actualmente:{' '}
+                <span className="font-mono">{initialFxInfo.fxRateUsed}</span> (
+                {initialFxInfo.fxRateSource}). Vacío = recomputar con BCRA del día.
+              </p>
+            )}
+            {errors.fxRateOverride && (
+              <p className="text-sm text-destructive">{errors.fxRateOverride}</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

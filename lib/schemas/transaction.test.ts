@@ -76,6 +76,49 @@ describe('transactionInputSchema', () => {
       transactionInputSchema.parse({ ...validBase, currencyOriginal: 'EUR' as 'USD' }),
     ).toThrow();
   });
+
+  describe('fxRateOverride', () => {
+    it('ausente / null / "" / espacios → null', () => {
+      expect(transactionInputSchema.parse(validBase).fxRateOverride).toBeNull();
+      expect(
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: null }).fxRateOverride,
+      ).toBeNull();
+      expect(
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '' }).fxRateOverride,
+      ).toBeNull();
+      expect(
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '   ' }).fxRateOverride,
+      ).toBeNull();
+    });
+
+    it('canonicaliza a 6 decimales', () => {
+      expect(
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '1500' }).fxRateOverride,
+      ).toBe('1500.000000');
+      expect(
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '1500.25' }).fxRateOverride,
+      ).toBe('1500.250000');
+      expect(
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '1500.1234567' })
+          .fxRateOverride,
+      ).toBe('1500.123457');
+    });
+
+    it('rechaza negativo, cero, no-numérico, Infinity', () => {
+      expect(() =>
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '-1' }),
+      ).toThrow();
+      expect(() =>
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: '0' }),
+      ).toThrow();
+      expect(() =>
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: 'abc' }),
+      ).toThrow();
+      expect(() =>
+        transactionInputSchema.parse({ ...validBase, fxRateOverride: 'Infinity' }),
+      ).toThrow();
+    });
+  });
 });
 
 describe('parseTransactionFormData', () => {

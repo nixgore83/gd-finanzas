@@ -1,21 +1,36 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { transactions } from '@/db/schema';
 import { parseTransactionFormData } from '@/lib/schemas/transaction';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { buildTransactionFields } from './_build';
 
-export type CreateTransactionResult =
+export type UpdateTransactionResult =
   | { ok: true; id: string }
   | {
       ok: false;
-      error: 'invalid_input' | 'invalid_refs' | 'fx_unavailable' | 'session' | 'unknown';
+      error:
+        | 'invalid_input'
+        | 'invalid_id'
+        | 'invalid_refs'
+        | 'fx_unavailable'
+        | 'not_found'
+        | 'session'
+        | 'unknown';
       fields?: Record<string, string>;
     };
 
-export async function createTransaction(formData: FormData): Promise<CreateTransactionResult> {
+const idSchema = z.string().uuid();
+
+export async function updateTransaction(formData: FormData): Promise<UpdateTransactionResult> {
+  const idParsed = idSchema.safeParse(formData.get('id'));
+  if (!idParsed.success) return { ok: false, error: 'invalid_id' };
+  const id = idParsed.data;
+
   let session;
   try {
     session = await requireHouseholdSession();
@@ -39,23 +54,19 @@ export async function createTransaction(formData: FormData): Promise<CreateTrans
 
   const db = getDb();
   try {
-    const [inserted] = await db
-      .insert(transactions)
-      .values({
-        householdId: session.householdId,
-        ...built.fields,
-        transactionSubtype: 'standard',
-        source: 'manual',
-        createdBy: session.userId,
-      })
+    const result = await db
+      .update(transactions)
+      .set(built.fields)
+      .where(and(eq(transactions.id, id), eq(transactions.householdId, session.householdId)))
       .returning({ id: transactions.id });
 
-    if (!inserted) return { ok: false, error: 'unknown' };
+    if (result.length === 0) return { ok: false, error: 'not_found' };
 
     revalidatePath('/transactions');
-    return { ok: true, id: inserted.id };
+    revalidatePath(`/transactions/${id}`);
+    return { ok: true, id };
   } catch (err) {
-    console.error('[transactions] create failed', { code: (err as { code?: string }).code });
+    console.error('[transactions] update failed', { code: (err as { code?: string }).code });
     return { ok: false, error: 'unknown' };
   }
 }
