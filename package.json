@@ -26,7 +26,8 @@
     "db:smoke-rls": "tsx scripts/smoke-rls.ts",
     "fx:list-vars": "tsx scripts/fx-list-variables.ts",
     "fx:backfill": "tsx scripts/fx-backfill.ts",
-    "fx:smoke": "tsx scripts/fx-smoke.ts"
+    "fx:smoke": "tsx scripts/fx-smoke.ts",
+    "fx:count": "tsx scripts/fx-count.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

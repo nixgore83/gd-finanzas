@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 2 — FX feed BCRA** (código completo, API v4 validada, pendiente backfill + activación en Vercel)
+**Hito 3 — Transacciones manuales** (próximo a arrancar)
 
 ---
 
@@ -76,7 +76,7 @@ MFA TOTP (2026-05-14):
 - [x] Smoke manual: crear cash sin institución ✅, crear bank_savings con institución ✅, validación rechaza credit_card sin institución ✅, editar ✅, archivar/reactivar ✅
 - [x] Validación verde: typecheck + lint + 38 tests + build + `db:smoke-rls` 8/8
 
-### 🟡 Hito 2 — FX feed BCRA
+### 🟢 Hito 2 — FX feed BCRA
 
 **2.A — Cliente BCRA + helper + backfill manual (2026-05-15, hecho):**
 - [x] `lib/fx/bcra.ts`: `listBcraVariables()` y `fetchBcraSeries({ idVariable, desde, hasta, limit })` contra `https://api.bcra.gob.ar/estadisticas/v3.0/Monetarias`, con Zod del payload, timeout 15s y `BcraApiError` tipado
@@ -98,12 +98,12 @@ MFA TOTP (2026-05-14):
 - [x] `npm run fx:list-vars` corrió OK contra v4: **idVariable=4 = "Tipo de cambio minorista (promedio vendedor)"** (Principales Variables)
 - [x] Validación verde: typecheck + lint + 45 tests + build
 
-**2.D — Pendiente (operacional, fuera de código):**
-- [ ] Setear `BCRA_FX_MINORISTA_VARIABLE_ID=4` y `CRON_SECRET=$(openssl rand -hex 32)` en `.env.local` y en Vercel (Production scope, marcar Sensitive el secret)
-- [ ] Backfill inicial: `npm run fx:backfill -- --variable 4 --from 2026-01-01 --to 2026-05-17`
-- [ ] Smoke manual de `getFxRate` (USD día con cotización, USD sábado → fallback `BCRA_last_available`, ARS → identity rate=1)
-- [ ] Push y deploy a Vercel para registrar el cron de `vercel.json`
-- [ ] Primer disparo del cron: verificar response 200 + filas nuevas en `fx_rates` + log "[cron/fx] upserted N puntos"
+**2.D — Activación operacional (2026-05-17, hecho):**
+- [x] `BCRA_FX_MINORISTA_VARIABLE_ID=4` y `CRON_SECRET` (hex 32 bytes) cargadas en `.env.local` y en Vercel Production
+- [x] Deploy en Vercel registró `/api/cron/fx` en la pantalla de Cron Jobs (schedule `0 14 * * *`)
+- [x] Smoke `/api/cron/fx` sin auth → 401, con Run desde Vercel → 200 + upsert OK
+- [x] Script `npm run fx:smoke` agregado para probar `getFxRate` local con 3 casos (día hábil, finde → fallback, ARS → identity)
+- [ ] (Opcional) Backfill histórico desde inicio del año si Hito 3 carga transacciones con fecha anterior a los últimos 7 días: `npm run fx:backfill -- --variable 4 --from 2026-01-01 --to <hoy>`
 
 ### ⏳ Hito 3 — Transacciones manuales
 Form alta + lista + edit + delete + transferencias.

@@ -80,25 +80,20 @@ async function main() {
 
   const sql = postgres(directUrl, { max: 1 });
   try {
-    let inserted = 0;
-    let updated = 0;
+    let written = 0;
     for (const p of points) {
       const mid = new Decimal(p.valor).toFixed(6, Decimal.ROUND_HALF_UP);
-      const result = await sql<{ action: 'inserted' | 'updated' }[]>`
+      await sql`
         insert into public.fx_rates (date, currency_pair, source, mid, fetched_at)
         values (${p.fecha}, ${args.pair}, ${args.source}, ${mid}, now())
         on conflict (date, currency_pair) do update
           set mid = excluded.mid,
               source = excluded.source,
               fetched_at = now()
-        returning case when xmax = 0 then 'inserted' else 'updated' end as action
       `;
-      if (result[0]?.action === 'inserted') inserted++;
-      else updated++;
+      written++;
     }
-    console.warn(
-      `[fx:backfill] ${points.length} puntos — ${inserted} insertados, ${updated} actualizados`,
-    );
+    console.warn(`[fx:backfill] ${written} filas escritas (insert+update via UPSERT)`);
   } finally {
     await sql.end();
   }
