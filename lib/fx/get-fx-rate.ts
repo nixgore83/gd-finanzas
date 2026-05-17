@@ -1,11 +1,9 @@
 import { and, desc, eq, lte } from 'drizzle-orm';
-import Decimal from 'decimal.js';
 import { fxRates } from '@/db/schema';
 import { getDb } from '@/lib/db/client';
 import { resolveFxRate, type ResolvedFxRate } from './resolve';
 
 export const USD_ARS_PAIR = 'USD/ARS';
-export const IDENTITY_SOURCE = 'identity';
 
 export class FxRateNotFoundError extends Error {
   constructor(
@@ -17,14 +15,14 @@ export class FxRateNotFoundError extends Error {
   }
 }
 
-export async function getFxRate(args: {
-  date: string;
-  currency: 'ARS' | 'USD';
-}): Promise<ResolvedFxRate> {
-  if (args.currency === 'ARS') {
-    return { rate: new Decimal(1), source: IDENTITY_SOURCE, effectiveDate: args.date };
-  }
-
+/**
+ * Devuelve la cotización BCRA minorista USD/ARS para una fecha (con fallback al
+ * día previo si la fecha pedida no tiene cotización publicada). El caller usa
+ * el rate para convertir en ambas direcciones (USD→ARS multiplicando, ARS→USD
+ * dividiendo). No parametrizamos por moneda porque toda conversión en V1 pasa
+ * por el par USD/ARS.
+ */
+export async function getFxRate(args: { date: string }): Promise<ResolvedFxRate> {
   const db = getDb();
   const rows = await db
     .select({

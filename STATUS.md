@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 3 — Transacciones manuales** (próximo a arrancar)
+**Hito 3 — Transacciones manuales** (3.A hecho; faltan edit/delete, transferencias, tags)
 
 ---
 
@@ -105,8 +105,31 @@ MFA TOTP (2026-05-14):
 - [x] Script `npm run fx:smoke` agregado para probar `getFxRate` local con 3 casos (día hábil, finde → fallback, ARS → identity)
 - [ ] (Opcional) Backfill histórico desde inicio del año si Hito 3 carga transacciones con fecha anterior a los últimos 7 días: `npm run fx:backfill -- --variable 4 --from 2026-01-01 --to <hoy>`
 
-### ⏳ Hito 3 — Transacciones manuales
-Form alta + lista + edit + delete + transferencias.
+### 🟡 Hito 3 — Transacciones manuales
+
+**3.A — Alta + lista income/expense end-to-end (2026-05-17, hecho):**
+- [x] `scripts/seed-categories-placeholder.ts` + `npm run db:seed:categories-placeholder`: 2 categorías por household ("Ingresos varios"/income, "Gastos varios"/expense), idempotente vía `WHERE NOT EXISTS`
+- [x] `lib/schemas/transaction.ts`: `transactionInputSchema` (date, accountId, categoryId, kind, amountOriginal positivo, currencyOriginal, description, notes opcional) + `parseTransactionFormData`; 12 tests
+- [x] `app/actions/transactions/create.ts`: valida sesión + parsea input + chequea que account y category pertenezcan al household (con WHERE doble) + matchea category.kind con transaction.kind + llama `getFxRate` + calcula amountUsd/amountArs con Decimal + INSERT con `source='manual'`, `transactionSubtype='standard'`, `createdBy=session.userId`
+- [x] UI bajo `app/(protected)/transactions/`: `page.tsx` (lista con LIMIT 50, formato `Intl.NumberFormat`, badge de kind), `new/page.tsx` (alta con empty states para 0 accounts / 0 categories), `transaction-form.tsx` (client component con Select kind/account/category/currency, filter categories por kind en `useMemo`, auto-fill currency desde account default)
+- [x] Layout protegido: header con nav links Dashboard / Cuentas / Transacciones
+- [x] Validación verde: typecheck + lint + 57 tests + build + `db:smoke-rls` 8/8
+
+**3.B — Pendiente: edit + delete**
+- [ ] Server action `updateTransaction` con `WHERE id + householdId`
+- [ ] Server action `deleteTransaction` (hard delete; FK `recurrence_id` no aplica todavía, `transfer_pair_id` tampoco — V1 sin soft delete)
+- [ ] `/transactions/[id]` con form prellenado + botón delete con confirm
+- [ ] Override manual de `fx_rate_used` (campo opcional en form, source = `manual_override`)
+
+**3.C — Pendiente: transferencias**
+- [ ] Soporte `kind='transfer'` con 2 cuentas (origen, destino) y `transfer_pair_id` linkeando ambas filas
+- [ ] Categorías nullable para transfers (schema ya lo permite)
+- [ ] Validación: cuentas distintas, mismo householdId
+
+**3.D — Pendiente: tags + filtros + paginación**
+- [ ] Multi-select de tags en el form (insert en `transaction_tags`)
+- [ ] Filtros de lista: por kind, account, category, rango de fecha
+- [ ] Paginación cuando supere los 50 por mes
 
 ### ⏳ (Sesión categorías con Nico antes de Hito 4)
 Cerrar taxonomía.
@@ -152,6 +175,19 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 3.A
+
+- **Categorías placeholder mínimas ("Ingresos varios", "Gastos varios")** en lugar de seedear una taxonomía improvisada. La taxonomía real se cierra con Pau/Nico antes del Hito 4; cualquier nombre puesto ahora genera ruido y posibles ajustes en cascada. Las transacciones de prueba se re-categorizan cuando el edit (3.B) esté listo.
+- **Amounts siempre positivos; `kind` carga la dirección.** El schema permite negativos pero los reservamos para casos específicos (correcciones puntuales). Esto hace que reportes de "total ingresos del mes" filtren por kind y sumen sin tener que mirar signos.
+- **Cálculo de `amount_usd`/`amount_ars` en server action** con `Decimal`, no en trigger. Permite override manual del fx en 3.B sin pelearnos con un trigger. Aplica el helper `toMoneyString` para canonicalizar a 2 decimales.
+- **Validación de refs (account + category) con queries Drizzle separadas**, no un solo JOIN. Da errores más diagnosticables por campo (account vs category vs kind mismatch). El costo es 2 round-trips contra DB en lugar de 1; aceptable para escritura humana.
+- **`category.kind` debe matchear `transaction.kind`.** Evita que una categoría "Sueldo" (income) termine en una transacción tipo expense. Se chequea en server action + el form filtra el Select por kind para que ni siquiera aparezca como opción inválida.
+- **Fecha futura permitida.** `getFxRate` cae a `BCRA_last_available` y la fila queda inmutable. Si la cotización real se publica después, queda divergente; aceptable, 3.B trae override manual.
+- **Sin filtro UI todavía**: la lista trae 50 más recientes ordenadas por `date DESC, created_at DESC`. Filtros y paginación entran en 3.D cuando haya volumen real (post-import del Hito 8).
+- **No mostramos `fx_rate_source` ni `amount_ars` en la lista.** Solo `amount_original` (en su moneda) y `amount_usd`. El source vive en DB para auditoría; el `amount_ars` se puede toggar en 3.D si hace falta.
+- **`<textarea>` con clases inline** en `notes` (no se creó un componente shadcn dedicado). Un solo uso, no justifica una abstracción.
+- **Nav links arriba del layout protegido**: Dashboard / Cuentas / Transacciones, sin highlight del active route todavía. Es la mínima usabilidad para no escribir URLs a mano; el highlight cuesta un client component o `usePathname` y no aporta hoy.
 
 ## Decisiones tomadas en Hito 2.C
 

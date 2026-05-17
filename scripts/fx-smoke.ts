@@ -14,14 +14,13 @@ async function main() {
   const { getFxRate } = await import('../lib/fx/get-fx-rate');
 
   const cases = [
-    { date: '2026-05-15', currency: 'USD' as const, label: 'viernes con cotización' },
-    { date: '2026-05-17', currency: 'USD' as const, label: 'domingo → fallback al viernes' },
-    { date: '2026-05-15', currency: 'ARS' as const, label: 'ARS → identity rate=1' },
+    { date: '2026-05-15', label: 'viernes con cotización' },
+    { date: '2026-05-17', label: 'domingo → fallback al viernes' },
   ];
 
   for (const c of cases) {
     try {
-      const r = await getFxRate({ date: c.date, currency: c.currency });
+      const r = await getFxRate({ date: c.date });
       console.warn(
         `[fx:smoke] ${c.label}: rate=${r.rate.toFixed(4)} source=${r.source} effective=${r.effectiveDate}`,
       );
