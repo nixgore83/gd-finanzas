@@ -1,13 +1,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { transactions } from '@/db/schema';
+import { transactions, transactionTags } from '@/db/schema';
 import { parseTransferFormData } from '@/lib/schemas/transfer';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { buildTransferFields } from './_build-transfer';
+import { validateTagIds } from './_build';
 
 export type UpdateTransferResult =
   | { ok: true; pairId: string }
@@ -57,8 +58,6 @@ export async function updateTransfer(formData: FormData): Promise<UpdateTransfer
   }
   const pairId = existing.transferPairId;
 
-  // Cargar ambas patas para validar que las cuentas no se intenten cambiar
-  // por DevTools. En 3.C las accounts son read-only en edit.
   const legs = await db
     .select({
       id: transactions.id,
@@ -75,7 +74,6 @@ export async function updateTransfer(formData: FormData): Promise<UpdateTransfer
 
   if (legs.length !== 2) return { ok: false, error: 'not_found' };
 
-  // amountOriginal viene como string desde numeric; "-50000.00" empieza con '-'.
   const fromLegOriginal = legs.find((l) => l.amountOriginal.startsWith('-'));
   const toLegOriginal = legs.find((l) => !l.amountOriginal.startsWith('-'));
   if (!fromLegOriginal || !toLegOriginal) return { ok: false, error: 'not_found' };
@@ -100,33 +98,47 @@ export async function updateTransfer(formData: FormData): Promise<UpdateTransfer
   const built = await buildTransferFields(parsed.data, session.householdId, pairId);
   if (!built.ok) return { ok: false, error: built.error, fields: built.fields };
 
+  const tagsCheck = await validateTagIds(parsed.data.tagIds, session.householdId);
+  if (!tagsCheck.ok) return { ok: false, error: 'invalid_refs', fields: tagsCheck.fields };
+
   try {
     await db.transaction(async (tx) => {
+      // DELETE pair (cascades a transaction_tags vía FK).
       await tx
         .delete(transactions)
         .where(
           and(
             eq(transactions.householdId, session.householdId),
             eq(transactions.transferPairId, pairId),
-            isNotNull(transactions.transferPairId),
           ),
         );
-      await tx.insert(transactions).values([
-        {
-          householdId: session.householdId,
-          ...built.fromLeg,
-          transactionSubtype: 'standard',
-          source: 'manual',
-          createdBy: session.userId,
-        },
-        {
-          householdId: session.householdId,
-          ...built.toLeg,
-          transactionSubtype: 'standard',
-          source: 'manual',
-          createdBy: session.userId,
-        },
-      ]);
+
+      const inserted = await tx
+        .insert(transactions)
+        .values([
+          {
+            householdId: session.householdId,
+            ...built.fromLeg,
+            transactionSubtype: 'standard',
+            source: 'manual',
+            createdBy: session.userId,
+          },
+          {
+            householdId: session.householdId,
+            ...built.toLeg,
+            transactionSubtype: 'standard',
+            source: 'manual',
+            createdBy: session.userId,
+          },
+        ])
+        .returning({ id: transactions.id });
+
+      if (parsed.data.tagIds.length > 0 && inserted.length > 0) {
+        const rows = inserted.flatMap((row) =>
+          parsed.data.tagIds.map((tagId) => ({ transactionId: row.id, tagId })),
+        );
+        await tx.insert(transactionTags).values(rows);
+      }
     });
 
     revalidatePath('/transactions');

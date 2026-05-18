@@ -3,12 +3,12 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-17 por Claude
+**Última actualización:** 2026-05-18 por Claude
 
 ---
 
 ## Hito en curso
-**Hito 3 — Transacciones manuales** (3.A + 3.B + 3.C + 3.D.1 hechos; falta solo 3.D.2 = tags)
+**Hito 3 — Transacciones manuales** (completo ✅; próximo: sesión de taxonomía de categorías con Pau antes de Hito 4)
 
 ---
 
@@ -105,7 +105,7 @@ MFA TOTP (2026-05-14):
 - [x] Script `npm run fx:smoke` agregado para probar `getFxRate` local con 3 casos (día hábil, finde → fallback, ARS → identity)
 - [ ] (Opcional) Backfill histórico desde inicio del año si Hito 3 carga transacciones con fecha anterior a los últimos 7 días: `npm run fx:backfill -- --variable 4 --from 2026-01-01 --to <hoy>`
 
-### 🟡 Hito 3 — Transacciones manuales
+### 🟢 Hito 3 — Transacciones manuales
 
 **3.A — Alta + lista income/expense end-to-end (2026-05-17, hecho):**
 - [x] `scripts/seed-categories-placeholder.ts` + `npm run db:seed:categories-placeholder`: 2 categorías por household ("Ingresos varios"/income, "Gastos varios"/expense), idempotente vía `WHERE NOT EXISTS`
@@ -145,12 +145,18 @@ MFA TOTP (2026-05-14):
 - [x] Paginador abajo: "Mostrando X–Y de Z" + Prev/Next como `<Link>` preservando filtros vía helper `buildHref`. Se oculta cuando hay 1 sola página
 - [x] Validación verde: typecheck + lint + 69 tests + build + `db:smoke-rls` 8/8
 
-**3.D.2 — Pendiente: tags**
-- [ ] CRUD de tags (page `/tags` con lista + alta + edit + archivado, o inline en transaction form)
-- [ ] Multi-select en transaction-form / transfer-form
-- [ ] Persistir en junction `transaction_tags` desde create/update actions
-- [ ] Filtro por tag en la lista
-- [ ] Mostrar tags como badges en cada fila
+**3.D.2 — Tags m:n + filtro + badges (2026-05-18, hecho):**
+- [x] `lib/schemas/tag.ts`: `tagInputSchema` (name, color hex opcional con regex), `tagIdsSchema` (array uuids con cap=20 y dedupe); 12 tests
+- [x] `lib/schemas/transaction.ts` + `transfer.ts`: campos `tagIds` opcional (default []), parser extrae `formData.getAll('tagIds')`; +3 tests cada uno
+- [x] `app/actions/tags/`: `create.ts` + `update.ts` (con guard `23505` para unique violation → `name_taken`) + `delete.ts` (hard delete, CASCADE limpia junction)
+- [x] `app/actions/transactions/_build.ts`: helper compartido `validateTagIds(tagIds, householdId)` para validar pertenencia
+- [x] `create.ts`, `update.ts`, `create-transfer.ts`, `update-transfer.ts`: envueltos en `db.transaction`; insert/replace de filas en `transaction_tags`. Para transfers, cada tag se duplica para ambas patas (consistencia en filtros)
+- [x] UI tags CRUD: `/tags/page.tsx` (lista con COUNT(transaction_tags) por tag), `/tags/new`, `/tags/[id]`, `tag-form.tsx` (color picker nativo + checkbox "sin color"), `delete-button.tsx` (confirm con el count de afectadas)
+- [x] `tag-multi-select.tsx`: chips clickeables, tinted con `color` (rgba al 18% si está) o neutro si no
+- [x] Integración en `transaction-form.tsx` y `transfer-form.tsx`: prop `availableTags`, prefill desde `initial.tagIds`, inyección al FormData via `formData.append('tagIds', id)`. Pages new/[id]/new-transfer precargan `tagRows` y, para edit, los `currentTagIds` del tx
+- [x] Nav link "Etiquetas" en layout protegido
+- [x] Lista `/transactions`: filtro `tagId` (EXISTS subquery con sql template) + segunda query batch para badges (`Map<txId, Tag[]>`) + render como pills con color del tag
+- [x] Validación verde: typecheck + lint + 86 tests + build + `db:smoke-rls` 8/8
 
 ### ⏳ (Sesión categorías con Nico antes de Hito 4)
 
@@ -197,6 +203,20 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 3.D.2
+
+- **Tags hard delete con CASCADE en `transaction_tags`.** No tiene `archived` en schema, así que vamos por hard delete. Antes de borrar, el `confirm()` del client muestra el count de transacciones afectadas. Race condition aceptada (el count puede ser stale por segundos).
+- **`UNIQUE(household_id, name)` reportado al user como `name_taken`.** Drizzle propaga el error de Postgres con `code = '23505'`; lo trapeo en el server action y devuelvo un `fields: { name: ... }` user-friendly en lugar de "unknown".
+- **Replace-strategy en update de tags m:n:** dentro del `db.transaction`, `DELETE FROM transaction_tags WHERE transaction_id = X` + `INSERT` con la nueva lista. Más simple que diffing y atómico. El costo extra de IO es despreciable (≤20 filas).
+- **`db.transaction` en create.ts también.** Antes no usaba. Ahora sí, para garantizar que la transacción + sus tags entren juntos o ninguno.
+- **Tags en transfers se duplican por leg.** Cada tag genera 2 filas en `transaction_tags` (una por leg). Permite filtrar consistentemente: si tildás "Pau" y filtrás por esa tag, ves ambos lados del movimiento. Si fuera una sola, depende de qué leg mirás.
+- **Validación de tagIds centralizada en `_build.ts`** vía `validateTagIds`. Un solo round-trip a DB que comprueba la pertenencia al household. Si difiere el count, `invalid_refs` con error apuntando al campo `tagIds`.
+- **`Input type="color"` nativo + checkbox "Asignar color"** en lugar de un picker custom. UX decente, zero deps. Para limpiar el color enviamos un input hidden `wipeColor=1` que el parser interpreta antes que el value del color.
+- **Color tinted al 18% para chip seleccionado** + borde y texto del color base. Sin imagen ni íconos: solo color para diferenciar las tags entre sí.
+- **Filtro por tag con `EXISTS subquery` (raw `sql\`...\``)**, no `INNER JOIN`. Evita inflación de rows (tx con 3 tags aparecería 3 veces) y compone limpio con los demás `conditions`.
+- **Segunda query batch para badges.** Cargar todos los `transaction_tags` de las 50 filas visibles en una query, agrupar en `Map<txId, Tag[]>`. Un round-trip extra es invisible y mantiene el query principal simple. Alternativa con `json_agg` era poco amigable con Drizzle.
+- **`tagIds` cap a 20 + dedupe en el schema.** Sanity bound vs DevTools abuse. En UX normal no se tildan 20 tags en una tx; si pasa, parsea silenciosamente solo los primeros 20 únicos.
 
 ## Decisiones tomadas en Hito 3.D.1
 

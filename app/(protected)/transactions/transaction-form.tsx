@@ -28,6 +28,7 @@ import {
   type TransactionKind,
 } from '@/lib/schemas/transaction';
 import { cn } from '@/lib/utils';
+import { TagMultiSelect, type TagOption } from './tag-multi-select';
 
 type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD' };
 type CategoryOption = { id: string; name: string; kind: 'income' | 'expense' };
@@ -45,6 +46,7 @@ type Initial = {
   currencyOriginal: 'ARS' | 'USD';
   description: string;
   notes: string | null;
+  tagIds?: string[];
 };
 
 type FxInfo = {
@@ -55,6 +57,7 @@ type FxInfo = {
 type Props = {
   accounts: AccountOption[];
   categories: CategoryOption[];
+  availableTags: TagOption[];
   action: (formData: FormData) => Promise<ActionResult>;
   submitLabel: string;
   title: string;
@@ -71,6 +74,7 @@ function todayIso(): string {
 export function TransactionForm({
   accounts,
   categories,
+  availableTags,
   action,
   submitLabel,
   title,
@@ -82,6 +86,7 @@ export function TransactionForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initial?.tagIds ?? []);
 
   const firstAccount = accounts[0];
   const initialKind: TransactionKind = initial?.kind ?? 'expense';
@@ -128,6 +133,8 @@ export function TransactionForm({
     formData.set('accountId', accountId);
     formData.set('categoryId', categoryId);
     formData.set('currencyOriginal', currencyOriginal);
+    formData.delete('tagIds');
+    selectedTagIds.forEach((id) => formData.append('tagIds', id));
     if (hiddenId) formData.set('id', hiddenId);
 
     setErrors({});
@@ -321,6 +328,14 @@ export function TransactionForm({
             />
             {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
           </div>
+
+          <TagMultiSelect
+            tags={availableTags}
+            value={selectedTagIds}
+            onChange={setSelectedTagIds}
+            disabled={isPending}
+          />
+          {errors.tagIds && <p className="text-sm text-destructive">{errors.tagIds}</p>}
 
           <div className="space-y-2">
             <Label htmlFor="fxRateOverride">FX rate (opcional — sobrescribe BCRA)</Label>

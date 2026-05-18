@@ -1,10 +1,31 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories } from '@/db/schema';
+import { accounts, categories, tags } from '@/db/schema';
 import { toMoneyString } from '@/lib/schemas/money';
 import { getFxRate, FxRateNotFoundError } from '@/lib/fx/get-fx-rate';
 import type { TransactionInput } from '@/lib/schemas/transaction';
+
+/**
+ * Valida que todos los `tagIds` pertenezcan al household. Devuelve `ok: false`
+ * si alguno no existe o pertenece a otro household. Útil tanto para
+ * transacciones como para transferencias.
+ */
+export async function validateTagIds(
+  tagIds: string[],
+  householdId: string,
+): Promise<{ ok: true } | { ok: false; fields: Record<string, string> }> {
+  if (tagIds.length === 0) return { ok: true };
+  const db = getDb();
+  const rows = await db
+    .select({ id: tags.id })
+    .from(tags)
+    .where(and(inArray(tags.id, tagIds), eq(tags.householdId, householdId)));
+  if (rows.length !== tagIds.length) {
+    return { ok: false, fields: { tagIds: 'Una o más etiquetas son inválidas' } };
+  }
+  return { ok: true };
+}
 
 export type BuiltTransactionFields = {
   date: string;

@@ -4,10 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { transactions } from '@/db/schema';
+import { transactions, transactionTags } from '@/db/schema';
 import { parseTransactionFormData } from '@/lib/schemas/transaction';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { buildTransactionFields } from './_build';
+import { buildTransactionFields, validateTagIds } from './_build';
 
 export type UpdateTransactionResult =
   | { ok: true; id: string }
@@ -52,15 +52,32 @@ export async function updateTransaction(formData: FormData): Promise<UpdateTrans
   const built = await buildTransactionFields(parsed.data, session.householdId);
   if (!built.ok) return { ok: false, error: built.error, fields: built.fields };
 
+  const tagsCheck = await validateTagIds(parsed.data.tagIds, session.householdId);
+  if (!tagsCheck.ok) return { ok: false, error: 'invalid_refs', fields: tagsCheck.fields };
+
   const db = getDb();
   try {
-    const result = await db
-      .update(transactions)
-      .set(built.fields)
-      .where(and(eq(transactions.id, id), eq(transactions.householdId, session.householdId)))
-      .returning({ id: transactions.id });
+    const updatedId = await db.transaction(async (tx) => {
+      const result = await tx
+        .update(transactions)
+        .set(built.fields)
+        .where(and(eq(transactions.id, id), eq(transactions.householdId, session.householdId)))
+        .returning({ id: transactions.id });
 
-    if (result.length === 0) return { ok: false, error: 'not_found' };
+      if (result.length === 0) return null;
+
+      // Replace tags: borra todo y reinserta. Más simple que diffing.
+      await tx.delete(transactionTags).where(eq(transactionTags.transactionId, id));
+      if (parsed.data.tagIds.length > 0) {
+        await tx
+          .insert(transactionTags)
+          .values(parsed.data.tagIds.map((tagId) => ({ transactionId: id, tagId })));
+      }
+
+      return id;
+    });
+
+    if (!updatedId) return { ok: false, error: 'not_found' };
 
     revalidatePath('/transactions');
     revalidatePath(`/transactions/${id}`);

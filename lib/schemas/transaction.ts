@@ -2,6 +2,7 @@ import { z } from 'zod';
 import Decimal from 'decimal.js';
 import { positiveMoneySchema } from './money';
 import { CURRENCIES } from './account';
+import { tagIdsSchema } from './tag';
 
 /**
  * Schema de input para crear/editar una transacción manual.
@@ -69,6 +70,7 @@ export const transactionInputSchema = z.object({
         return z.NEVER;
       }
     }),
+  tagIds: tagIdsSchema.default([]),
 });
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;
@@ -87,5 +89,6 @@ export function parseTransactionFormData(formData: FormData) {
     description: formData.get('description'),
     notes,
     fxRateOverride: formData.get('fxRateOverride'),
+    tagIds: formData.getAll('tagIds').filter((v): v is string => typeof v === 'string'),
   });
 }

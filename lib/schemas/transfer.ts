@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import Decimal from 'decimal.js';
 import { positiveMoneySchema } from './money';
+import { tagIdsSchema } from './tag';
 
 /**
  * Schema de input para crear/editar una transferencia entre 2 cuentas del
@@ -56,6 +57,7 @@ const baseTransferSchema = z.object({
         return z.NEVER;
       }
     }),
+  tagIds: tagIdsSchema.default([]),
 });
 
 export const transferInputSchema = baseTransferSchema.refine(
@@ -78,5 +80,6 @@ export function parseTransferFormData(formData: FormData) {
     description: formData.get('description'),
     notes,
     fxRateOverride: formData.get('fxRateOverride'),
+    tagIds: formData.getAll('tagIds').filter((v): v is string => typeof v === 'string'),
   });
 }

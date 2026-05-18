@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { TagMultiSelect, type TagOption } from './tag-multi-select';
 
 type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD' };
 
@@ -37,12 +38,14 @@ type Initial = {
   amountTo: string;
   description: string;
   notes: string | null;
+  tagIds?: string[];
 };
 
 type FxInfo = { fxRateUsed: string; fxRateSource: string };
 
 type Props = {
   accounts: AccountOption[];
+  availableTags: TagOption[];
   action: (formData: FormData) => Promise<ActionResult>;
   submitLabel: string;
   title: string;
@@ -59,6 +62,7 @@ function todayIso(): string {
 
 export function TransferForm({
   accounts,
+  availableTags,
   action,
   submitLabel,
   title,
@@ -71,6 +75,7 @@ export function TransferForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initial?.tagIds ?? []);
 
   const firstAccount = accounts[0];
   const secondAccount = accounts[1];
@@ -108,6 +113,8 @@ export function TransferForm({
   function handleSubmit(formData: FormData) {
     formData.set('accountFromId', accountFromId);
     formData.set('accountToId', accountToId);
+    formData.delete('tagIds');
+    selectedTagIds.forEach((id) => formData.append('tagIds', id));
     if (hiddenId) formData.set('id', hiddenId);
 
     setErrors({});
@@ -303,6 +310,14 @@ export function TransferForm({
             />
             {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
           </div>
+
+          <TagMultiSelect
+            tags={availableTags}
+            value={selectedTagIds}
+            onChange={setSelectedTagIds}
+            disabled={isPending}
+          />
+          {errors.tagIds && <p className="text-sm text-destructive">{errors.tagIds}</p>}
 
           <div className="space-y-2">
             <Label htmlFor="fxRateOverride">FX rate (opcional — sobrescribe BCRA)</Label>

@@ -73,6 +73,19 @@ describe('transferInputSchema', () => {
       transferInputSchema.parse({ ...valid, accountToId: 'not-uuid' }),
     ).toThrow();
   });
+
+  describe('tagIds', () => {
+    const TAG_A = '00000000-0000-0000-0000-000000000010';
+
+    it('ausente → array vacío', () => {
+      expect(transferInputSchema.parse(valid).tagIds).toEqual([]);
+    });
+
+    it('array dedupea', () => {
+      const out = transferInputSchema.parse({ ...valid, tagIds: [TAG_A, TAG_A] });
+      expect(out.tagIds).toEqual([TAG_A]);
+    });
+  });
 });
 
 describe('parseTransferFormData', () => {

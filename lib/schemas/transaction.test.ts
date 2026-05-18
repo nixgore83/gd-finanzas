@@ -119,6 +119,26 @@ describe('transactionInputSchema', () => {
       ).toThrow();
     });
   });
+
+  describe('tagIds', () => {
+    const TAG_A = '00000000-0000-0000-0000-000000000010';
+    const TAG_B = '00000000-0000-0000-0000-000000000020';
+
+    it('ausente → array vacío', () => {
+      expect(transactionInputSchema.parse(validBase).tagIds).toEqual([]);
+    });
+
+    it('array de uuids con dedupe', () => {
+      const out = transactionInputSchema.parse({ ...validBase, tagIds: [TAG_A, TAG_B, TAG_A] });
+      expect(out.tagIds).toEqual([TAG_A, TAG_B]);
+    });
+
+    it('rechaza items no-uuid', () => {
+      expect(() =>
+        transactionInputSchema.parse({ ...validBase, tagIds: [TAG_A, 'not-uuid'] }),
+      ).toThrow();
+    });
+  });
 });
 
 describe('parseTransactionFormData', () => {

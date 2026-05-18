@@ -3,7 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories, transactions } from '@/db/schema';
+import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { updateTransaction } from '@/app/actions/transactions/update';
 import { updateTransfer } from '@/app/actions/transactions/update-transfer';
@@ -47,6 +47,19 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));
 
+  const tagRows = await db
+    .select({ id: tags.id, name: tags.name, color: tags.color })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId))
+    .orderBy(asc(tags.name));
+
+  const currentTagIds = (
+    await db
+      .select({ tagId: transactionTags.tagId })
+      .from(transactionTags)
+      .where(eq(transactionTags.transactionId, tx.id))
+  ).map((r) => r.tagId);
+
   if (tx.kind === 'transfer') {
     if (!tx.transferPairId) redirect('/transactions');
 
@@ -86,6 +99,7 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
       <div className="mx-auto max-w-xl space-y-4">
         <TransferForm
           accounts={accountRows}
+          availableTags={tagRows}
           action={updateTransfer}
           submitLabel="Guardar cambios"
           title="Editar transferencia"
@@ -100,6 +114,7 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
             amountTo: amountToAbs,
             description: tx.description,
             notes: tx.notes,
+            tagIds: currentTagIds,
           }}
           initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
         />
@@ -131,6 +146,7 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
       <TransactionForm
         accounts={accountRows}
         categories={categoryRows}
+        availableTags={tagRows}
         action={updateTransaction}
         submitLabel="Guardar cambios"
         title="Editar transacción"
@@ -145,6 +161,7 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
           currencyOriginal: tx.currencyOriginal,
           description: tx.description,
           notes: tx.notes,
+          tagIds: currentTagIds,
         }}
         initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
       />

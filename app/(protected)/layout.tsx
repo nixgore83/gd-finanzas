@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/accounts', label: 'Cuentas' },
   { href: '/transactions', label: 'Transacciones' },
+  { href: '/tags', label: 'Etiquetas' },
 ];
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {

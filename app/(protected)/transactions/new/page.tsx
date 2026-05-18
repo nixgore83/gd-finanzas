@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories } from '@/db/schema';
+import { accounts, categories, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { createTransaction } from '@/app/actions/transactions/create';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,12 @@ export default async function NewTransactionPage() {
     )
     .orderBy(asc(categories.name));
 
+  const tagRows = await db
+    .select({ id: tags.id, name: tags.name, color: tags.color })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId))
+    .orderBy(asc(tags.name));
+
   if (accountRows.length === 0) {
     return (
       <EmptyState
@@ -66,6 +72,7 @@ export default async function NewTransactionPage() {
       <TransactionForm
         accounts={accountRows}
         categories={categoryRows}
+        availableTags={tagRows}
         action={createTransaction}
         submitLabel="Crear transacción"
         title="Nueva transacción"

@@ -2,10 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { getDb } from '@/lib/db/client';
-import { transactions } from '@/db/schema';
+import { transactions, transactionTags } from '@/db/schema';
 import { parseTransactionFormData } from '@/lib/schemas/transaction';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { buildTransactionFields } from './_build';
+import { buildTransactionFields, validateTagIds } from './_build';
 
 export type CreateTransactionResult =
   | { ok: true; id: string }
@@ -37,23 +37,36 @@ export async function createTransaction(formData: FormData): Promise<CreateTrans
   const built = await buildTransactionFields(parsed.data, session.householdId);
   if (!built.ok) return { ok: false, error: built.error, fields: built.fields };
 
+  const tagsCheck = await validateTagIds(parsed.data.tagIds, session.householdId);
+  if (!tagsCheck.ok) return { ok: false, error: 'invalid_refs', fields: tagsCheck.fields };
+
   const db = getDb();
   try {
-    const [inserted] = await db
-      .insert(transactions)
-      .values({
-        householdId: session.householdId,
-        ...built.fields,
-        transactionSubtype: 'standard',
-        source: 'manual',
-        createdBy: session.userId,
-      })
-      .returning({ id: transactions.id });
+    const id = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(transactions)
+        .values({
+          householdId: session.householdId,
+          ...built.fields,
+          transactionSubtype: 'standard',
+          source: 'manual',
+          createdBy: session.userId,
+        })
+        .returning({ id: transactions.id });
 
-    if (!inserted) return { ok: false, error: 'unknown' };
+      if (!inserted) throw new Error('insert returned no row');
+
+      if (parsed.data.tagIds.length > 0) {
+        await tx
+          .insert(transactionTags)
+          .values(parsed.data.tagIds.map((tagId) => ({ transactionId: inserted.id, tagId })));
+      }
+
+      return inserted.id;
+    });
 
     revalidatePath('/transactions');
-    return { ok: true, id: inserted.id };
+    return { ok: true, id };
   } catch (err) {
     console.error('[transactions] create failed', { code: (err as { code?: string }).code });
     return { ok: false, error: 'unknown' };

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts } from '@/db/schema';
+import { accounts, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { createTransfer } from '@/app/actions/transactions/create-transfer';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,12 @@ export default async function NewTransferPage() {
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));
 
+  const tagRows = await db
+    .select({ id: tags.id, name: tags.name, color: tags.color })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId))
+    .orderBy(asc(tags.name));
+
   if (accountRows.length < 2) {
     return (
       <div className="mx-auto max-w-xl space-y-4 rounded-md border border-dashed p-8 text-center">
@@ -46,6 +52,7 @@ export default async function NewTransferPage() {
     <div className="mx-auto max-w-xl">
       <TransferForm
         accounts={accountRows}
+        availableTags={tagRows}
         action={createTransfer}
         submitLabel="Crear transferencia"
         title="Nueva transferencia"
