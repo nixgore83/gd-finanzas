@@ -8,9 +8,12 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { updateTransaction } from '@/app/actions/transactions/update';
 import { updateTransfer } from '@/app/actions/transactions/update-transfer';
+import { findMatchCandidates } from '@/app/actions/forecasts/_candidates';
+import { forecasts as forecastsTable, recurrences } from '@/db/schema';
 import { TransactionForm } from '../transaction-form';
 import { TransferForm } from '../transfer-form';
 import { DeleteTransactionButton } from '../delete-button';
+import { ForecastMatcher } from '../forecast-matcher';
 
 export const metadata = {
   title: 'Editar transacción · gd-finanzas',
@@ -138,6 +141,37 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
   // income / expense
   const categoryRows = await loadCategoryTree(session.householdId);
 
+  // Forecast linkage: si la tx está matched, mostrar bloque "Linkeada".
+  // Si no, calcular candidatas y mostrar bloque "Previsiones candidatas".
+  let linkedInfo: { recurrenceName: string; expectedDate: string } | null = null;
+  let candidates: Awaited<ReturnType<typeof findMatchCandidates>> = [];
+
+  if (tx.recurrenceId) {
+    const [linked] = await db
+      .select({
+        recurrenceName: recurrences.name,
+        expectedDate: forecastsTable.expectedDate,
+      })
+      .from(recurrences)
+      .leftJoin(
+        forecastsTable,
+        and(
+          eq(forecastsTable.recurrenceId, recurrences.id),
+          eq(forecastsTable.matchedTransactionId, tx.id),
+        ),
+      )
+      .where(eq(recurrences.id, tx.recurrenceId))
+      .limit(1);
+    if (linked) {
+      linkedInfo = {
+        recurrenceName: linked.recurrenceName,
+        expectedDate: linked.expectedDate ?? tx.date,
+      };
+    }
+  } else {
+    candidates = await findMatchCandidates(tx.id, session.householdId);
+  }
+
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <TransactionForm
@@ -162,6 +196,27 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
         }}
         initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
       />
+
+      {linkedInfo ? (
+        <ForecastMatcher
+          mode="linked"
+          transactionId={tx.id}
+          recurrenceName={linkedInfo.recurrenceName}
+          expectedDate={linkedInfo.expectedDate}
+        />
+      ) : candidates.length > 0 ? (
+        <ForecastMatcher
+          mode="candidates"
+          transactionId={tx.id}
+          candidates={candidates.map((c) => ({
+            id: c.id,
+            recurrenceName: c.recurrenceName,
+            expectedDate: c.expectedDate,
+            expectedAmount: c.expectedAmount,
+            currency: c.currency,
+          }))}
+        />
+      ) : null}
 
       <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
         <div className="flex items-center justify-between gap-3">

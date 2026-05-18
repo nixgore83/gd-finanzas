@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 4 — Recurrencias + previsiones** (4.A hecho; falta 4.B = vista cashflow + matching + missed cron)
+**Hito 4 — Recurrencias + previsiones** (completo ✅; próximo: Hito 5 = Dashboard + Reporte A = V1.0)
 
 ---
 
@@ -162,7 +162,7 @@ MFA TOTP (2026-05-14):
 
 Cerrar taxonomía.
 
-### 🟡 Hito 4 — Recurrencias + previsiones
+### 🟢 Hito 4 — Recurrencias + previsiones
 
 **4.A — CRUD de recurrencias + generación auto de forecasts (2026-05-18, hecho):**
 - [x] `lib/recurrences/forecasts.ts`: `computeForecastDates(...)` puro, sin DB, sin timezone. Soporta monthly/bimonthly/quarterly/yearly + clamp a último día del mes. Rolling 12 meses (PRD §5.3); 11 tests cubren day 31 en feb (leap/no-leap), endDate cortando horizon, startDate posterior, etc.
@@ -174,13 +174,18 @@ Cerrar taxonomía.
 - [x] Nav link "Recurrencias" en layout protegido
 - [x] Validación verde: typecheck + lint + 108 tests + build + `db:smoke-rls` 8/8
 
-**4.B — Pendiente: cashflow proyectado + matching + missed cron**
-- [ ] Vista `/forecasts` con lista de pending agrupadas por mes
-- [ ] Acción "cancelar" forecast (status → cancelled, no se regenera)
-- [ ] Matching manual desde `/transactions/[id]`: si hay forecasts pending que matchean (misma account, kind correcto, amount ±10%, fecha ±5 días), bloque "Previsiones candidatas" con botón "Linkear"
-- [ ] Cuando se linkea: forecast.status='matched', forecast.matched_transaction_id=tx.id, tx.recurrence_id=forecast.recurrence_id
-- [ ] Cron diario `/api/cron/forecasts-missed`: forecasts pending con expected_date < today - 7 días → status='missed'
-- [ ] Auto-match toggle: hardcoded OFF en V1; cuando se arme `/settings/metas` (Hito 7) se expone
+**4.B — Cashflow proyectado + matching manual + missed cron (2026-05-18, hecho):**
+- [x] `lib/forecasts/candidates.ts`: `rankCandidates(candidates, tx)` puro, filtra por |date diff| ≤ 5d y |amount usd diff %| ≤ 10%; ordena por proximidad de fecha luego de monto; 9 tests
+- [x] `app/actions/forecasts/_candidates.ts`: helper `findMatchCandidates(txId, householdId)` con pre-filter SQL (account, kind, pending, ventana ±5d) + conversión a USD via `getFxRate` por candidate + `rankCandidates` + cap top 5
+- [x] Server actions: `cancel.ts` (pending→cancelled), `link.ts` (db.transaction: forecast→matched + tx.recurrence_id; bloquea si already_linked), `unlink.ts` (revertir)
+- [x] UI: `/forecasts/page.tsx` (lista de pending agrupada por mes con cancel button), `forecasts/cancel-button.tsx`, `transactions/forecast-matcher.tsx` (modo `candidates` muestra cards con "Linkear"; modo `linked` muestra "Linkeada a {recurrence}" + "Desvincular")
+- [x] `/transactions/[id]/page.tsx`: en branch income/expense, después del form integra ForecastMatcher según si la tx tiene recurrence_id o hay candidates
+- [x] Nav link "Previsiones" en layout protegido
+- [x] Cron `/api/cron/forecasts-missed`: GET con auth Bearer CRON_SECRET; UPDATE pending → missed donde expected_date < today − 7d; loggea solo conteo
+- [x] `vercel.json`: schedule `30 14 * * *` (15 min después del FX cron)
+- [x] Validación verde: typecheck + lint + 117 tests + build + `db:smoke-rls` 8/8
+
+**Hito 4 cerrado — V1.0 funcional pendiente del Hito 5 (Dashboard + Reporte A).**
 
 ### ⏳ Hito 5 — Dashboard + Reporte A
 **V1.0 funcional.**
@@ -221,6 +226,18 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 4.B
+
+- **Cross-currency match en USD equivalent.** `tx.amount_usd` ya está persistido; para el forecast, computo on-the-fly via `getFxRate(expected_date)`. Acepta el caso ARS recurrence ↔ USD transaction (y viceversa) sin asunción de moneda.
+- **Filtro de match: ±10% en USD, ±5 días.** PRD §5.3 literal. Solo aplica si la transacción tiene `amount_usd > 0` (sino el filtro % no se puede computar — return []).
+- **Top 5 candidates en la UI.** Cap arbitrario; en V1 raramente hay más, pero evita render largo si el match es ambiguo.
+- **Cancelled vs missed son distintos.** Cancelled = user lo borró conscientemente. Missed = pasó el tiempo sin match. Ambos quedan en la DB para auditoría; ninguno se regenera salvo edit de la recurrence.
+- **`syncForecasts` ya NO toca cancelled/matched/missed historics** (4.A). Si el user re-edita la recurrence, las pending del futuro se regeneran limpias; el resto queda.
+- **Link y unlink usan `db.transaction`** para mantener invariante: forecast.status y tx.recurrence_id siempre coherentes.
+- **Cron threshold computado en server JS** (`today - 7d` en ISO), no en SQL. Evita dependencia de la timezone de Postgres (Supabase corre en UTC pero los `date` columns no la afecta, igual mejor consistencia).
+- **Cron schedule `30 14 * * *`**: 15 minutos después del cron de FX (`0 14`). Sin solapamiento ni dependencia explícita; FX corre primero por convención (forecasts en USD del día necesitan el rate fresh, pero el missed cron solo lee fechas, no rates).
+- **`isNull(matchedTransactionId)`** en el query de candidatas es defensivo: si una pending por error tuviera `matched_transaction_id`, no la ofrecemos.
 
 ## Decisiones tomadas en Hito 4.A
 

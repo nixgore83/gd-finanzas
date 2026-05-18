@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: '/accounts', label: 'Cuentas' },
   { href: '/transactions', label: 'Transacciones' },
   { href: '/recurrences', label: 'Recurrencias' },
+  { href: '/forecasts', label: 'Previsiones' },
   { href: '/tags', label: 'Etiquetas' },
 ];
 
