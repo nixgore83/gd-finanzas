@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 5 — Dashboard + Reporte A** (5.A budgets grid hecho; faltan 5.B = Reporte A, 5.C = Dashboard)
+**Hito 5 — Dashboard + Reporte A** (5.A + 5.B hechos; falta 5.C = Dashboard)
 
 ---
 
@@ -198,11 +198,15 @@ Cerrar taxonomía.
 - [x] Nav link "Presupuesto" en layout protegido
 - [x] Validación verde: typecheck + lint + 130 tests + build + `db:smoke-rls` 8/8
 
-**5.B — Pendiente: Reporte A (cashflow real vs budget)**
-- [ ] Página `/reports/cashflow` o `/reports/a` con tabla por categoría × mes seleccionado
-- [ ] Columnas: Budget USD | Real USD | Δ USD | Δ %
-- [ ] Subtotales por categoría padre + total ingresos/gastos/neto
-- [ ] Drill-down: click en categoría → lista de transacciones filtrada
+**5.B — Reporte A: cashflow real vs budget (2026-05-18, hecho):**
+- [x] `lib/reports/cashflow.ts`: `buildCashflowReport(tree, budgets, reals)` puro. Agrega children en parents recursivamente, calcula Δ USD y Δ % (null si budget=0). Helper `deltaTone(kind, delta)` para colorear: income+ = good, expense− = good. 11 tests
+- [x] `lib/reports/cashflow-data.ts`: `loadCashflowData(householdId, year, month)` carga tree + budgets + agrega `SUM(amount_usd) GROUP BY category_id` con WHERE date BETWEEN month range + kind IN income/expense + category_id NOT NULL (transfers fuera). `monthRange(y,m)` exportable
+- [x] `/reports/cashflow` server page con selector ◀ prev / next ▶, tabla con orden de árbol (parents arriba con subtotales calculados, children indentados), tfoot con Total Ingresos / Gastos / Neto. Drill-down: click en categoría hoja → `/transactions?categoryId=X&from=YYYY-MM-01&to=YYYY-MM-DD`
+- [x] Nav link "Reportes" (apunta a `/reports/cashflow`; cuando entren reportes B/C/D se vuelve menú)
+- [x] Validación verde: typecheck + lint + 141 tests + build + `db:smoke-rls` 8/8
+
+**5.C — Pendiente: Dashboard**
+- [ ] `/dashboard` con KPIs del PRD §5.6: ingresos/gastos del mes (real vs budget), neto, top 5 gastos, previsiones próximas 14 días, últimas 10 transacciones
 
 **5.C — Pendiente: Dashboard**
 - [ ] `/dashboard` con KPIs del PRD §5.6: ingresos/gastos del mes (real vs budget), neto, top 5 gastos, previsiones próximas 14 días, últimas 10 transacciones
@@ -243,6 +247,18 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 5.B
+
+- **Función pura `buildCashflowReport`** separada del loader. Permite testear la agregación + el ranking de signos sin DB. El loader server-side (`loadCashflowData`) hace los SUMs en SQL y pasa al pure builder.
+- **SUM agrupado por `category_id` en SQL**, no en JS. Drizzle `sum(...).mapWith(String)` devuelve `numeric` como string ya canonicalizado.
+- **Transfers excluidas via `kind IN ('income','expense')` + `category_id IS NOT NULL`** (defensa en profundidad — los transfers tienen `category_id = null` siempre).
+- **`deltaPct = null` cuando budget=0**: la división por cero se muestra como "—" en UI, evita Infinity/NaN.
+- **`deltaTone` encapsula la convención**: income+ = good, expense− = good. Net delta se trata como income (positivo bueno).
+- **Drill-down via filtros existentes**: en lugar de una página `/reports/cashflow/transactions/X`, linkeo a `/transactions?categoryId=X&from=...&to=...`. Reusa el filtro de Hito 3.D.1 sin duplicar código.
+- **Selector mes/año con prev/next links, sin form**. Más simple que un dropdown para 2026 V1 (1-2 años de historia). Si crece, hacer dropdown.
+- **Cálculos en `Decimal`** (no `Number`) para evitar drift en SUMs grandes y porcentajes. Costo cero a esta escala.
+- **Sin filtros account/tag en 5.B.** El PRD los menciona pero no son críticos para el primer reporte. Si surgen, 5.B.2.
 
 ## Decisiones tomadas en Hito 5.A
 

@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: '/recurrences', label: 'Recurrencias' },
   { href: '/forecasts', label: 'Previsiones' },
   { href: '/budget', label: 'Presupuesto' },
+  { href: '/reports/cashflow', label: 'Reportes' },
   { href: '/tags', label: 'Etiquetas' },
 ];
 
