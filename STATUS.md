@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 6 — Reportes B + C** (completo ✅). Próximo: Hito 7 (Reporte D + /settings/metas)
+**Hito 7 — Reporte D + /settings/metas** (7.A metas hecho; falta 7.B = Reporte D)
 
 ---
 
@@ -226,7 +226,25 @@ Cerrar taxonomía.
 
 **Hito 6 cerrado.**
 
-### ⏳ Hito 7 — Reporte D + Settings metas
+### 🟡 Hito 7 — Reporte D + Settings metas
+
+**7.A — /settings/metas con financial_goals CRUD (2026-05-18, hecho):**
+- [x] `lib/schemas/financial-goals.ts`: `financialGoalsInputSchema` (targetAhorroMensualUsd, edades 18-120 ints, retiro/educación/buffer positivos, notas ≤2000); 8 tests
+- [x] `lib/financial-goals/defaults.ts`: constantes del PRD validadas con Pau 2026-05-05 (USD 5.700 ahorro, edades 58/60, retiro 2.23M, educación 150k, buffer 72k). Sirven solo para "primer guardado" del household — no se siembran en DB
+- [x] `app/actions/financial-goals/upsert.ts`: UPSERT por UNIQUE(household_id) con `updated_at=now(), updated_by=session.userId`
+- [x] `/settings` → redirect a `/settings/metas`. `/settings/metas` page server lee fila o aplica defaults; el form (client) muestra inputs por monto/edades/notas + total target calculado en vivo + último updated (timestamp + displayName del autor desde profiles)
+- [x] Nav link "Metas" en layout protegido
+- [x] Validación verde: typecheck + lint + 162 tests + build + `db:smoke-rls` 8/8
+
+**7.B — Pendiente: Reporte D (año económico + trayectoria a IF)**
+- [ ] `/reports/year-economy` con header KPIs anuales (Ingresos / Gastos / Neto / Tasa de ahorro YTD)
+- [ ] Bloque "Trayectoria a IF": ahorro mensual real YTD vs target, acumulado YTD vs trayectoria objetivo, semáforo 🟢🟡🔴
+- [ ] Bar chart mensual con línea horizontal del target
+- [ ] Tabla por categoría: real YTD | proyección a dic | budget anual | Δ
+- [ ] Stacked bar mensual: 12 cols, ingresos arriba, gastos abajo, neto line
+- [ ] Comparativo año vs año (cuando haya histórico) — postergable
+- [ ] Proyección a dic: real YTD + suma previsiones rolling hasta dic
+- [ ] Sumar tercer link "Año económico" al `ReportsNav`
 
 ### ⏳ Hito 8 — Imports con AI parser
 
@@ -260,6 +278,16 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 7.A
+
+- **Defaults en código (no en DB seed)**: `lib/financial-goals/defaults.ts` evita SQL manual para households nuevos. La primera vez que alguien entra a `/settings/metas`, ve los defaults; al guardar, se persisten. Si Pau cambia el plan en el futuro, lo edita desde la UI.
+- **UPSERT por UNIQUE(household_id)** con `revisionAt` reset en cada save. PRD §5.9: "cada revisión sobrescribe; sin auditoría de cambios en V1". 2 users editan → last-write-wins.
+- **`total_target_usd` NO se persiste**: lo calculo en vivo en el form (retiro + educación + buffer). El PRD lo lista como "calculado". Mantiene la fila lean y evita inconsistencia entre componentes y total.
+- **`updated_by` muestra displayName** (de `profiles`, no de `auth.users`). El schema `auth.users` re-exportado por Drizzle solo expone `id` — sin email/etc. Para mostrar quien editó, joinear con `profiles.display_name`. Si display_name es null, queda como timestamp solo.
+- **Edades 18-120 sanity bounds**: el plan financiero se piensa desde edad adulta y a futuro. Si alguien quiere edad <18 (ej. plan para hijo recién nacido), se replantea como objetivo separado en V2.
+- **Notas hasta 2000 chars**: suficiente para resumir supuestos y próxima review. No es un diario de planning; ese viaja por fuera de la app.
+- **`/settings` como hub** con redirect a `/settings/metas` por ahora. En V2 si hay más settings (moneda preferida, time zone, notifications), se vuelve un index.
 
 ## Decisiones tomadas en Hito 6.B
 

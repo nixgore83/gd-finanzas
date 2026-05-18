@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: '/budget', label: 'Presupuesto' },
   { href: '/reports/cashflow', label: 'Reportes' },
   { href: '/tags', label: 'Etiquetas' },
+  { href: '/settings/metas', label: 'Metas' },
 ];
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
