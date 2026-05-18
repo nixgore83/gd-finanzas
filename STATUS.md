@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 5 — Dashboard + Reporte A** (5.A + 5.B hechos; falta 5.C = Dashboard)
+**Hito 5 — Dashboard + Reporte A** (completo ✅) — 🎉 **V1.0 funcional**. Próximo: Hito 6 (Reportes B + C)
 
 ---
 
@@ -187,7 +187,7 @@ Cerrar taxonomía.
 
 **Hito 4 cerrado — V1.0 funcional pendiente del Hito 5 (Dashboard + Reporte A).**
 
-### 🟡 Hito 5 — Dashboard + Reporte A (V1.0 funcional)
+### 🟢 Hito 5 — Dashboard + Reporte A (V1.0 funcional 🎉)
 
 **5.A — Budgets grilla editable categoría × mes (2026-05-18, hecho):**
 - [x] `lib/schemas/budget.ts`: `budgetInputSchema` (year 2020-2100, month 1-12, categoryId, amountUsd vía moneySchema permite 0 y negativos); 8 tests
@@ -204,12 +204,6 @@ Cerrar taxonomía.
 - [x] `/reports/cashflow` server page con selector ◀ prev / next ▶, tabla con orden de árbol (parents arriba con subtotales calculados, children indentados), tfoot con Total Ingresos / Gastos / Neto. Drill-down: click en categoría hoja → `/transactions?categoryId=X&from=YYYY-MM-01&to=YYYY-MM-DD`
 - [x] Nav link "Reportes" (apunta a `/reports/cashflow`; cuando entren reportes B/C/D se vuelve menú)
 - [x] Validación verde: typecheck + lint + 141 tests + build + `db:smoke-rls` 8/8
-
-**5.C — Pendiente: Dashboard**
-- [ ] `/dashboard` con KPIs del PRD §5.6: ingresos/gastos del mes (real vs budget), neto, top 5 gastos, previsiones próximas 14 días, últimas 10 transacciones
-
-**5.C — Pendiente: Dashboard**
-- [ ] `/dashboard` con KPIs del PRD §5.6: ingresos/gastos del mes (real vs budget), neto, top 5 gastos, previsiones próximas 14 días, últimas 10 transacciones
 
 ### ⏳ Hito 6 — Reportes B + C
 
@@ -247,6 +241,15 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 5.C
+
+- **Sin selector de mes en V1**: el dashboard es "home" del mes en curso. Para ver otros meses, ir al reporte A. Mantiene la home pulcra.
+- **4 queries en `Promise.all`**: totales (reusa cashflow data) + top 5 + forecasts 14d + recent 10. Latencia agregada ~150ms para 1 household; no merece caching.
+- **Top 5 muestra hojas tal cual** (no agrupa parents en el dashboard). Consistente con cómo se cargan los gastos en la lista de transacciones; cuando se quiere ver agregado por parent, el reporte A lo hace.
+- **Reuso de `deltaTone`** entre `/reports/cashflow` y `/dashboard` para colorear Δ consistentemente. Income+/Expense− = good (verde); el resto rojo o neutral.
+- **Sin client components nuevos**: todo SSR. Las cards son shadcn `Card`/`CardHeader`/`CardContent`. Helpers de format duplicados (formatUsd, formatAmount) por ahora — refactor a `lib/format` queda para cuando duela.
+- **Empty states por card** ("Sin gastos este mes", "Sin previsiones próximas", "Sin transacciones todavía"). Reduce confusión en mes nuevo o tras un wipe.
 
 ## Decisiones tomadas en Hito 5.B
 
