@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, lte, type SQL } from 'drizzle-orm';
+import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { accounts, categories, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { DeleteTransactionButton } from './delete-button';
 
 export const metadata = {
@@ -13,6 +16,51 @@ export const metadata = {
 };
 
 const PAGE_LIMIT = 50;
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Cada campo se parsea por separado: si uno está mal, se descarta sin romper
+// la página. Mejor degradación que 400.
+function parseFilters(sp: Record<string, string | string[] | undefined>) {
+  const get = (k: string): string | undefined => {
+    const v = sp[k];
+    if (typeof v === 'string' && v.length > 0) return v;
+    return undefined;
+  };
+
+  const kind = z.enum(['income', 'expense', 'transfer']).safeParse(get('kind'));
+  const accountId = z.string().uuid().safeParse(get('accountId'));
+  const categoryId = z.string().uuid().safeParse(get('categoryId'));
+  const from = z.string().regex(ISO_DATE_RE).safeParse(get('from'));
+  const to = z.string().regex(ISO_DATE_RE).safeParse(get('to'));
+  const q = z.string().trim().min(1).max(200).safeParse(get('q'));
+  const page = z.coerce.number().int().positive().safeParse(get('page'));
+
+  return {
+    kind: kind.success ? kind.data : undefined,
+    accountId: accountId.success ? accountId.data : undefined,
+    categoryId: categoryId.success ? categoryId.data : undefined,
+    from: from.success ? from.data : undefined,
+    to: to.success ? to.data : undefined,
+    q: q.success ? q.data : undefined,
+    page: page.success ? page.data : 1,
+  };
+}
+
+type Filters = ReturnType<typeof parseFilters>;
+
+function buildHref(base: string, filters: Filters, pageOverride: number): string {
+  const sp = new URLSearchParams();
+  if (filters.kind) sp.set('kind', filters.kind);
+  if (filters.accountId) sp.set('accountId', filters.accountId);
+  if (filters.categoryId) sp.set('categoryId', filters.categoryId);
+  if (filters.from) sp.set('from', filters.from);
+  if (filters.to) sp.set('to', filters.to);
+  if (filters.q) sp.set('q', filters.q);
+  if (pageOverride > 1) sp.set('page', String(pageOverride));
+  const qs = sp.toString();
+  return qs.length > 0 ? `${base}?${qs}` : base;
+}
 
 function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
   const n = Number.parseFloat(amount);
@@ -24,7 +72,13 @@ function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
   }).format(Number.isFinite(n) ? n : 0);
 }
 
-export default async function TransactionsPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -33,7 +87,44 @@ export default async function TransactionsPage() {
     throw err;
   }
 
+  const sp = await searchParams;
+  const filters = parseFilters(sp);
+
   const db = getDb();
+
+  // Cargar listas para los Selects de filtro.
+  const accountOptions = await db
+    .select({ id: accounts.id, name: accounts.name })
+    .from(accounts)
+    .where(eq(accounts.householdId, session.householdId))
+    .orderBy(asc(accounts.name));
+
+  const categoryOptions = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(eq(categories.householdId, session.householdId))
+    .orderBy(asc(categories.name));
+
+  // WHERE dinámico
+  const conditions: SQL[] = [eq(transactions.householdId, session.householdId)];
+  if (filters.kind) conditions.push(eq(transactions.kind, filters.kind));
+  if (filters.accountId) conditions.push(eq(transactions.accountId, filters.accountId));
+  if (filters.categoryId) conditions.push(eq(transactions.categoryId, filters.categoryId));
+  if (filters.from) conditions.push(gte(transactions.date, filters.from));
+  if (filters.to) conditions.push(lte(transactions.date, filters.to));
+  if (filters.q) conditions.push(ilike(transactions.description, `%${filters.q}%`));
+
+  const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+
+  const totalRows = await db
+    .select({ total: count() })
+    .from(transactions)
+    .where(whereClause);
+  const total = totalRows[0]?.total ?? 0;
+
+  const totalPages = total === 0 ? 1 : Math.ceil(total / PAGE_LIMIT);
+  const page = Math.min(filters.page, totalPages);
+  const offset = (page - 1) * PAGE_LIMIT;
 
   const rows = await db
     .select({
@@ -50,17 +141,20 @@ export default async function TransactionsPage() {
     .from(transactions)
     .leftJoin(accounts, eq(accounts.id, transactions.accountId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
-    .where(eq(transactions.householdId, session.householdId))
+    .where(whereClause)
     .orderBy(desc(transactions.date), desc(transactions.createdAt))
-    .limit(PAGE_LIMIT);
+    .limit(PAGE_LIMIT)
+    .offset(offset);
 
-  // Cuentas para empty state guard
+  // Empty state guard: ¿el household tiene siquiera 1 cuenta?
   const accountCount = await db
     .select({ id: accounts.id })
     .from(accounts)
     .where(eq(accounts.householdId, session.householdId))
-    .orderBy(asc(accounts.name))
     .limit(1);
+
+  const showStart = total === 0 ? 0 : offset + 1;
+  const showEnd = Math.min(offset + rows.length, total);
 
   return (
     <div className="space-y-6">
@@ -84,65 +178,201 @@ export default async function TransactionsPage() {
           </Link>
           .
         </div>
-      ) : rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Sin transacciones todavía. Cargá la primera.
-        </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-medium">Fecha</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium">Cuenta</th>
-                <th className="px-3 py-2 font-medium">Categoría</th>
-                <th className="px-3 py-2 text-right font-medium">Monto</th>
-                <th className="px-3 py-2 text-right font-medium">USD</th>
-                <th className="px-3 py-2 font-medium">Descripción</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{row.date}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        row.kind === 'income'
-                          ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'
-                          : row.kind === 'expense'
-                            ? 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
-                            : 'rounded bg-sky-50 px-1.5 py-0.5 text-xs text-sky-700'
-                      }
+        <>
+          {/* Form GET nativo: submit recarga con nuevos searchParams.
+              IMPORTANTE: no incluir input hidden de `page` — submitting reset
+              al default (1) para que cambiar filtros vuelva a la página 1. */}
+          <form
+            method="get"
+            action="/transactions"
+            className="rounded-md border bg-muted/20 p-4 space-y-3"
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="q">Búsqueda</Label>
+                <Input
+                  id="q"
+                  name="q"
+                  defaultValue={filters.q ?? ''}
+                  maxLength={200}
+                  placeholder="texto en descripción…"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="kind">Tipo</Label>
+                <select
+                  id="kind"
+                  name="kind"
+                  defaultValue={filters.kind ?? ''}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Todos</option>
+                  <option value="income">Ingreso</option>
+                  <option value="expense">Gasto</option>
+                  <option value="transfer">Transferencia</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="accountId">Cuenta</Label>
+                <select
+                  id="accountId"
+                  name="accountId"
+                  defaultValue={filters.accountId ?? ''}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Todas</option>
+                  {accountOptions.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="categoryId">Categoría</Label>
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  defaultValue={filters.categoryId ?? ''}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Todas</option>
+                  {categoryOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="from">Desde</Label>
+                <Input id="from" name="from" type="date" defaultValue={filters.from ?? ''} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="to">Hasta</Label>
+                <Input id="to" name="to" type="date" defaultValue={filters.to ?? ''} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" asChild>
+                <Link href="/transactions">Limpiar</Link>
+              </Button>
+              <Button type="submit">Aplicar</Button>
+            </div>
+          </form>
+
+          {rows.length === 0 ? (
+            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+              {total === 0
+                ? 'Sin transacciones que coincidan con esos filtros.'
+                : 'Esta página está fuera de rango. Volvé a la primera.'}
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr className="text-left">
+                      <th className="px-3 py-2 font-medium">Fecha</th>
+                      <th className="px-3 py-2 font-medium">Tipo</th>
+                      <th className="px-3 py-2 font-medium">Cuenta</th>
+                      <th className="px-3 py-2 font-medium">Categoría</th>
+                      <th className="px-3 py-2 text-right font-medium">Monto</th>
+                      <th className="px-3 py-2 text-right font-medium">USD</th>
+                      <th className="px-3 py-2 font-medium">Descripción</th>
+                      <th className="px-3 py-2 font-medium" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.id} className="border-t">
+                        <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                          {row.date}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={
+                              row.kind === 'income'
+                                ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'
+                                : row.kind === 'expense'
+                                  ? 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
+                                  : 'rounded bg-sky-50 px-1.5 py-0.5 text-xs text-sky-700'
+                            }
+                          >
+                            {ALL_KIND_LABELS[row.kind as keyof typeof ALL_KIND_LABELS] ?? row.kind}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">{row.accountName ?? '—'}</td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {row.categoryName ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatAmount(row.amountOriginal, row.currencyOriginal)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                          {formatAmount(row.amountUsd, 'USD')}
+                        </td>
+                        <td className="px-3 py-2">{row.description}</td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/transactions/${row.id}`}>Editar</Link>
+                            </Button>
+                            <DeleteTransactionButton id={row.id} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Mostrando {showStart}–{showEnd} de {total}
+                </span>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild={page > 1}
+                      disabled={page <= 1}
                     >
-                      {ALL_KIND_LABELS[row.kind as keyof typeof ALL_KIND_LABELS] ?? row.kind}
+                      {page > 1 ? (
+                        <Link href={buildHref('/transactions', filters, page - 1)}>
+                          ← Anterior
+                        </Link>
+                      ) : (
+                        <span>← Anterior</span>
+                      )}
+                    </Button>
+                    <span className="text-xs">
+                      Página {page} de {totalPages}
                     </span>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.accountName ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.categoryName ?? '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {formatAmount(row.amountOriginal, row.currencyOriginal)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                    {formatAmount(row.amountUsd, 'USD')}
-                  </td>
-                  <td className="px-3 py-2">{row.description}</td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/transactions/${row.id}`}>Editar</Link>
-                      </Button>
-                      <DeleteTransactionButton id={row.id} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild={page < totalPages}
+                      disabled={page >= totalPages}
+                    >
+                      {page < totalPages ? (
+                        <Link href={buildHref('/transactions', filters, page + 1)}>
+                          Siguiente →
+                        </Link>
+                      ) : (
+                        <span>Siguiente →</span>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );
 }
+

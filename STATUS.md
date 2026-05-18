@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 3 — Transacciones manuales** (3.A + 3.B + 3.C hechos; falta tags + filtros + paginación = 3.D)
+**Hito 3 — Transacciones manuales** (3.A + 3.B + 3.C + 3.D.1 hechos; falta solo 3.D.2 = tags)
 
 ---
 
@@ -139,25 +139,18 @@ MFA TOTP (2026-05-14):
 - [x] `tx-peek.ts` actualizado: muestra `transfer_pair_id` truncado + `amount_original` con signo
 - [x] Validación verde: typecheck + lint + 69 tests + build + `db:smoke-rls` 8/8
 
-**3.D — Pendiente: tags + filtros + paginación**
-- [ ] Multi-select de tags en el form (insert en `transaction_tags`)
-- [ ] Filtros de lista: por kind, account, category, rango de fecha
-- [ ] Paginación cuando supere los 50 por mes
+**3.D.1 — Filtros + paginación (2026-05-17, hecho):**
+- [x] `/transactions/page.tsx`: parseo de search params con Zod field-por-field (descarta inválidos sin romper UX), WHERE dinámico con `and(...)`, dos queries (count + page), `LIMIT 50 OFFSET (page-1)*50`
+- [x] Form GET nativo arriba de la tabla: búsqueda (`q` ilike), kind, accountId, categoryId, from, to. Submit recarga con nuevos params; "Limpiar" es link a `/transactions`. Sin client interactividad → no se incluye hidden `page`, se resetea a 1 al filtrar
+- [x] Paginador abajo: "Mostrando X–Y de Z" + Prev/Next como `<Link>` preservando filtros vía helper `buildHref`. Se oculta cuando hay 1 sola página
+- [x] Validación verde: typecheck + lint + 69 tests + build + `db:smoke-rls` 8/8
 
-**3.D — Pendiente: tags + filtros + paginación**
-- [ ] Multi-select de tags en el form (insert en `transaction_tags`)
-- [ ] Filtros de lista: por kind, account, category, rango de fecha
-- [ ] Paginación cuando supere los 50 por mes
-
-**3.C — Pendiente: transferencias**
-- [ ] Soporte `kind='transfer'` con 2 cuentas (origen, destino) y `transfer_pair_id` linkeando ambas filas
-- [ ] Categorías nullable para transfers (schema ya lo permite)
-- [ ] Validación: cuentas distintas, mismo householdId
-
-**3.D — Pendiente: tags + filtros + paginación**
-- [ ] Multi-select de tags en el form (insert en `transaction_tags`)
-- [ ] Filtros de lista: por kind, account, category, rango de fecha
-- [ ] Paginación cuando supere los 50 por mes
+**3.D.2 — Pendiente: tags**
+- [ ] CRUD de tags (page `/tags` con lista + alta + edit + archivado, o inline en transaction form)
+- [ ] Multi-select en transaction-form / transfer-form
+- [ ] Persistir en junction `transaction_tags` desde create/update actions
+- [ ] Filtro por tag en la lista
+- [ ] Mostrar tags como badges en cada fila
 
 ### ⏳ (Sesión categorías con Nico antes de Hito 4)
 
@@ -204,6 +197,16 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 3.D.1
+
+- **Form GET nativo, no client component con `router.replace`.** Submit explícito; UX un tick más lento pero zero JS para los filtros. Cuando termine pesando, se cambia a client sin tocar el back-end (los searchParams ya están normalizados).
+- **Schema de filtros field-por-field, no schema único.** Si el user pega una URL con un kind inválido, parseamos todos los demás filtros válidos y descartamos solo el roto. Más resiliente que un `safeParse` global que falla por uno solo.
+- **Reset de `page` al filtrar via "no incluir hidden page" en el form.** Submit GET solo carga lo visible; `page` vuelve al default (1). Si en el futuro un cambio agrega `page` por accidente, el bug se nota rápido (paginás con filtros que devuelven menos).
+- **Dos queries (count + page), no window function.** Drizzle no expone bien `count(*) OVER ()`; mejor dos queries explícitas. A esta escala el extra round-trip es invisible.
+- **`q` con `ilike` sin índice trigram.** A <10k filas es fine. Cuando duela, evaluamos `pg_trgm`. Para V1 vale la simpleza.
+- **Filtro por categoría excluye transfers** porque tienen `category_id = null`. Esperado (categoría no aplica a movimientos internos). El usuario los ve dejando "Todas".
+- **Buttons Prev/Next con `asChild` condicional**: si la página está al límite, render como `<span>` (deshabilitado visual + no clickable) en vez de Link, manteniendo el mismo wrapper Button.
 
 ## Decisiones tomadas en Hito 3.C
 
