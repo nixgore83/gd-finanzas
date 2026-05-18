@@ -4,6 +4,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCashflowData } from '@/lib/reports/cashflow-data';
 import { deltaTone } from '@/lib/reports/cashflow';
 import { cn } from '@/lib/utils';
+import { ReportsNav } from '../reports-nav';
 
 export const metadata = {
   title: 'Cashflow del mes · gd-finanzas',
@@ -105,6 +106,7 @@ export default async function CashflowReportPage({
 
   return (
     <div className="space-y-4">
+      <ReportsNav active="cashflow" />
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Cashflow · {monthLabel}</h1>
         <div className="flex items-center gap-3 text-sm">

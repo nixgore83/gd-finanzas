@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 5 — Dashboard + Reporte A** (completo ✅) — 🎉 **V1.0 funcional**. Próximo: Hito 6 (Reportes B + C)
+**Hito 6 — Reportes B + C** (6.A breakdown hecho; falta 6.B = evolución 12m)
 
 ---
 
@@ -205,7 +205,22 @@ Cerrar taxonomía.
 - [x] Nav link "Reportes" (apunta a `/reports/cashflow`; cuando entren reportes B/C/D se vuelve menú)
 - [x] Validación verde: typecheck + lint + 141 tests + build + `db:smoke-rls` 8/8
 
-### ⏳ Hito 6 — Reportes B + C
+### 🟡 Hito 6 — Reportes B + C
+
+**6.A — Reporte B: breakdown gastos por categoría (2026-05-18, hecho):**
+- [x] `npm install recharts` (3.8.1, compatible con React 19)
+- [x] `lib/reports/breakdown.ts`: `rollupBuckets` puro que agrupa por hoja o por parent según `level`. Buckets con amount=0 se omiten; ordena por amount desc; calcula pct. 6 tests
+- [x] `lib/reports/breakdown-data.ts`: SQL SUM agrupado JOIN categories (con self-alias para parents) WHERE kind='expense' AND mes range → buckets crudos → `rollupBuckets`
+- [x] `/reports/breakdown` page server con selector ◀ prev / next ▶ + toggle Parent/Leaf (links GET con query params). Grid 2 cols: donut a la izquierda, tabla a la derecha. Tabla con color swatch + nombre + monto + %. Drill-down solo en filas leaf → `/transactions?categoryId=...&from=...&to=...` (parents agregados no linkean)
+- [x] `donut.tsx` (client recharts): Pie chart con paleta fallback cíclica para cats sin color; centro muestra total
+- [x] `reports-nav.tsx`: mini-nav reusable (Cashflow · Breakdown) arriba de cada reporte
+- [x] Validación verde: typecheck + lint + 147 tests + build + `db:smoke-rls` 8/8
+
+**6.B — Pendiente: Reporte C (evolución 12 meses)**
+- [ ] `/reports/evolution` con bar chart agrupado ingresos vs gastos por mes
+- [ ] Línea de neto superpuesta
+- [ ] USD por default, toggle a ARS
+- [ ] Filtro por categoría
 
 ### ⏳ Hito 7 — Reporte D + Settings metas
 
@@ -241,6 +256,16 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 6.A
+
+- **Recharts 3.x para React 19**: instalación nueva. Bundle adicional ~80KB gz acotado a los reportes (client component split del donut). Aceptable.
+- **Función pura `rollupBuckets`** separada del loader. Permite testear el agrupado parent/leaf sin DB. El input incluye `parentName`/`parentColor` para que el rollup pueda materializar la row del parent sin lookups extras.
+- **`level='parent'` no permite drill-down** porque no hay un único `categoryId` (los parents agregan N children). Sólo filas leaf linkean a `/transactions`. Helper text explica.
+- **Self-join en categories** via `alias(categories, 'parents')` para obtener nombre y color del parent en una sola query. Drizzle lo soporta nativamente.
+- **Paleta fallback cíclica** para categorías sin color (`null` en DB). Determinista por índice; no por hash, pero suficiente para que dos categorías adyacentes no compartan tono.
+- **`ReportsNav` componente compartido** en `app/(protected)/reports/reports-nav.tsx`. Cuando entre 6.B se agrega "Evolución" ahí.
+- **Total en el centro del donut** absoluto, sin decimales. Empty state si no hay gastos.
 
 ## Decisiones tomadas en Hito 5.C
 
