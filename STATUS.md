@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 6 — Reportes B + C** (6.A breakdown hecho; falta 6.B = evolución 12m)
+**Hito 6 — Reportes B + C** (completo ✅). Próximo: Hito 7 (Reporte D + /settings/metas)
 
 ---
 
@@ -205,7 +205,7 @@ Cerrar taxonomía.
 - [x] Nav link "Reportes" (apunta a `/reports/cashflow`; cuando entren reportes B/C/D se vuelve menú)
 - [x] Validación verde: typecheck + lint + 141 tests + build + `db:smoke-rls` 8/8
 
-### 🟡 Hito 6 — Reportes B + C
+### 🟢 Hito 6 — Reportes B + C
 
 **6.A — Reporte B: breakdown gastos por categoría (2026-05-18, hecho):**
 - [x] `npm install recharts` (3.8.1, compatible con React 19)
@@ -216,11 +216,15 @@ Cerrar taxonomía.
 - [x] `reports-nav.tsx`: mini-nav reusable (Cashflow · Breakdown) arriba de cada reporte
 - [x] Validación verde: typecheck + lint + 147 tests + build + `db:smoke-rls` 8/8
 
-**6.B — Pendiente: Reporte C (evolución 12 meses)**
-- [ ] `/reports/evolution` con bar chart agrupado ingresos vs gastos por mes
-- [ ] Línea de neto superpuesta
-- [ ] USD por default, toggle a ARS
-- [ ] Filtro por categoría
+**6.B — Reporte C: evolución 12 meses (2026-05-18, hecho):**
+- [x] `lib/reports/evolution.ts`: `rollingMonths(endY, endM, count)` para llenar gaps + `buildEvolutionSeries` puro que ordena, calcula net y arma labels "MMM YY"; 7 tests
+- [x] `lib/reports/evolution-data.ts`: SQL GROUP BY `EXTRACT(year/month FROM date), kind` SUM en USD o ARS según param + WHERE household + kind IN income/expense + opcional categoryId; llena meses sin data con `{0, 0}`
+- [x] `/reports/evolution` page con: navegador "Mover ventana atrás/adelante", form GET con selector moneda + selector categoría (tree indentado), totales 12m abajo (Ingresos / Gastos / Neto coloreado)
+- [x] `evolution/chart.tsx` (client): Recharts `ComposedChart` con 2 Bars (Ingresos verde, Gastos rojo) + Line (Neto violeta), tooltip formateado por moneda, axis compact (k/M)
+- [x] `ReportsNav` ampliado con tercer link "Evolución"
+- [x] Validación verde: typecheck + lint + 154 tests + build + `db:smoke-rls` 8/8
+
+**Hito 6 cerrado.**
 
 ### ⏳ Hito 7 — Reporte D + Settings metas
 
@@ -256,6 +260,17 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 6.B
+
+- **Ventana rolling de 12 meses**, no año calendario. PRD §5.6 dice "Evolución 12 meses"; lo interpreto como trailing 12 (intuitivo para trayectoria). Para ver año calendario, el user navega hasta dic.
+- **Filtro de categoría exacto**, no incluye descendants. Si el user elige "Vivienda", solo cuenta movimientos asignados directamente a "Vivienda" (poco habitual: nuestra UX no permite presupuestar/contabilizar en parents porque las hojas son lo natural). Para "todo Vivienda" → ir al breakdown del mes. Si surge necesidad, recursive CTE en V2.
+- **Gap-filling en JS, no SQL**: cargo el array de 12 meses con `rollingMonths`, agrupo los rows agregados y completo con 0 los meses sin data. Más simple que CTE de generate_series.
+- **`extract(year/month FROM date)` en SQL** + GROUP BY: una sola query devuelve todos los buckets agregados. Drizzle no tiene helper nativo, uso `sql` template.
+- **Eje Y compact** (k/M): para que números grandes en ARS no rompan el layout. `axisCompact` ad-hoc.
+- **Línea de Neto en violeta** para no chocar con verde/rojo de las bars. Recharts `ComposedChart` permite mezclar `Bar` y `Line` sin issues.
+- **Sin tabla auxiliar**: el chart es el reporte. Cards de totales 12m al pie cubren el quick glance numérico. Si Pau quiere CSV, lo agarra del export contador (Hito 9).
+- **Form GET con hidden endYear/endMonth**: al "Aplicar" filtros, mantiene la ventana actual; mover ventana ◀/▶ preserva moneda + categoría via `buildHref`.
 
 ## Decisiones tomadas en Hito 6.A
 

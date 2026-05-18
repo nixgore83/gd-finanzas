@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 const LINKS = [
   { href: '/reports/cashflow', label: 'Cashflow', key: 'cashflow' as const },
   { href: '/reports/breakdown', label: 'Breakdown', key: 'breakdown' as const },
+  { href: '/reports/evolution', label: 'Evolución', key: 'evolution' as const },
 ];
 
 export type ReportKey = (typeof LINKS)[number]['key'];
