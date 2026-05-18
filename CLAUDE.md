@@ -141,7 +141,7 @@ Antes de decir "listo" en cualquier hito: `npm run typecheck && npm test && npm 
 | 2 | FX feed BCRA | Cron diario, caching, helper `getFxRate(date, ccy)` |
 | 3 | Transacciones manuales | Form alta + lista + edit + delete + transferencias |
 | — | (Sesión de categorías con Nico antes del Hito 4) | Taxonomía cerrada |
-| 4 | Recurrencias + previsiones | Forecasts rolling 3 meses + confirmación 1-click |
+| 4 | Recurrencias + previsiones | Forecasts rolling 12 meses + confirmación 1-click |
 | 5 | Dashboard + Reporte A | Budget mensual + cashflow real vs budget — **V1.0 funcional** |
 | 6 | Reportes B + C | Donut por categoría + evolución 12 meses |
 | 7 | Reporte D + Settings metas | Año económico + bloque "Trayectoria a IF" |

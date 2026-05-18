@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 3 — Transacciones manuales** (completo ✅; próximo: sesión de taxonomía de categorías con Pau antes de Hito 4)
+**Hito 4 — Recurrencias + previsiones** (4.A hecho; falta 4.B = vista cashflow + matching + missed cron)
 
 ---
 
@@ -162,7 +162,25 @@ MFA TOTP (2026-05-14):
 
 Cerrar taxonomía.
 
-### ⏳ Hito 4 — Recurrencias + previsiones
+### 🟡 Hito 4 — Recurrencias + previsiones
+
+**4.A — CRUD de recurrencias + generación auto de forecasts (2026-05-18, hecho):**
+- [x] `lib/recurrences/forecasts.ts`: `computeForecastDates(...)` puro, sin DB, sin timezone. Soporta monthly/bimonthly/quarterly/yearly + clamp a último día del mes. Rolling 12 meses (PRD §5.3); 11 tests cubren day 31 en feb (leap/no-leap), endDate cortando horizon, startDate posterior, etc.
+- [x] `lib/schemas/recurrence.ts`: `recurrenceInputSchema` (name/account/category/kind/amount/currency/frequency/dayOfMonth 1-31/start/end/active) + refine endDate >= startDate. `custom` del enum DB queda fuera del schema en V1. 11 tests
+- [x] `app/actions/recurrences/_sync.ts`: `syncForecasts(tx, recurrenceId, input, today)`. Borra pending del futuro (no toca history) + regenera con `computeForecastDates`. Llamable desde `db.transaction` para atomicidad
+- [x] `create.ts`, `update.ts`, `set-active.ts`, `delete.ts`. Create/update envueltos en `db.transaction(syncForecasts)`. `set-active`: al pausar borra pending futuras; al reactivar regenera. Delete cascadea forecasts; `transactions.recurrence_id` queda en NULL (FK ON DELETE SET NULL)
+- [x] UI: `/recurrences` (lista con próxima fecha via `min(forecasts.expectedDate)` filtrado por pending+futuro, toggle Activas/Todas), `/recurrences/new` (empty states accounts/categories), `/recurrences/[id]` (form + bloque mini de 12 próximas pending + bloque destructivo de delete)
+- [x] `recurrence-form.tsx`: reusa loadCategoryTree + filtro por kind, selects de frequency, day input 1-31, checkbox active
+- [x] Nav link "Recurrencias" en layout protegido
+- [x] Validación verde: typecheck + lint + 108 tests + build + `db:smoke-rls` 8/8
+
+**4.B — Pendiente: cashflow proyectado + matching + missed cron**
+- [ ] Vista `/forecasts` con lista de pending agrupadas por mes
+- [ ] Acción "cancelar" forecast (status → cancelled, no se regenera)
+- [ ] Matching manual desde `/transactions/[id]`: si hay forecasts pending que matchean (misma account, kind correcto, amount ±10%, fecha ±5 días), bloque "Previsiones candidatas" con botón "Linkear"
+- [ ] Cuando se linkea: forecast.status='matched', forecast.matched_transaction_id=tx.id, tx.recurrence_id=forecast.recurrence_id
+- [ ] Cron diario `/api/cron/forecasts-missed`: forecasts pending con expected_date < today - 7 días → status='missed'
+- [ ] Auto-match toggle: hardcoded OFF en V1; cuando se arme `/settings/metas` (Hito 7) se expone
 
 ### ⏳ Hito 5 — Dashboard + Reporte A
 **V1.0 funcional.**
@@ -203,6 +221,18 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 4.A
+
+- **Rolling 12 meses (PRD §5.3), no 3.** CLAUDE.md decía 3 pero el PRD V1.1 manda. Lo alineé en CLAUDE.md tabla de hitos.
+- **`custom` frequency queda fuera del Zod V1** aunque está en el enum DB. Si el día de mañana hace falta (ej. cada 45 días), se agrega `interval` integer y se prende. Para V1 los 4 (monthly/bimonthly/quarterly/yearly) cubren los casos del PRD.
+- **`computeForecastDates` función pura, sin Date timezone tricks.** Trabaja con strings ISO. Postgres `date` column lo respeta sin conversiones. Probé day 31 en feb (leap/no-leap), endDate cortando, startDate posterior al horizon → 11 tests verdes.
+- **Anchor de primera ocurrencia**: si `startDate=2026-01-15` + `dayOfMonth=2`, primera = `2026-02-02` (siguiente día válido >= startDate). Si `dayOfMonth=20`, primera = `2026-01-20`. La función "busca hacia adelante" desde startDate.
+- **`syncForecasts` borra solo pending futuras** (expected_date >= today). Mantiene matched/cancelled/missed history y también las pending pasadas (esas pasan a `missed` por el cron de 4.B). Re-correr no rompe nada.
+- **Al pausar**: borra pending futuras. Al reactivar: regenera 12 meses. Mantiene invariante: si está inactiva, no hay pending futuras en la lista.
+- **Auto-match hardcoded OFF en V1.** Sin migración a `financial_goals` todavía. Cuando se arme `/settings/metas` (Hito 7), se agrega columna `auto_match_recurrences` y el toggle.
+- **Delete cascadea forecasts** (ON DELETE CASCADE) pero **NO transactions** (ON DELETE SET NULL en `transactions.recurrence_id`). Las txs históricas que estaban matched pierden el link pero la fila queda. Pérdida aceptable.
+- **`_sync.ts` separado de los actions** para reuso entre create/update/set-active sin duplicar el cálculo. Tipo `Tx` derivado de `Parameters<...>` para que cambie con drizzle sin tocar el helper.
 
 ## Decisiones tomadas en Hito 3.D.2
 
