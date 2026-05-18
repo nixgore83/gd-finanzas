@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories, tags } from '@/db/schema';
+import { accounts, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
+import { loadCategoryTree } from '@/lib/categories/tree';
 import { createTransaction } from '@/app/actions/transactions/create';
 import { Button } from '@/components/ui/button';
 import { TransactionForm } from '../transaction-form';
@@ -33,13 +34,7 @@ export default async function NewTransactionPage() {
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));
 
-  const categoryRows = await db
-    .select({ id: categories.id, name: categories.name, kind: categories.kind })
-    .from(categories)
-    .where(
-      and(eq(categories.householdId, session.householdId), eq(categories.archived, false)),
-    )
-    .orderBy(asc(categories.name));
+  const categoryRows = await loadCategoryTree(session.householdId);
 
   const tagRows = await db
     .select({ id: tags.id, name: tags.name, color: tags.color })

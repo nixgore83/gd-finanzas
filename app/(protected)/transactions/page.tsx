@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
+import { loadCategoryTree } from '@/lib/categories/tree';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,11 +116,7 @@ export default async function TransactionsPage({
     .where(eq(accounts.householdId, session.householdId))
     .orderBy(asc(accounts.name));
 
-  const categoryOptions = await db
-    .select({ id: categories.id, name: categories.name })
-    .from(categories)
-    .where(eq(categories.householdId, session.householdId))
-    .orderBy(asc(categories.name));
+  const categoryOptions = await loadCategoryTree(session.householdId);
 
   const tagOptions = await db
     .select({ id: tags.id, name: tags.name })
@@ -302,7 +299,7 @@ export default async function TransactionsPage({
                   <option value="">Todas</option>
                   {categoryOptions.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.depth === 1 ? `    ↳ ${c.name}` : c.name}
                     </option>
                   ))}
                 </select>

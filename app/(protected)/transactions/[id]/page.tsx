@@ -3,8 +3,9 @@ import { and, asc, eq } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
+import { accounts, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
+import { loadCategoryTree } from '@/lib/categories/tree';
 import { updateTransaction } from '@/app/actions/transactions/update';
 import { updateTransfer } from '@/app/actions/transactions/update-transfer';
 import { TransactionForm } from '../transaction-form';
@@ -135,11 +136,7 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
   }
 
   // income / expense
-  const categoryRows = await db
-    .select({ id: categories.id, name: categories.name, kind: categories.kind })
-    .from(categories)
-    .where(and(eq(categories.householdId, session.householdId), eq(categories.archived, false)))
-    .orderBy(asc(categories.name));
+  const categoryRows = await loadCategoryTree(session.householdId);
 
   return (
     <div className="mx-auto max-w-xl space-y-4">

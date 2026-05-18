@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { TagMultiSelect, type TagOption } from './tag-multi-select';
 
 type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD' };
-type CategoryOption = { id: string; name: string; kind: 'income' | 'expense' };
+type CategoryOption = { id: string; name: string; kind: 'income' | 'expense'; depth: 0 | 1 };
 
 type ActionResult =
   | { ok: true; id?: string }
@@ -239,7 +239,10 @@ export function TransactionForm({
               <SelectContent>
                 {filteredCategories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                    <span style={c.depth === 1 ? { paddingLeft: '1rem' } : undefined}>
+                      {c.depth === 1 ? '↳ ' : ''}
+                      {c.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -165,11 +165,17 @@ async function main() {
       `),
     );
 
-    // Cleanup
-    console.warn('[smoke-rls] cleanup');
-    await sql`delete from accounts where name like '__smoke%'`;
-    await sql`delete from households where id = ${fakeHouseholdId}`;
   } finally {
+    // Cleanup idempotente. Vive en `finally` para que un crash interno no
+    // deje phantom households en la DB (ya nos pasó una vez con el seed
+    // de categorías).
+    console.warn('[smoke-rls] cleanup');
+    try {
+      await sql`delete from accounts where name like '__smoke%'`;
+      await sql`delete from households where name like '__smoke_other__'`;
+    } catch (err) {
+      console.error('[smoke-rls] cleanup failed:', err);
+    }
     await sql.end();
   }
 

@@ -23,6 +23,7 @@
     "db:seed:household": "tsx scripts/seed-household.ts",
     "db:seed:institutions": "tsx scripts/seed-institutions.ts",
     "db:seed:categories-placeholder": "tsx scripts/seed-categories-placeholder.ts",
+    "db:seed:categories": "tsx scripts/seed-categories.ts",
     "db:confirm-emails": "tsx scripts/confirm-emails.ts",
     "db:smoke-rls": "tsx scripts/smoke-rls.ts",
     "fx:list-vars": "tsx scripts/fx-list-variables.ts",
