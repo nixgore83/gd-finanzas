@@ -7,6 +7,7 @@ export type CategoryNode = {
   name: string;
   kind: 'income' | 'expense';
   depth: 0 | 1;
+  parentId: string | null;
 };
 
 /**
@@ -46,12 +47,12 @@ export async function loadCategoryTree(householdId: string): Promise<CategoryNod
 
   const result: CategoryNode[] = [];
   for (const p of sortedParents) {
-    result.push({ id: p.id, name: p.name, kind: p.kind, depth: 0 });
+    result.push({ id: p.id, name: p.name, kind: p.kind, depth: 0, parentId: null });
     const children = (childrenByParent.get(p.id) ?? []).sort((a, b) =>
       a.name.localeCompare(b.name, 'es'),
     );
     for (const c of children) {
-      result.push({ id: c.id, name: c.name, kind: c.kind, depth: 1 });
+      result.push({ id: c.id, name: c.name, kind: c.kind, depth: 1, parentId: p.id });
     }
   }
   return result;

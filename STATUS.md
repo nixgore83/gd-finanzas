@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 4 — Recurrencias + previsiones** (completo ✅; próximo: Hito 5 = Dashboard + Reporte A = V1.0)
+**Hito 5 — Dashboard + Reporte A** (5.A budgets grid hecho; faltan 5.B = Reporte A, 5.C = Dashboard)
 
 ---
 
@@ -187,8 +187,25 @@ Cerrar taxonomía.
 
 **Hito 4 cerrado — V1.0 funcional pendiente del Hito 5 (Dashboard + Reporte A).**
 
-### ⏳ Hito 5 — Dashboard + Reporte A
-**V1.0 funcional.**
+### 🟡 Hito 5 — Dashboard + Reporte A (V1.0 funcional)
+
+**5.A — Budgets grilla editable categoría × mes (2026-05-18, hecho):**
+- [x] `lib/schemas/budget.ts`: `budgetInputSchema` (year 2020-2100, month 1-12, categoryId, amountUsd vía moneySchema permite 0 y negativos); 8 tests
+- [x] `lib/budgets/leaves.ts`: `isLeafCategory` + `leafIdsOf` (parent es hoja si nadie lo referencia como parent); 5 tests
+- [x] `lib/categories/tree.ts` ampliado: `CategoryNode` incluye `parentId: string | null`
+- [x] Server actions `set.ts` (UPSERT vía Drizzle `.onConflictDoUpdate` con `revision_at=now()`) + `clear.ts` (DELETE WHERE household+year+month+category). Set valida que la category sea hoja
+- [x] UI: `/budget` redirect a `/budget/{año actual}`. `/budget/[year]/page.tsx` carga tree + budgets del año. `budget-grid.tsx` (client) con state local `Map<catId-month, string>`, optimistic UI, blur dispara setBudget o clearBudget según vacío, parents read-only con subtotal calculado, meses pasados disabled, mes en curso resaltado, columna Total año y filas Subtotal Ingresos / Gastos / Neto
+- [x] Nav link "Presupuesto" en layout protegido
+- [x] Validación verde: typecheck + lint + 130 tests + build + `db:smoke-rls` 8/8
+
+**5.B — Pendiente: Reporte A (cashflow real vs budget)**
+- [ ] Página `/reports/cashflow` o `/reports/a` con tabla por categoría × mes seleccionado
+- [ ] Columnas: Budget USD | Real USD | Δ USD | Δ %
+- [ ] Subtotales por categoría padre + total ingresos/gastos/neto
+- [ ] Drill-down: click en categoría → lista de transacciones filtrada
+
+**5.C — Pendiente: Dashboard**
+- [ ] `/dashboard` con KPIs del PRD §5.6: ingresos/gastos del mes (real vs budget), neto, top 5 gastos, previsiones próximas 14 días, últimas 10 transacciones
 
 ### ⏳ Hito 6 — Reportes B + C
 
@@ -226,6 +243,17 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 5.A
+
+- **Budget solo en hojas** (PRD: granularidad categoría×mes, sin nivel). Parents con children muestran subtotal calculado read-only. La taxonomía actual deja a Vacaciones/Personales/Otros como leaves directos editables. Si en V2 hay 3 niveles, replantear.
+- **`set 0` ≠ `clear`**: input vacío borra la fila (no presupuestado), `0` la deja con amount=0 (presupuesté cero explícito). Distinción útil para reportes que distinguen "no medido" vs "medido cero".
+- **UPSERT por UNIQUE(household, year, month, category)** con `revision_at=now()` en cada save. PRD §5.5: "cada revisión sobrescribe". 2 users editando la misma cell → last-write-wins, sin warning.
+- **Optimistic UI con `useTransition`**: actualizo el state local primero, dispara el server action en background, revierto si falla. Render sin spinner por cell (un único isPending compartido).
+- **1 server action por cell, sin batch**: pegar valores masivos puede generar 50+ actions. Aceptable a esta escala (492 cells máx, <100ms cada). Si molesta, batch en 5.A.2.
+- **`loadCategoryTree` ahora incluye `parentId`** para que el cliente sepa qué cat es hoja sin otra query. Costo cero (un campo más en el SELECT).
+- **Past months disabled visual**: input `disabled` + `bg-muted/20`. Sin toggle de override en V1; si hace falta, lo agregamos en 5.A.2.
+- **Mes en curso resaltado** con bg-sky-50 en el header. Identificable a primera vista cuál es el mes a actualizar.
 
 ## Decisiones tomadas en Hito 4.B
 
