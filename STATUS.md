@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 9 cerrado — Export contador (.zip con 5 CSVs). Próximo: Hito 10 (Backups Drive) → V1.1 funcional.**
+**🎉 V1.1 funcional completo — Hitos 0-10 cerrados.** Pendiente operacional: setup del service account Drive + wipe smoke + cargar info real.
 
 ---
 
@@ -354,8 +354,47 @@ Sub-hito 7.B.4 (página + charts + nav):
 
 **Hito 9 cerrado.**
 
-### ⏳ Hito 10 — Backups Drive
-**V1.1 funcional.**
+### 🟢 Hito 10 — Backups Drive (V1.1 funcional 🎉)
+
+**10.A — Deps + helper Drive + env vars (2026-05-20, hecho):**
+- [x] `npm i googleapis` (oficial; JWT auth refresh automático)
+- [x] `lib/env.ts` + `.env.example`: `GOOGLE_SERVICE_ACCOUNT_KEY_B64` (optional; key del service account base64-encoded para sobrevivir al multi-line JSON) y `GOOGLE_DRIVE_BACKUP_FOLDER_ID` (optional)
+- [x] `lib/backups/drive.ts`: cliente cacheado con `google.auth.JWT` (scope `drive.file`); helpers `uploadBackup` (POST multipart con stream), `listBackups` (orderBy createdTime desc), `deleteFile`, `getBackupFolderId`. `DriveConfigError` tipado para distinguir fallos de setup vs runtime
+
+**10.B — Snapshot DB puro (2026-05-20, hecho):**
+- [x] `lib/backups/snapshot.ts`: `loadHouseholdSnapshot(householdId)` carga 16 tablas en paralelo via `Promise.all`. Tablas household-scoped filtran por `household_id`; `fx_rates` e `institutions` van enteras (sin filter). `auth.users` ignorada. `transaction_tags`, `forecasts` e `import_lines` se cargan en pasos separados via `inArray` sobre los ids ya filtrados
+
+**10.C — Zip builder + tests (2026-05-20, hecho):**
+- [x] `lib/backups/build-zip.ts`: usa JSZip (ya instalado en Hito 9). Genera `snapshot.json` (dump JSON formateado) + `tables/{name}.csv` por cada tabla (reusa `toCsv` de `lib/exports/csv.ts`) + `README.txt` con conteo de filas + procedimiento manual de restore
+- [x] Tests: 5 (shape del zip, contenido JSON, CSVs vacíos con marker, headers UTF-8 BOM, README con contadores)
+
+**10.D — Cron route + prune + vercel.json (2026-05-20, hecho):**
+- [x] `lib/backups/prune.ts`: `pruneOldBackups(files, keep)` pura, devuelve los archivos a borrar para mantener los `keep` más recientes. Constante `BACKUP_RETENTION = 12`. 5 tests
+- [x] `lib/backups/run.ts`: orquesta `loadHouseholdSnapshot` → `buildBackupZip` → `uploadBackup` (filename `gd-finanzas-backup-YYYY-MM-DD.zip`, con sufijo `-1`/`-2` si colisiona el mismo día) → `listBackups` + `pruneOldBackups` → `deleteFile` los excedentes. Compartido entre cron y server action
+- [x] `app/api/cron/backup-drive/route.ts`: GET con `Authorization: Bearer ${CRON_SECRET}`, resuelve household (asume 1 — V1), llama `runBackup`. Loggea solo nombres + size + counts, nunca contenido. Devuelve 500 si DriveConfigError, 500 si backup_failed
+- [x] `vercel.json`: schedule `0 2 * * 1` (lunes 02:00 UTC ≈ domingo 23:00 AR)
+
+**10.E — UI /settings/backups + sub-nav (2026-05-20, hecho):**
+- [x] `app/actions/backups/run-now.ts`: server action `runBackupNow()` con cookie auth via `requireHouseholdSession`. Llama al mismo `runBackup` que el cron. Returns filename + sizeBytes + deleted count
+- [x] `/settings/backups/page.tsx` (server): lista `listBackups()` con tabla (Nombre, Creado, Tamaño, Link a Drive). Empty state + banner amber si `DriveConfigError` (setup pendiente). Card con botón "Backup ahora"
+- [x] `run-now-button.tsx` (client): `useTransition` + toast del resultado + `router.refresh()`
+- [x] `SettingsNav` ampliado con 3er link "Backups"
+- [x] Validación verde: typecheck + lint + 246 tests + build + db:smoke-rls 8/8
+
+**Hito 10 cerrado — V1.1 funcional COMPLETO. 🎉**
+
+**Acción operacional manual pendiente (sin esto el cron falla silencioso):**
+1. Google Cloud Console → proyecto → habilitar Drive API.
+2. Crear service account `gd-finanzas-backup` → Keys → New JSON.
+3. Base64-encode la key: `base64 -i sa-key.json | tr -d '\n' | pbcopy` (mac).
+4. Crear carpeta en Drive personal "gd-finanzas backups".
+5. Compartirla con el email del SA con rol Editor.
+6. Copiar el folder ID del URL.
+7. Cargar en `.env.local` + Vercel Production (Sensitive ✓):
+   - `GOOGLE_SERVICE_ACCOUNT_KEY_B64`
+   - `GOOGLE_DRIVE_BACKUP_FOLDER_ID`
+8. Redeploy Vercel.
+9. Smoke: `/settings/backups` → "Backup ahora" → ver archivo en Drive.
 
 ---
 
@@ -382,6 +421,24 @@ Sub-hito 7.B.4 (página + charts + nav):
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 10
+
+- **Service Account, no OAuth user-flow**. Razón: el cron necesita identidad estable que no expire ni requiera re-auth. Setup operacional one-time (compartir carpeta de Drive con el SA email). La carpeta queda owned por la cuenta personal (tuya/Pau) que la creó, no por el SA — eso es OK porque ustedes la comparten.
+- **Service account key en env var base64-encoded**, no como path a archivo. Razón: Vercel no soporta archivos en runtime, y el JSON multi-line de Google rompe parsers de `.env`. Base64 lo aplana a una sola línea. Decode + JSON.parse en runtime.
+- **Scope drive.file** (no `drive` completo). Suficiente porque el SA solo accede a archivos que él mismo crea o que le fueron compartidos. Si la carpeta destino le fue compartida con rol Editor, puede listar + upload + delete ahí. Mínimo privilegio.
+- **Backup solo de DB**, sin PDFs del bucket Storage (decisión user-side esta conversación). Razón PRD literal §5.8 dice "CSV de todas las tablas + dump JSON" — no menciona Storage. Los PDFs originales son data del banco, re-descargables.
+- **16 tablas en el snapshot**, incluyendo `households`, `household_members`, `profiles` (las 3 de identity/tenancy) + `fx_rates` e `institutions` globales sin filter. Si en V2 hay restore, el zip por sí solo basta para hidratar la DB sin necesitar otros recursos.
+- **`auth.users` queda fuera** del backup. No es nuestra tabla — Supabase la maneja, y en un restore eventual los users se re-crean por su lado (los `profiles.id = auth.users.id`).
+- **README dentro del zip** con conteo de filas + procedimiento manual de restore. Importante porque V1 no tiene restore automático; si en algún momento hay que restaurar, el README guía. Cuando V2 sume restore endpoint, este README se simplifica.
+- **Filename `gd-finanzas-backup-YYYY-MM-DD.zip` con sufijo `-1`, `-2` si colisiona**. Importante para "Backup ahora" disparado el mismo día que el cron — no pisa el del cron, suma un siguiente.
+- **Retención 12 backups (no "12 semanas estrictas")**: si por algún motivo se acumulan 14 (ej. dos manuales en un día), el prune se aplica a los 12 más recientes igual. Garantiza límite duro de archivos.
+- **Re-list después del upload** para incluir el recién subido en el orden por `createdTime desc`. Defensa contra race conditions teóricas (en V1 con 2 users no debería importar).
+- **Cron schedule `0 2 * * 1`**: lunes 02:00 UTC = domingo 23:00 AR. PRD dice "domingo 23:00" en local time, traducido a UTC con UTC-3.
+- **`runBackup(householdId)` compartido** entre cron route y server action. Único path para hacer un backup. El caller hace su propia auth (Bearer para cron, cookie para UI).
+- **DriveConfigError tipado** vs errores genéricos. Permite al UI mostrar "setup pendiente" con instrucciones específicas en lugar de un toast genérico. El cron también lo distingue para responder 500 con razón clara.
+- **Env vars Google `optional()`** en `lib/env.ts`. Razón: el resto de la app debe poder correr sin Drive configurado (dev local, primer deploy a Vercel antes del setup). El `DriveConfigError` se levanta solo si alguien llama a `getDriveClient()` sin las vars.
+- **Sin notificación post-cron** (mail / Slack / Sentry). PRD V1 no lo pide; si falla, Vercel logs muestran el error y `/settings/backups` mostraría una caída en la lista. Sumar en V2 si surge necesidad.
 
 ## Decisiones tomadas en Hito 9
 
@@ -635,18 +692,30 @@ Sub-hito 7.B.4 (página + charts + nav):
 - Region Supabase confirmada: **us-west-2** (Oregon). El PRD/CLAUDE.md original decía us-east-1; cambiamos a us-west-2 al crear el proyecto. Latencia +50ms desde AR, no relevante para uso doméstico.
 - **Custom SMTP** (Resend/Postmark) — considerar cuando el rate limit de 2 mails/hora del SMTP built-in moleste. Hoy con 2 users y login esporádico no es urgente. Si lo hacemos antes, sirve también para futuros mails transaccionales.
 
-## Operacional pendiente: wipe smoke data al cierre de Hito 10
+## Operacional pendiente al cierre de V1.1
 
-Toda la data acumulada en prod (transactions, imports, recurrences, budgets, accounts, archivos de Storage) durante hitos 0-8 es **smoke**, no real. Decisión 2026-05-20: NO wipear iterativamente. Mantener smoke hasta cerrar Hito 10 (V1.1 funcional) — hitos 9 (export contador) y 10 (backups Drive) necesitan data para validar.
+**1. Setup Google Drive (Hito 10):**
+- Crear service account + JSON key + carpeta en Drive + compartirla con el SA email.
+- Cargar `GOOGLE_SERVICE_ACCOUNT_KEY_B64` (Sensitive) y `GOOGLE_DRIVE_BACKUP_FOLDER_ID` en `.env.local` y Vercel Production.
+- Redeploy. Smoke con "Backup ahora" en `/settings/backups`.
+- Detalles paso a paso arriba en la sección de Hito 10.
 
-**Al cierre de Hito 10**, correr:
+**2. Wipe smoke data + cargar info real:**
+
+Toda la data acumulada en prod durante hitos 0-10 es **smoke**, no real. Ahora que V1.1 está cerrado:
+
 ```bash
 npm run db:wipe-smoke -- --all
 ```
 
-El script preserva: `categories`, `tags`, `fx_rates`, `institutions`, `financial_goals`, `profiles`, `auth`. Borra el resto (incluyendo archivos del bucket Storage).
+Preserva: `categories`, `tags`, `fx_rates`, `institutions`, `financial_goals`, `profiles`, `auth`. Borra: transactions, imports + archivos del bucket Storage, recurrences (+ forecasts), budgets, accounts.
 
-Después: cargar info real (accounts definitivas, recurrences reales, re-importar resúmenes con la taxonomía de Nico).
+Después cargar info real:
+- Accounts definitivas (Galicia Amex, ICBC Caja, etc.) con sus nombres reales.
+- Recurrences reales (sueldos, expensas, suscripciones).
+- Sesión taxonomía de categorías con Nico → re-seedear si hace falta.
+- Re-importar resúmenes reales (Galicia / ICBC / HSBC US).
+- Cargar budgets reales para el resto de 2026.
 
 ## Procedimientos administrativos
 

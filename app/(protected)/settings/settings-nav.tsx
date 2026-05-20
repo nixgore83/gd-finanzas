@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 const LINKS = [
   { href: '/settings/metas', label: 'Metas', key: 'metas' as const },
   { href: '/settings/categorias', label: 'Categorías', key: 'categorias' as const },
+  { href: '/settings/backups', label: 'Backups', key: 'backups' as const },
 ];
 
 export type SettingsKey = (typeof LINKS)[number]['key'];

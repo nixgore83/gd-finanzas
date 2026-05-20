@@ -13,6 +13,8 @@ const serverEnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1),
   IMPORT_PARSER_MODEL_DEFAULT: z.string().min(1).default('claude-sonnet-4-6'),
   IMPORT_PARSER_MODEL_CHEAP: z.string().min(1).default('claude-haiku-4-5-20251001'),
+  GOOGLE_SERVICE_ACCOUNT_KEY_B64: z.string().optional(),
+  GOOGLE_DRIVE_BACKUP_FOLDER_ID: z.string().optional(),
 });
 
 const clientEnvSchema = z.object({

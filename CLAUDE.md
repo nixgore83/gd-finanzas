@@ -147,7 +147,7 @@ Antes de decir "listo" en cualquier hito: `npm run typecheck && npm test && npm 
 | 7 | Reporte D + Settings metas | Año económico + bloque "Trayectoria a IF" |
 | 8 | Imports con AI parser | Galicia Amex como primer caso |
 | 9 | Export contador | .zip con 5 CSVs |
-| 10 | Backups Drive | Cron semanal — **V1.1 funcional** |
+| 10 | Backups Drive ✅ | Cron semanal — **V1.1 funcional 🎉** |
 
 Deadline funcional: **review de octubre 2026**, primera revisión semestral del plan financiero con webapp andando.
 
