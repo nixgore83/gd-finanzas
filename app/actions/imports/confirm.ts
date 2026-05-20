@@ -107,6 +107,9 @@ export async function confirmImport(input: {
             notes: parsed.data.notes ?? null,
             fxRateOverride: null,
             tagIds: [],
+            transactionSubtype: 'standard',
+            deducibleGanancias: false,
+            meta: null,
           },
           session.householdId,
         );

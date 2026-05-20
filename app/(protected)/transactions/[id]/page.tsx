@@ -193,6 +193,19 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
           description: tx.description,
           notes: tx.notes,
           tagIds: currentTagIds,
+          transactionSubtype: tx.transactionSubtype as 'standard' | 'domestic_service',
+          deducibleGanancias: tx.deducibleGanancias,
+          meta:
+            tx.transactionSubtype === 'domestic_service' &&
+            tx.meta &&
+            typeof tx.meta === 'object'
+              ? (tx.meta as {
+                  empleado_nombre: string;
+                  empleado_cuil: string;
+                  concepto: 'sueldo' | 'aporte' | 'aguinaldo';
+                  periodo: string;
+                })
+              : null,
         }}
         initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
       />

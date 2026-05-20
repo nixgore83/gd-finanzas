@@ -23,9 +23,15 @@ import {
 } from '@/components/ui/select';
 import { CURRENCIES } from '@/lib/schemas/account';
 import {
+  DOMESTIC_SERVICE_CONCEPTOS,
   TRANSACTION_KINDS,
   TRANSACTION_KIND_LABELS,
+  TRANSACTION_SUBTYPES,
+  TRANSACTION_SUBTYPE_LABELS,
+  type DomesticServiceConcepto,
+  type DomesticServiceMeta,
   type TransactionKind,
+  type TransactionSubtype,
 } from '@/lib/schemas/transaction';
 import { cn } from '@/lib/utils';
 import { TagMultiSelect, type TagOption } from './tag-multi-select';
@@ -47,6 +53,9 @@ type Initial = {
   description: string;
   notes: string | null;
   tagIds?: string[];
+  transactionSubtype?: TransactionSubtype;
+  deducibleGanancias?: boolean;
+  meta?: DomesticServiceMeta | null;
 };
 
 type FxInfo = {
@@ -108,6 +117,23 @@ export function TransactionForm({
     initial?.currencyOriginal ?? firstAccount?.currencyDefault ?? 'ARS',
   );
 
+  const [transactionSubtype, setTransactionSubtype] = useState<TransactionSubtype>(
+    initial?.transactionSubtype ?? 'standard',
+  );
+  const [deducibleGanancias, setDeducibleGanancias] = useState<boolean>(
+    initial?.deducibleGanancias ?? false,
+  );
+  const [metaEmpleadoNombre, setMetaEmpleadoNombre] = useState<string>(
+    initial?.meta?.empleado_nombre ?? '',
+  );
+  const [metaEmpleadoCuil, setMetaEmpleadoCuil] = useState<string>(
+    initial?.meta?.empleado_cuil ?? '',
+  );
+  const [metaConcepto, setMetaConcepto] = useState<DomesticServiceConcepto>(
+    initial?.meta?.concepto ?? 'sueldo',
+  );
+  const [metaPeriodo, setMetaPeriodo] = useState<string>(initial?.meta?.periodo ?? '');
+
   function handleKindChange(next: string) {
     const nextKind = next as TransactionKind;
     setKind(nextKind);
@@ -115,6 +141,10 @@ export function TransactionForm({
     if (!stillValid) {
       const firstForKind = categories.find((c) => c.kind === nextKind);
       setCategoryId(firstForKind?.id ?? '');
+    }
+    // Servicio doméstico solo aplica a expense; al pasar a income reseteamos.
+    if (nextKind !== 'expense' && transactionSubtype === 'domestic_service') {
+      setTransactionSubtype('standard');
     }
   }
 
@@ -133,6 +163,14 @@ export function TransactionForm({
     formData.set('accountId', accountId);
     formData.set('categoryId', categoryId);
     formData.set('currencyOriginal', currencyOriginal);
+    formData.set('transactionSubtype', transactionSubtype);
+    formData.set('deducibleGanancias', deducibleGanancias ? '1' : '');
+    if (transactionSubtype === 'domestic_service') {
+      formData.set('meta_empleado_nombre', metaEmpleadoNombre);
+      formData.set('meta_empleado_cuil', metaEmpleadoCuil);
+      formData.set('meta_concepto', metaConcepto);
+      formData.set('meta_periodo', metaPeriodo);
+    }
     formData.delete('tagIds');
     selectedTagIds.forEach((id) => formData.append('tagIds', id));
     if (hiddenId) formData.set('id', hiddenId);
@@ -339,6 +377,106 @@ export function TransactionForm({
             disabled={isPending}
           />
           {errors.tagIds && <p className="text-sm text-destructive">{errors.tagIds}</p>}
+
+          <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+            <div className="flex items-center gap-2">
+              <input
+                id="deducibleGanancias"
+                type="checkbox"
+                checked={deducibleGanancias}
+                onChange={(e) => setDeducibleGanancias(e.target.checked)}
+                disabled={isPending}
+                className="size-4 rounded border-input"
+              />
+              <Label htmlFor="deducibleGanancias" className="cursor-pointer">
+                Deducible Ganancias
+              </Label>
+            </div>
+
+            {kind === 'expense' && (
+              <div className="space-y-2">
+                <Label htmlFor="transactionSubtype">Subtipo</Label>
+                <Select
+                  value={transactionSubtype}
+                  onValueChange={(v) => setTransactionSubtype(v as TransactionSubtype)}
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="transactionSubtype">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRANSACTION_SUBTYPES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {TRANSACTION_SUBTYPE_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {transactionSubtype === 'domestic_service' && kind === 'expense' && (
+              <div className="space-y-3 rounded-md border bg-background p-3">
+                <p className="text-xs text-muted-foreground">
+                  Datos del empleado para el export del contador (CSV 03).
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="meta_empleado_nombre">Empleado</Label>
+                    <Input
+                      id="meta_empleado_nombre"
+                      value={metaEmpleadoNombre}
+                      onChange={(e) => setMetaEmpleadoNombre(e.target.value)}
+                      disabled={isPending}
+                      placeholder="Nombre completo"
+                      aria-invalid={errors.meta ? true : undefined}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="meta_empleado_cuil">CUIL</Label>
+                    <Input
+                      id="meta_empleado_cuil"
+                      value={metaEmpleadoCuil}
+                      onChange={(e) => setMetaEmpleadoCuil(e.target.value)}
+                      disabled={isPending}
+                      placeholder="##-########-#"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="meta_concepto">Concepto</Label>
+                    <Select
+                      value={metaConcepto}
+                      onValueChange={(v) => setMetaConcepto(v as DomesticServiceConcepto)}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger id="meta_concepto">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DOMESTIC_SERVICE_CONCEPTOS.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="meta_periodo">Período (YYYY-MM)</Label>
+                    <Input
+                      id="meta_periodo"
+                      type="month"
+                      value={metaPeriodo}
+                      onChange={(e) => setMetaPeriodo(e.target.value)}
+                      disabled={isPending}
+                      placeholder="2026-05"
+                    />
+                  </div>
+                </div>
+                {errors.meta && <p className="text-sm text-destructive">{errors.meta}</p>}
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="fxRateOverride">FX rate (opcional — sobrescribe BCRA)</Label>

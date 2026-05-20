@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: '/budget', label: 'Presupuesto' },
   { href: '/reports/cashflow', label: 'Reportes' },
   { href: '/imports', label: 'Imports' },
+  { href: '/exports', label: 'Exports' },
   { href: '/tags', label: 'Etiquetas' },
   { href: '/settings', label: 'Settings' },
 ];

@@ -173,3 +173,123 @@ describe('parseTransactionFormData', () => {
     if (out.success) expect(out.data.notes).toBeNull();
   });
 });
+
+describe('extensions: subtype, deducible, meta', () => {
+  it('defaults: standard, no deducible, meta null', () => {
+    const out = transactionInputSchema.parse(validBase);
+    expect(out.transactionSubtype).toBe('standard');
+    expect(out.deducibleGanancias).toBe(false);
+    expect(out.meta).toBeNull();
+  });
+
+  it('domestic_service requires meta válida', () => {
+    const out = transactionInputSchema.safeParse({
+      ...validBase,
+      transactionSubtype: 'domestic_service',
+      meta: null,
+    });
+    expect(out.success).toBe(false);
+  });
+
+  it('domestic_service con meta válida pasa', () => {
+    const out = transactionInputSchema.parse({
+      ...validBase,
+      transactionSubtype: 'domestic_service',
+      meta: {
+        empleado_nombre: 'Rougier Nahir',
+        empleado_cuil: '27-41996999-6',
+        concepto: 'sueldo',
+        periodo: '2026-05',
+      },
+    });
+    expect(out.transactionSubtype).toBe('domestic_service');
+    expect(out.meta?.empleado_cuil).toBe('27-41996999-6');
+  });
+
+  it('domestic_service rechaza CUIL mal formado', () => {
+    const out = transactionInputSchema.safeParse({
+      ...validBase,
+      transactionSubtype: 'domestic_service',
+      meta: {
+        empleado_nombre: 'X',
+        empleado_cuil: '27419969996',
+        concepto: 'sueldo',
+        periodo: '2026-05',
+      },
+    });
+    expect(out.success).toBe(false);
+  });
+
+  it('domestic_service rechaza periodo YYYY-MM-DD', () => {
+    const out = transactionInputSchema.safeParse({
+      ...validBase,
+      transactionSubtype: 'domestic_service',
+      meta: {
+        empleado_nombre: 'X',
+        empleado_cuil: '27-41996999-6',
+        concepto: 'sueldo',
+        periodo: '2026-05-15',
+      },
+    });
+    expect(out.success).toBe(false);
+  });
+
+  it('domestic_service solo aplica a expense (income rechazado)', () => {
+    const out = transactionInputSchema.safeParse({
+      ...validBase,
+      kind: 'income',
+      transactionSubtype: 'domestic_service',
+      meta: {
+        empleado_nombre: 'X',
+        empleado_cuil: '27-41996999-6',
+        concepto: 'sueldo',
+        periodo: '2026-05',
+      },
+    });
+    expect(out.success).toBe(false);
+  });
+
+  it('deducibleGanancias toma true cuando se setea', () => {
+    const out = transactionInputSchema.parse({ ...validBase, deducibleGanancias: true });
+    expect(out.deducibleGanancias).toBe(true);
+  });
+});
+
+describe('parseTransactionFormData: nuevos campos', () => {
+  it('checkbox on=true', () => {
+    const fd = new FormData();
+    fd.set('date', validBase.date);
+    fd.set('accountId', validBase.accountId);
+    fd.set('categoryId', validBase.categoryId);
+    fd.set('kind', validBase.kind);
+    fd.set('amountOriginal', validBase.amountOriginal);
+    fd.set('currencyOriginal', validBase.currencyOriginal);
+    fd.set('description', validBase.description);
+    fd.set('deducibleGanancias', '1');
+    const out = parseTransactionFormData(fd);
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.deducibleGanancias).toBe(true);
+  });
+
+  it('subtype domestic_service + meta desde FormData', () => {
+    const fd = new FormData();
+    fd.set('date', validBase.date);
+    fd.set('accountId', validBase.accountId);
+    fd.set('categoryId', validBase.categoryId);
+    fd.set('kind', 'expense');
+    fd.set('amountOriginal', '50000');
+    fd.set('currencyOriginal', 'ARS');
+    fd.set('description', 'Sueldo Rougier');
+    fd.set('transactionSubtype', 'domestic_service');
+    fd.set('meta_empleado_nombre', 'Rougier Nahir');
+    fd.set('meta_empleado_cuil', '27-41996999-6');
+    fd.set('meta_concepto', 'sueldo');
+    fd.set('meta_periodo', '2026-05');
+    const out = parseTransactionFormData(fd);
+    expect(out.success).toBe(true);
+    if (out.success) {
+      expect(out.data.transactionSubtype).toBe('domestic_service');
+      expect(out.data.meta?.empleado_nombre).toBe('Rougier Nahir');
+    }
+  });
+});

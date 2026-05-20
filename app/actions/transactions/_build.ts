@@ -40,6 +40,9 @@ export type BuiltTransactionFields = {
   fxRateSource: string;
   description: string;
   notes: string | null;
+  transactionSubtype: 'standard' | 'domestic_service';
+  deducibleGanancias: boolean;
+  meta: Record<string, unknown>;
 };
 
 export type BuildResult =
@@ -131,6 +134,9 @@ export async function buildTransactionFields(
       fxRateSource,
       description: input.description,
       notes: input.notes,
+      transactionSubtype: input.transactionSubtype,
+      deducibleGanancias: input.deducibleGanancias,
+      meta: input.meta ?? {},
     },
   };
 }

@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 8 cerrado — Imports con AI parser (Galicia + ICBC + HSBC US). Próximo: Hito 9 (Export contador).**
+**Hito 9 cerrado — Export contador (.zip con 5 CSVs). Próximo: Hito 10 (Backups Drive) → V1.1 funcional.**
 
 ---
 
@@ -316,7 +316,43 @@ Sub-hito 7.B.4 (página + charts + nav):
 - Setear `ANTHROPIC_API_KEY` en `.env.local` y en Vercel Production.
 - Correr `npm run storage:setup` para crear el bucket privado `imports` en Supabase (o crearlo desde Supabase Studio: bucket "imports", privado, file size limit 20MB).
 
-### ⏳ Hito 9 — Export contador
+### 🟢 Hito 9 — Export contador
+
+**9.A — Schema/form: subtype, meta domestic_service, deducible (2026-05-20, hecho):**
+- [x] `lib/schemas/transaction.ts`: agregados `transactionSubtype` enum ('standard'|'domestic_service'), `deducibleGanancias` boolean, `meta` jsonb con `domesticServiceMetaSchema` (empleado_nombre, empleado_cuil regex `##-########-#`, concepto enum sueldo/aporte/aguinaldo, periodo YYYY-MM). `superRefine`: domestic_service exige meta + solo aplica a expense
+- [x] `parseTransactionFormData` lee los nuevos campos del FormData (incluye prefijo `meta_` para los 4 fields condicionales)
+- [x] `app/(protected)/transactions/transaction-form.tsx`: bloque nuevo con checkbox Deducible + Select Subtipo (solo visible si kind=expense) + render condicional de los 4 inputs domestic_service
+- [x] `app/actions/transactions/_build.ts`: `BuiltTransactionFields` extendido con los 3 nuevos campos; se propaga a `create.ts` y `update.ts` (este último ya usaba `set(built.fields)` así que sin cambios)
+- [x] `app/actions/imports/confirm.ts`: actualizado para pasar defaults (`'standard'`, `false`, `null`) al `buildTransactionFields` desde el flow de imports
+- [x] `app/(protected)/transactions/[id]/page.tsx`: edit page carga `transactionSubtype`, `deducibleGanancias` y `meta` desde el row y los pasa al form
+- [x] Tests Zod: +9 (defaults, validación CUIL/periodo, mismatch kind, parseFormData con nuevos campos)
+
+**9.B — CSV utility + 5 builders + README puros (2026-05-20, hecho):**
+- [x] `npm i jszip` (3.10.x)
+- [x] `lib/exports/csv.ts`: `toCsv(rows, headers)` con BOM UTF-8, CRLF, escape de comillas/comas/newlines; 7 tests
+- [x] `lib/exports/types.ts`: types compartidos `ExportTx`, `ExportAccount`, `ExportCategory` + helpers `monthOf`, `yearOf`
+- [x] `lib/exports/ingresos.ts`: filtra kind='income', sorted by date, columnas multi-moneda (original + USD + ARS)
+- [x] `lib/exports/consumos-tc.ts`: filtra account.type='credit_card' + kind='expense'; agrupa por (account, mes, moneda) con totales y count
+- [x] `lib/exports/servicio-domestico.ts`: filtra subtype='domestic_service'; expande meta jsonb a columnas (parsea con `domesticServiceMetaSchema`, skipea si meta inválida)
+- [x] `lib/exports/gastos-deducibles.ts`: filtra `deducibleGanancias=true`
+- [x] `lib/exports/otros-ingresos.ts`: filtra income con categoria.name que NO matchea `/sueldo/i`. Heurística simple; V1.2 reemplaza por flag explícito
+- [x] `lib/exports/readme.ts`: README con disclaimer del PRD §5.7 + lista de archivos + alcance + items patrimoniales V2
+- [x] Tests builders: +10 (filter por tipo, sort, agregación TC, expand meta, skip meta inválida, deducible filter, sin sueldo)
+
+**9.C — Zip + route handler (2026-05-20, hecho):**
+- [x] `lib/exports/ganancias-data.ts`: loader que carga txns del año (WHERE date BETWEEN year-01-01 y year-12-31, household scoped) + accounts + categorías + nombre household. Devuelve `GananciasData`
+- [x] `lib/exports/ganancias-zip.ts`: usa JSZip, llama a los 5 builders + README, genera Uint8Array con compression DEFLATE
+- [x] `app/api/exports/ganancias/route.ts`: GET handler con `requireHouseholdSession()` (cookie auth), validación de `?year=` con Zod (rango 2020-2100), default año actual. Devuelve `Response` con `Content-Type: application/zip` + `Content-Disposition: attachment; filename=ganancias-{year}-{household-slug}.zip` + `Cache-Control: no-store`. No persiste — cumple PRD §7
+
+**9.D — UI /exports + nav (2026-05-20, hecho):**
+- [x] `app/(protected)/exports/page.tsx` (server): header + card con descripción del Ganancias export + selector año + botón descarga + bloque amber con disclaimer "cubre ~30% del checklist, patrimoniales V2"
+- [x] `app/(protected)/exports/exports-client.tsx`: client component con Select de año (6 años hacia atrás) + Button asChild con `<a href download>` que apunta al route handler. Sin fetch ni transición — el browser descarga directo
+- [x] Nav link "Exports" en layout protegido entre "Imports" y "Etiquetas"
+
+**9.E — Validación + cierre (2026-05-20, hecho):**
+- [x] Validación verde: typecheck + lint + 236 tests + build (`/exports` y `/api/exports/ganancias` registradas) + `db:smoke-rls` 8/8
+
+**Hito 9 cerrado.**
 
 ### ⏳ Hito 10 — Backups Drive
 **V1.1 funcional.**
@@ -346,6 +382,22 @@ Sub-hito 7.B.4 (página + charts + nav):
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 9
+
+- **Sumamos UI mínimo para `transaction_subtype` y `deducible_ganancias` en el form de tx** en este mismo hito. Razón: sin esos campos el CSV 03 (servicio doméstico) y el 04 (deducibles) salen vacíos. Postergarlos a V1.2 dejaba el export a medias. Costo: ~80 líneas adicionales al form.
+- **`domesticServiceMetaSchema` con regex CUIL `##-########-#` y periodo `YYYY-MM`**: el contador necesita CUIL bien formado para procesar. Validación strict en Zod; el form usa `<input type="month">` para el periodo, lo que evita errores de formato.
+- **Servicio doméstico solo aplica a expense** (refine en el schema). Si el user setea kind=income con subtype=domestic_service, falla la validación. Decisión: no se modela "income" de servicio doméstico (esa plata no entra al household). El form también auto-resetea el subtype a 'standard' si el kind cambia a income.
+- **05_otros_ingresos heurística por nombre** (`/sueldo/i NOT IN categoria.name`). V1 simple, sin schema change. Cuando se cierre la taxonomía con Nico, se reemplaza por flag explícito o lista hardcoded de category IDs. Heurística cubre los 2 categorías del seed real ("Sueldo Nico", "Sueldo Pau" → quedan en 01, no en 05).
+- **Zip on-the-fly, sin Storage**. Route handler genera Uint8Array en memoria y responde directo con `Content-Type: application/zip`. Cumple PRD §7 "no persistir >24h" por default. Sin retención que gestionar, sin cron de cleanup, sin signed URLs. Cuando V2 quiera historial de exports, se mueve a Storage.
+- **CSV format: UTF-8 con BOM + CRLF + comillas dobles condicionales** (solo si el valor contiene `,`, `"`, `\n` o `\r`). Excel-friendly. CRLF (no LF) porque algunos parsers contables AR esperan ese line ending. BOM para que Excel detecte UTF-8 (sino lee como Latin-1).
+- **Money en 3 columnas separadas** (`amount_original` + `monto_usd` + `monto_ars`) — el contador elige cuál usar. Triple ancho del CSV pero ahorra que pregunte "che, ¿esto era USD o ARS?".
+- **Consumos TC agrupados por (account, mes, moneda)** con count + totales, no fila por consumo individual. Ahorra ruido al contador; si quiere detalle por consumo va al 01_ingresos o a `/transactions`. Decisión basada en PRD §5.7 "totales por tarjeta y moneda".
+- **Servicio doméstico saltea silenciosamente filas con meta inválida** (sin meta o meta corrupta). Defensa: si por bug se persistió una tx con subtype='domestic_service' sin meta, no rompe el export — solo desaparece esa fila del CSV. Si surge un caso así, se ve en `/transactions` y se corrige.
+- **Sin cron de FX backfill en este hito**: el export usa `amount_usd` y `amount_ars` que ya están persistidos por la transacción al momento de crearla. No requiere ningún recálculo de FX.
+- **Categoría 'Alquileres' NO se suma al seed**: se confía en que cuando Nico cierre la taxonomía la creará. Mientras tanto la heurística `/sueldo/i NOT IN` agarra cualquier income que no sea sueldo y la mete en 05.
+- **`requireHouseholdSession()` funciona en route handlers** porque internamente usa `createClient()` de `@supabase/ssr` que lee cookies del request. Sin necesidad de Bearer auth especial — la cookie está presente porque el browser la envía en el `<a href download>`.
+- **Filename del zip incluye slug del household**: `ganancias-2026-garaglio-dasso.zip`. Permite tener exports de múltiples households (si en V2 hubiera más) en una sola carpeta sin colisión.
 
 ## Decisiones tomadas en Hito 8
 

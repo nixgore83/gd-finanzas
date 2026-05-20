@@ -48,7 +48,6 @@ export async function createTransaction(formData: FormData): Promise<CreateTrans
         .values({
           householdId: session.householdId,
           ...built.fields,
-          transactionSubtype: 'standard',
           source: 'manual',
           createdBy: session.userId,
         })
