@@ -19,11 +19,10 @@ import { getDb } from '@/lib/db/client';
 import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
-import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DeleteTransactionButton } from './delete-button';
+import { TransactionsTable, type TxRow } from './transactions-table';
 
 export const metadata = {
   title: 'Transacciones · gd-finanzas',
@@ -77,16 +76,6 @@ function buildHref(base: string, filters: Filters, pageOverride: number): string
   if (pageOverride > 1) sp.set('page', String(pageOverride));
   const qs = sp.toString();
   return qs.length > 0 ? `${base}?${qs}` : base;
-}
-
-function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
-  const n = Number.parseFloat(amount);
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(n) ? n : 0);
 }
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -239,13 +228,77 @@ export default async function TransactionsPage({
         </div>
       ) : (
         <>
-          {/* Form GET nativo: submit recarga con nuevos searchParams.
-              IMPORTANTE: no incluir input hidden de `page` — submitting reset
-              al default (1) para que cambiar filtros vuelva a la página 1. */}
+          {(() => {
+            const activeChips: Array<{ label: string; value: string }> = [];
+            if (filters.kind) {
+              const kindLabel =
+                filters.kind === 'income'
+                  ? 'Ingreso'
+                  : filters.kind === 'expense'
+                    ? 'Gasto'
+                    : 'Transferencia';
+              activeChips.push({ label: 'Tipo', value: kindLabel });
+            }
+            if (filters.accountId) {
+              const acc = accountOptions.find((a) => a.id === filters.accountId);
+              activeChips.push({ label: 'Cuenta', value: acc?.name ?? '—' });
+            }
+            if (filters.categoryId) {
+              const cat = categoryOptions.find((c) => c.id === filters.categoryId);
+              activeChips.push({ label: 'Categoría', value: cat?.name ?? '—' });
+            }
+            if (filters.tagId) {
+              const tag = tagOptions.find((t) => t.id === filters.tagId);
+              activeChips.push({ label: 'Tag', value: tag?.name ?? '—' });
+            }
+            if (filters.from) activeChips.push({ label: 'Desde', value: filters.from });
+            if (filters.to) activeChips.push({ label: 'Hasta', value: filters.to });
+            if (filters.q) activeChips.push({ label: 'Texto', value: filters.q });
+            if (activeChips.length === 0) return null;
+            return (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+                <span className="text-muted-foreground">Filtros activos:</span>
+                {activeChips.map((c, i) => (
+                  <span
+                    key={i}
+                    className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary"
+                  >
+                    {c.label}: {c.value}
+                  </span>
+                ))}
+                <Link
+                  href="/transactions"
+                  className="ml-auto text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  Limpiar
+                </Link>
+              </div>
+            );
+          })()}
+
+          {/* Form GET collapsible. Default cerrado para no robar vertical;
+              si hay filtros activos, abierto. */}
+          <details
+            className="rounded-md border bg-muted/20"
+            open={
+              !!(
+                filters.kind ||
+                filters.accountId ||
+                filters.categoryId ||
+                filters.tagId ||
+                filters.from ||
+                filters.to ||
+                filters.q
+              )
+            }
+          >
+            <summary className="cursor-pointer select-none px-4 py-2 text-sm font-medium">
+              Filtros
+            </summary>
           <form
             method="get"
             action="/transactions"
-            className="rounded-md border bg-muted/20 p-4 space-y-3"
+            className="p-4 pt-2 space-y-3"
           >
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-1.5 md:col-span-2">
@@ -336,6 +389,7 @@ export default async function TransactionsPage({
               <Button type="submit">Aplicar</Button>
             </div>
           </form>
+          </details>
 
           {rows.length === 0 ? (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -345,83 +399,21 @@ export default async function TransactionsPage({
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40">
-                    <tr className="text-left">
-                      <th className="px-3 py-2 font-medium">Fecha</th>
-                      <th className="px-3 py-2 font-medium">Tipo</th>
-                      <th className="px-3 py-2 font-medium">Cuenta</th>
-                      <th className="px-3 py-2 font-medium">Categoría</th>
-                      <th className="px-3 py-2 text-right font-medium">Monto</th>
-                      <th className="px-3 py-2 text-right font-medium">USD</th>
-                      <th className="px-3 py-2 font-medium">Descripción</th>
-                      <th className="px-3 py-2 font-medium" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.id} className="border-t">
-                        <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                          {row.date}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={
-                              row.kind === 'income'
-                                ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'
-                                : row.kind === 'expense'
-                                  ? 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
-                                  : 'rounded bg-sky-50 px-1.5 py-0.5 text-xs text-sky-700'
-                            }
-                          >
-                            {ALL_KIND_LABELS[row.kind as keyof typeof ALL_KIND_LABELS] ?? row.kind}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">{row.accountName ?? '—'}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {row.categoryName ?? '—'}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {formatAmount(row.amountOriginal, row.currencyOriginal)}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                          {formatAmount(row.amountUsd, 'USD')}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span>{row.description}</span>
-                            {(tagsByTx.get(row.id) ?? []).map((t, i) => (
-                              <span
-                                key={i}
-                                className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
-                                style={
-                                  t.color
-                                    ? { borderColor: t.color, color: t.color }
-                                    : {
-                                        borderColor: 'rgb(229 231 235)',
-                                        color: 'rgb(107 114 128)',
-                                      }
-                                }
-                              >
-                                {t.name}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/transactions/${row.id}`}>Editar</Link>
-                            </Button>
-                            <DeleteTransactionButton id={row.id} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {(() => {
+                const tableRows: TxRow[] = rows.map((row) => ({
+                  id: row.id,
+                  date: row.date,
+                  kind: row.kind as 'income' | 'expense' | 'transfer',
+                  amountOriginal: row.amountOriginal,
+                  currencyOriginal: row.currencyOriginal,
+                  amountUsd: row.amountUsd,
+                  description: row.description,
+                  accountName: row.accountName,
+                  categoryName: row.categoryName,
+                  tags: tagsByTx.get(row.id) ?? [],
+                }));
+                return <TransactionsTable rows={tableRows} categories={categoryOptions} />;
+              })()}
 
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>

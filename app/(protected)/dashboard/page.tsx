@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadDashboardData } from '@/lib/reports/dashboard-data';
-import { deltaTone } from '@/lib/reports/cashflow';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SparklineKpiCard } from '@/components/dashboard/sparkline-kpi-card';
 import { cn } from '@/lib/utils';
 
 export const metadata = { title: 'Dashboard · gd-finanzas' };
@@ -24,8 +24,8 @@ const MONTH_LABELS = [
   'Diciembre',
 ];
 
-function formatUsd(amount: string, withDecimals = false): string {
-  const n = Number.parseFloat(amount);
+function formatUsd(amount: string | number, withDecimals = false): string {
+  const n = typeof amount === 'number' ? amount : Number.parseFloat(amount);
   if (!Number.isFinite(n)) return '—';
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -46,10 +46,27 @@ function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
   }).format(n);
 }
 
-function toneClass(tone: 'good' | 'bad' | 'neutral'): string {
-  if (tone === 'good') return 'text-emerald-700';
-  if (tone === 'bad') return 'text-rose-700';
-  return 'text-muted-foreground';
+function formatPct(pct: number | null): string {
+  if (pct === null) return '—';
+  return `${pct.toFixed(1)}%`;
+}
+
+function deltaText(d: number): { text: string; tone: 'good' | 'bad' | 'neutral' } {
+  if (Math.abs(d) < 0.005) return { text: '—', tone: 'neutral' };
+  const sign = d > 0 ? '+' : '';
+  return {
+    text: `${sign}${formatUsd(d)}`,
+    tone: d >= 0 ? 'good' : 'bad',
+  };
+}
+
+function deltaTextExpense(d: number): { text: string; tone: 'good' | 'bad' | 'neutral' } {
+  if (Math.abs(d) < 0.005) return { text: '—', tone: 'neutral' };
+  const sign = d > 0 ? '+' : '';
+  return {
+    text: `${sign}${formatUsd(d)}`,
+    tone: d <= 0 ? 'good' : 'bad',
+  };
 }
 
 export default async function DashboardPage() {
@@ -68,44 +85,80 @@ export default async function DashboardPage() {
 
   const data = await loadDashboardData(session.householdId, year, month);
 
-  const incomeTone = deltaTone('income', data.totals.income.delta);
-  const expenseTone = deltaTone('expense', data.totals.expense.delta);
-  const netTone = deltaTone('income', data.totals.net.delta);
+  const last = data.monthly[data.monthly.length - 1];
+  const prev = data.monthly[data.monthly.length - 2];
+  const incomeDelta = last && prev ? last.income - prev.income : 0;
+  const expenseDelta = last && prev ? last.expense - prev.expense : 0;
+  const netDelta = last && prev ? last.net - prev.net : 0;
+
+  const savingsPct =
+    last && last.income > 0 ? ((last.income - last.expense) / last.income) * 100 : null;
+  const prevSavingsPct =
+    prev && prev.income > 0 ? ((prev.income - prev.expense) / prev.income) * 100 : null;
+  const savingsDelta =
+    savingsPct !== null && prevSavingsPct !== null ? savingsPct - prevSavingsPct : null;
+
+  const topMax = data.topExpenseCategories.reduce(
+    (acc, c) => Math.max(acc, Number.parseFloat(c.total) || 0),
+    0,
+  );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">{monthLabel}</p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">{monthLabel}</p>
+        </div>
+        <Link
+          href="/reports/cashflow"
+          className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Ver cashflow del mes →
+        </Link>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <KpiCard
-          title="Ingresos del mes"
-          real={data.totals.income.real}
-          budget={data.totals.income.budget}
-          delta={data.totals.income.delta}
-          tone={incomeTone}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SparklineKpiCard
+          label="Ingresos del mes"
+          value={formatUsd(data.totals.income.real)}
+          delta={prev ? deltaText(incomeDelta) : null}
+          data={data.monthly.map((m) => m.income)}
+          color="emerald"
         />
-        <KpiCard
-          title="Gastos del mes"
-          real={data.totals.expense.real}
-          budget={data.totals.expense.budget}
-          delta={data.totals.expense.delta}
-          tone={expenseTone}
+        <SparklineKpiCard
+          label="Gastos del mes"
+          value={formatUsd(data.totals.expense.real)}
+          delta={prev ? deltaTextExpense(expenseDelta) : null}
+          data={data.monthly.map((m) => m.expense)}
+          color="rose"
         />
-        <KpiCard
-          title="Neto del mes"
-          real={data.totals.net.real}
-          budget={data.totals.net.budget}
-          delta={data.totals.net.delta}
-          tone={netTone}
+        <SparklineKpiCard
+          label="Neto del mes"
+          value={formatUsd(data.totals.net.real)}
+          delta={prev ? deltaText(netDelta) : null}
+          data={data.monthly.map((m) => m.net)}
+          color="violet"
         />
-      </div>
+        <SparklineKpiCard
+          label="Tasa de ahorro"
+          value={formatPct(savingsPct)}
+          delta={
+            savingsDelta !== null
+              ? {
+                  text: `${savingsDelta > 0 ? '+' : ''}${savingsDelta.toFixed(1)}pp`,
+                  tone: savingsDelta >= 0 ? 'good' : 'bad',
+                }
+              : null
+          }
+          data={data.monthly.map((m) =>
+            m.income > 0 ? ((m.income - m.expense) / m.income) * 100 : 0,
+          )}
+          color="sky"
+        />
+      </section>
 
-      {/* Top 5 + Próximas 14 días */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Top 5 gastos del mes</CardTitle>
@@ -114,21 +167,32 @@ export default async function DashboardPage() {
             {data.topExpenseCategories.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin gastos este mes.</p>
             ) : (
-              <ul className="space-y-1.5 text-sm">
-                {data.topExpenseCategories.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3">
-                    <span>{c.name}</span>
-                    <span className="tabular-nums text-muted-foreground">{formatUsd(c.total)}</span>
-                  </li>
-                ))}
+              <ul className="space-y-2 text-sm">
+                {data.topExpenseCategories.map((c) => {
+                  const n = Number.parseFloat(c.total) || 0;
+                  const pct = topMax > 0 ? (n / topMax) * 100 : 0;
+                  return (
+                    <li key={c.id}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate">{c.name}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {formatUsd(c.total)}
+                        </span>
+                      </div>
+                      <div
+                        className="mt-1 h-1 overflow-hidden rounded-full bg-muted"
+                        aria-hidden
+                      >
+                        <div
+                          className="h-full rounded-full bg-rose-500/70"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
-            <Link
-              href="/reports/cashflow"
-              className="mt-3 inline-block text-xs text-muted-foreground hover:underline"
-            >
-              Ver cashflow del mes →
-            </Link>
           </CardContent>
         </Card>
 
@@ -140,14 +204,14 @@ export default async function DashboardPage() {
             {data.upcomingForecasts.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin previsiones próximas.</p>
             ) : (
-              <ul className="space-y-1.5 text-sm">
-                {data.upcomingForecasts.map((f) => (
-                  <li key={f.id} className="flex items-center justify-between gap-3">
-                    <span>
-                      <span className="text-muted-foreground">{f.expectedDate}</span>{' '}
-                      <span>{f.recurrenceName}</span>
+              <ul className="divide-y divide-border text-sm">
+                {data.upcomingForecasts.slice(0, 8).map((f) => (
+                  <li key={f.id} className="flex items-center justify-between gap-3 py-1.5">
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium">{f.recurrenceName}</span>
+                      <span className="text-xs text-muted-foreground">{f.expectedDate}</span>
                     </span>
-                    <span className="tabular-nums text-muted-foreground">
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
                       {formatAmount(f.expectedAmount, f.currency)}
                     </span>
                   </li>
@@ -156,18 +220,25 @@ export default async function DashboardPage() {
             )}
             <Link
               href="/forecasts"
-              className="mt-3 inline-block text-xs text-muted-foreground hover:underline"
+              className="mt-3 inline-block text-xs text-muted-foreground hover:text-foreground hover:underline"
             >
               Ver todas las previsiones →
             </Link>
           </CardContent>
         </Card>
-      </div>
+      </section>
 
-      {/* Últimas 10 transacciones */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Últimas transacciones</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Últimas transacciones</CardTitle>
+            <Link
+              href="/transactions"
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              Ver todas →
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           {data.recentTransactions.length === 0 ? (
@@ -192,9 +263,12 @@ export default async function DashboardPage() {
                         <span
                           className={cn(
                             'rounded px-1.5 py-0.5 text-xs',
-                            tx.kind === 'income' && 'bg-emerald-50 text-emerald-700',
-                            tx.kind === 'expense' && 'bg-rose-50 text-rose-700',
-                            tx.kind === 'transfer' && 'bg-sky-50 text-sky-700',
+                            tx.kind === 'income' &&
+                              'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+                            tx.kind === 'expense' &&
+                              'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
+                            tx.kind === 'transfer' &&
+                              'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
                           )}
                         >
                           {ALL_KIND_LABELS[tx.kind]}
@@ -211,43 +285,8 @@ export default async function DashboardPage() {
               </table>
             </div>
           )}
-          <Link
-            href="/transactions"
-            className="mt-3 inline-block text-xs text-muted-foreground hover:underline"
-          >
-            Ver todas las transacciones →
-          </Link>
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function KpiCard({
-  title,
-  real,
-  budget,
-  delta,
-  tone,
-}: {
-  title: string;
-  real: string;
-  budget: string;
-  delta: string;
-  tone: 'good' | 'bad' | 'neutral';
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-semibold tabular-nums">{formatUsd(real)}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Budget <span className="tabular-nums">{formatUsd(budget)}</span> ·{' '}
-          <span className={cn('tabular-nums', toneClass(tone))}>Δ {formatUsd(delta)}</span>
-        </p>
-      </CardContent>
-    </Card>
   );
 }

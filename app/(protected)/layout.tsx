@@ -1,24 +1,12 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { createClient } from '@/lib/supabase/server';
 import { getMfaState } from '@/lib/auth/mfa';
 import { getDb } from '@/lib/db/client';
 import { householdMembers, profiles } from '@/db/schema';
-
-const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/accounts', label: 'Cuentas' },
-  { href: '/transactions', label: 'Transacciones' },
-  { href: '/recurrences', label: 'Recurrencias' },
-  { href: '/forecasts', label: 'Previsiones' },
-  { href: '/budget', label: 'Presupuesto' },
-  { href: '/reports/cashflow', label: 'Reportes' },
-  { href: '/imports', label: 'Imports' },
-  { href: '/exports', label: 'Exports' },
-  { href: '/tags', label: 'Etiquetas' },
-  { href: '/settings', label: 'Settings' },
-];
+import { Sidebar } from '@/components/nav/sidebar';
+import { MobileNav } from '@/components/nav/mobile-nav';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -67,38 +55,29 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     .where(eq(profiles.id, user.id))
     .limit(1);
 
+  const displayName = profile?.displayName ?? user.email ?? null;
+
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-5">
-            <span className="text-sm font-medium">gd-finanzas</span>
-            <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-              {NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="hover:text-foreground hover:underline underline-offset-4"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
+    <div className="flex min-h-dvh">
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex md:shrink-0">
+        <Sidebar userDisplayName={displayName} />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar: hamburguesa + brand + theme toggle */}
+        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
+          <div className="flex items-center gap-3">
+            <MobileNav userDisplayName={displayName} />
+            <span className="text-sm font-semibold">gd-finanzas</span>
           </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{profile?.displayName ?? user.email}</span>
-            <form action="/auth/sign-out" method="post">
-              <button
-                type="submit"
-                className="text-sm underline underline-offset-4 hover:opacity-80"
-              >
-                Salir
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</div>
+          <ThemeToggle />
+        </header>
+
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+          <div className="mx-auto w-full max-w-5xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

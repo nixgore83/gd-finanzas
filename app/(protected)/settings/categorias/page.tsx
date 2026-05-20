@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { loadCategoryTree, type CategoryNode } from '@/lib/categories/tree';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { SettingsNav } from '../settings-nav';
 import { InvestmentToggle } from './investment-toggle';
 
 export const metadata = {
@@ -26,7 +25,6 @@ export default async function CategoriasPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <SettingsNav active="categorias" />
       <div>
         <h1 className="text-2xl font-semibold">Categorías</h1>
         <p className="text-sm text-muted-foreground">

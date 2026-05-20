@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { DriveConfigError, getBackupFolderId, listBackups, type BackupFile } from '@/lib/backups/drive';
 import { BACKUP_RETENTION } from '@/lib/backups/prune';
-import { SettingsNav } from '../settings-nav';
 import { RunNowButton } from './run-now-button';
 
 export const metadata = {
@@ -52,7 +51,6 @@ export default async function BackupsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <SettingsNav active="backups" />
       <div>
         <h1 className="text-2xl font-semibold">Backups</h1>
         <p className="text-sm text-muted-foreground">

@@ -48,6 +48,7 @@
     "clsx": "^2.1.1",
     "decimal.js": "^10.4.3",
     "drizzle-orm": "^0.36.0",
+    "geist": "^1.7.1",
     "googleapis": "^172.0.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.460.0",

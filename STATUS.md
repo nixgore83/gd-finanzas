@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**🎉 V1.1 funcional completo — Hitos 0-10 cerrados.** Pendiente operacional: setup del service account Drive + wipe smoke + cargar info real.
+**🎉 V1.1 funcional + Hito UI completo — Hitos 0-10 + UI cerrados.** Pendiente operacional: setup del service account Drive + wipe smoke + cargar info real.
 
 ---
 
@@ -396,6 +396,43 @@ Sub-hito 7.B.4 (página + charts + nav):
 8. Redeploy Vercel.
 9. Smoke: `/settings/backups` → "Backup ahora" → ver archivo en Drive.
 
+### 🟢 Hito UI — Polish V1.1 (2026-05-20)
+
+Post-V1.1 funcional, antes de cargar info real:
+
+**UI.A — Theme foundation (Geist + emerald + dark mode):**
+- [x] `npm i geist` — package oficial Vercel
+- [x] `app/layout.tsx`: aplica `GeistSans.variable` + `GeistMono.variable` al `<html>`; script anti-flash inline en `<head>` que lee `localStorage` antes del hydrate y aplica class `dark` (evita flicker)
+- [x] `app/globals.css` reescrito con Tailwind v4 `@theme` + `@custom-variant dark`. Paleta nueva basada en neutrals + emerald accent. Variables CSS en `:root` (light) y `.dark` (dark). `--color-sidebar` separada para el sidebar
+- [x] `components/theme/theme-toggle.tsx`: usa `useSyncExternalStore` para leer localStorage (evita el lint `react-hooks/set-state-in-effect`). 3 estados: light/dark/system; cicla en click. Lucide icons Sun/Moon/Monitor
+- [x] Suscripción a `(prefers-color-scheme: dark)` cuando theme='system' para responder a cambios del OS en vivo
+
+**UI.B — Sidebar nav + responsive:**
+- [x] `components/nav/sidebar-sections.ts`: definición declarativa de las 5 secciones (Operar/Planificar/Reportes/Tools/Settings) + `isActiveLink(pathname, link)` helper con soporte de `matchPrefix` para que `/transactions/[id]` también marque activo el item "Transacciones"
+- [x] `components/nav/sidebar.tsx` (client): sidebar 256px con header (logo) + scrollable middle (5 secciones con sub-headers small-caps) + footer (user + ThemeToggle + Salir). Highlight con `bg-primary/10 text-primary` para active
+- [x] `components/nav/mobile-nav.tsx` (client): hamburguesa + drawer custom sin Radix Dialog (50 líneas vs ~80KB de dep). Backdrop con blur, lock scroll del body mientras abierto
+- [x] `app/(protected)/layout.tsx` reescrito: grid 2 cols (sidebar fija desktop, main fluido). Top bar mobile-only con hamburguesa + brand + theme toggle. Eliminado el old top-nav de 11 links flat
+- [x] `SettingsNav` eliminado (sidebar reemplaza la navegación entre Metas/Categorías/Backups). `ReportsNav` se mantiene como breadcrumb interno de reportes (patrón complementario válido)
+
+**UI.C — Dashboard polish:**
+- [x] `lib/reports/dashboard-data.ts` ampliado: nuevo campo `monthly: DashboardMonthPoint[]` con últimos 6 meses (income/expense/net por mes). Query agrupa por `extract(year/month from date)` + kind. Gaps se llenan con 0
+- [x] `components/dashboard/sparkline-kpi-card.tsx` (client): card con label + value + delta tinted (good/bad/neutral) + mini area chart (recharts) con gradient stop. 4 colors: emerald/rose/violet/sky
+- [x] `app/(protected)/dashboard/page.tsx` re-layout: header con título prominente y mes, grid 4 KPIs (Ingresos / Gastos / Neto / Tasa de ahorro) cada uno con sparkline + Δ vs mes anterior. Top 5 gastos con barras horizontales (rose-500/70 sobre muted). Próximas previsiones cap 8 en lugar de unlimited. Recent txns con badges tinted dark-aware
+
+**UI.D — /transactions polish + bulk actions:**
+- [x] Filtros wrapped en `<details>` collapsible, default cerrado cuando no hay filtros activos, abierto si alguno seteado
+- [x] Chips de filtros activos arriba del details cuando hay alguno (Tipo / Cuenta / Categoría / Tag / Desde / Hasta / Texto) + link "Limpiar"
+- [x] `app/(protected)/transactions/transactions-table.tsx` (client): wrapper que recibe rows + categorías del server. State de `Set<string>` para selected ids
+- [x] Agrupación visual por día: filas-separador con la fecha formateada (`dd MMM yyyy`)
+- [x] Bulk panel: aparece cuando hay >=1 seleccionada. Muestra count + Select de categoría (filtrado por kind uniforme; deshabilitado si selección con kinds mixtos) + botones "Aplicar" / "Borrar N" / "Limpiar"
+- [x] `app/actions/transactions/bulk-delete.ts`: server action que borra batch + extiende a transfer_pair_id (mismo helper que delete individual, scopeado a household)
+- [x] `app/actions/transactions/bulk-set-category.ts`: filtra mismatches de kind y reporta `skipped`; igual patrón que el bulk de imports
+
+**UI.E — Validación + cierre:**
+- [x] typecheck + lint + 246 tests + build + `db:smoke-rls` 8/8
+
+**Sub-Hito UI cerrado.**
+
 ---
 
 ## Decisiones tomadas en este hito
@@ -421,6 +458,26 @@ Sub-hito 7.B.4 (página + charts + nav):
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito UI
+
+- **Sidebar lateral fija (no top-nav)** decidido por el usuario. Patrón clásico para apps con muchas rutas (Linear/Notion). Mejor uso del espacio vertical en mobile y más espacio para el contenido principal.
+- **Geist (Vercel) como tipografía** vs Inter porque suma identidad visual sin costo. Cargada via `geist/font` package que Next 16 inyecta como CSS var.
+- **Accent emerald** coherente con "cashflow positivo" y el verde que ya había en reportes. La paleta entera se reorganizó alrededor del emerald-600 como primary.
+- **Dark mode con 3 estados (light/dark/system)** y class-based, no media-query-based. Permite override manual independiente del OS. localStorage `gd-theme` + script anti-flash inline en `<head>` para evitar flicker en SSR hydration.
+- **`useSyncExternalStore` para leer el theme del localStorage** en lugar de `useEffect + useState`, para satisfacer el lint `react-hooks/set-state-in-effect` que recién apareció en eslint-plugin-react-hooks 5. Es el patrón oficial recomendado por React docs para state externo.
+- **Mobile drawer custom sin Radix Dialog**: `useState` + Tailwind transforms + portal-less. 50 líneas vs ~80KB de dep. Si en V2 emerge necesidad de modales complejos, migramos a Radix.
+- **No persistencia del state "drawer open" entre navegaciones**: cuando user clickea un link en el drawer, `onNavigate` lo cierra; si navega por back-button del browser, el drawer queda abierto (edge case aceptable, X button siempre sirve). Eliminé el `useEffect(() => setOpen(false), [pathname])` por conflicto con `set-state-in-effect`.
+- **`SettingsNav` eliminado** porque el sidebar lista Metas/Categorías/Backups directo. **`ReportsNav` se mantiene** porque es patrón complementario (breadcrumb interno entre reportes hermanos) y costo cero de mantener.
+- **CSS vars `--background`, `--foreground`, etc. + `--color-*` derivados** patrón shadcn-compatible. Las vars base viven en `:root` / `.dark`; las `--color-*` las consume Tailwind v4 via `@theme`. Permite cambiar paleta entera tocando solo 2 bloques.
+- **Sparklines con `recharts.AreaChart` + gradient stop**, no librería separada (sparkline.js, etc.). Recharts ya está, y el costo de un mini-chart es bajo. `isAnimationActive={false}` para que carguen instantáneo (mini-charts no merecen animación).
+- **Tasa de ahorro como 4to KPI** en el dashboard. Calculada en el server: `(income - expense) / income * 100`. Sin investment categories (eso es Reporte D); el dashboard mantiene la versión simple. Δ vs mes anterior expresado en "pp" (percentage points) para diferenciar de cambio porcentual relativo.
+- **Top 5 gastos con mini-bars** (`bg-rose-500/70` sobre `bg-muted`) en lugar de bar chart con recharts. Más liviano y suficiente. La proporción es relativa al máximo del top 5 (no al gasto total) — destaca el delta entre las primeras.
+- **Bulk actions en `/transactions` solo delete + recategorize**: bulk-set-deducible postergado a iteración posterior. Cada bulk action es ~80 líneas (server action) + UI. Las dos elegidas son las que más friction tenían en el day-to-day.
+- **Bulk delete extiende a transfer_pair_id**: si selecciono solo la pata "out" de una transfer, también borra la "in". Mismo patrón que el delete individual de Hito 3.C.
+- **Bulk recategorize filtra mismatches de kind**: idéntico patrón al bulk de imports. Si selecciono una income y una expense y aplico una cat de expense, la income se skipea y se reporta `skipped: 1`. Transfers se ignoran completamente (no tienen categoría).
+- **Agrupación visual por día en la tabla**: row-separador con la fecha formateada (`dd MMM yyyy`) cuando cambia. Más fácil escanear que ver 50 filas planas con la columna fecha repitiéndose.
+- **Filtros activos como chips** arriba del details. UX inspirado en Gmail/Linear: los chips dicen lo que se está filtrando sin tener que abrir el panel.
 
 ## Decisiones tomadas en Hito 10
 

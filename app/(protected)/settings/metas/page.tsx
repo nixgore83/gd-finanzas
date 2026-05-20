@@ -5,7 +5,6 @@ import { financialGoals, profiles } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { FINANCIAL_GOALS_DEFAULTS } from '@/lib/financial-goals/defaults';
 import { FinancialGoalsForm } from './financial-goals-form';
-import { SettingsNav } from '../settings-nav';
 
 export const metadata = {
   title: 'Metas · gd-finanzas',
@@ -73,7 +72,6 @@ export default async function MetasPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <SettingsNav active="metas" />
       <div>
         <h1 className="text-2xl font-semibold">Metas</h1>
         <p className="text-sm text-muted-foreground">
