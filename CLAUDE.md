@@ -22,7 +22,7 @@ no lo "arregles" en silencio: avisalo.
 - **UI:** Tailwind + shadcn/ui
 - **Validación:** Zod (schemas compartidos client/server)
 - **Charts:** Recharts
-- **LLM (parser de imports):** Anthropic API — `claude-sonnet-4-5` default, `claude-haiku-4-5` para modo barato
+- **LLM (parser de imports):** Anthropic API — `claude-sonnet-4-6` default, `claude-haiku-4-5-20251001` para modo barato (env vars `IMPORT_PARSER_MODEL_DEFAULT` / `IMPORT_PARSER_MODEL_CHEAP`)
 - **FX feed:** API BCRA (gratis, oficial)
 - **Backups:** Google Drive API
 - **Hosting:** Vercel (Hobby tier suficiente)

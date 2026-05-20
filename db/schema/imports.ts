@@ -22,6 +22,7 @@ export const imports = pgTable(
       .notNull()
       .references(() => households.id, { onDelete: 'cascade' }),
     fileUrl: text('file_url').notNull(),
+    fileHash: text('file_hash').notNull().default(''),
     type: importTypeEnum('type').notNull(),
     institutionId: uuid('institution_id').references(() => institutions.id, {
       onDelete: 'restrict',
@@ -34,7 +35,10 @@ export const imports = pgTable(
     createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('imports_household_idx').on(table.householdId)],
+  (table) => [
+    index('imports_household_idx').on(table.householdId),
+    index('imports_household_hash_idx').on(table.householdId, table.fileHash),
+  ],
 );
 
 export const importLines = pgTable(

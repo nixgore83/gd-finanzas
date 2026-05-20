@@ -10,6 +10,9 @@ const serverEnvSchema = z.object({
   ALLOWED_EMAILS: z.string().min(1),
   CRON_SECRET: z.string().min(16),
   BCRA_FX_MINORISTA_VARIABLE_ID: z.coerce.number().int().positive(),
+  ANTHROPIC_API_KEY: z.string().min(1),
+  IMPORT_PARSER_MODEL_DEFAULT: z.string().min(1).default('claude-sonnet-4-6'),
+  IMPORT_PARSER_MODEL_CHEAP: z.string().min(1).default('claude-haiku-4-5-20251001'),
 });
 
 const clientEnvSchema = z.object({

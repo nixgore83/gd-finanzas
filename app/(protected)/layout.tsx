@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: '/forecasts', label: 'Previsiones' },
   { href: '/budget', label: 'Presupuesto' },
   { href: '/reports/cashflow', label: 'Reportes' },
+  { href: '/imports', label: 'Imports' },
   { href: '/tags', label: 'Etiquetas' },
   { href: '/settings', label: 'Settings' },
 ];

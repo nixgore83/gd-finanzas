@@ -8,7 +8,7 @@
 ---
 
 ## Hito en curso
-**Hito 7 cerrado — V1.0 + año económico completos. Próximo: Hito 8 (Imports con AI parser).**
+**Hito 8 cerrado — Imports con AI parser (Galicia + ICBC + HSBC US). Próximo: Hito 9 (Export contador).**
 
 ---
 
@@ -262,7 +262,59 @@ Sub-hito 7.B.4 (página + charts + nav):
 
 **Hito 7 cerrado.**
 
-### ⏳ Hito 8 — Imports con AI parser
+### 🟢 Hito 8 — Imports con AI parser
+
+**8.A — Infra: storage, upload, hash dedup, lista (2026-05-20, hecho):**
+- [x] Migración `0003_crazy_iron_man.sql`: `imports.file_hash text not null default ''` + idx `imports_household_hash_idx`
+- [x] `scripts/setup-storage.ts` + `npm run storage:setup`: crea bucket privado `imports` (Supabase Storage), file size limit 20MB, allowed mime types PDF/CSV/XLSX. Idempotente
+- [x] `lib/imports/storage.ts`: cliente Supabase service-role cacheado + `uploadImportFile` / `downloadImportFile` / `buildImportPath` / `hashBytes` (SHA-256 via `crypto.subtle`)
+- [x] `lib/schemas/import.ts`: `importCreateMetaSchema` + helpers `parseImportCreateMeta`, `extractExtension` (PDF/CSV), `contentTypeForExt`; 11 tests
+- [x] `app/actions/imports/create.ts`: server action que valida session + meta + file, hashea, dedup contra confirmed con mismo hash (warning + flag `force=1` para override), insert imports row con status=uploaded, upload a Storage. Rollback de row si falla el upload
+- [x] UI: `/imports/page.tsx` (lista con status badge tonado), `/imports/new/page.tsx` + `import-upload-form.tsx` (Select institución + Select type + file input, manejo del estado duplicate con botón "Re-importar igual"), `/imports/[id]/page.tsx` (detalle metadata + hash + status)
+- [x] Nav link "Imports" en layout protegido
+- [x] Validación verde: typecheck + lint + 192 tests + build + `db:smoke-rls` 8/8
+
+**8.B — Parser Galicia TC (Amex/Visa/Master) + revisión + confirm (2026-05-20, hecho):**
+- [x] `npm i @anthropic-ai/sdk` (0.97.x)
+- [x] `lib/env.ts` + `.env.example`: `ANTHROPIC_API_KEY` + `IMPORT_PARSER_MODEL_DEFAULT='claude-sonnet-4-6'` + `IMPORT_PARSER_MODEL_CHEAP='claude-haiku-4-5-20251001'`
+- [x] `lib/imports/llm.ts`: `runParser({modelId, systemPrompt, userPrompt, file: pdf|text, outputSchema})` con `LlmError` tipado y reintento 1 vez si JSON inválido / schema mismatch. Extrae JSON puro defensivamente del output (busca `{...}` outer). Soporta content blocks PDF (base64 document) y CSV (text)
+- [x] `lib/imports/parsers/types.ts`: `Parser` interface + `parsedTxLineSchema` (date YYYY-MM-DD, description, amountOriginal numérico, currencyOriginal ARS|USD, kind income|expense, merchant?, notes?) + `parserOutputSchema = { lines: [...] }`; 6 tests
+- [x] `lib/imports/parsers/galicia-tc.ts`: prompt ES con reglas estrictas (no PAN/CBU/credenciales, ignorar totales/subtotales, una línea por tx, cuotas como una sola línea con monto del mes)
+- [x] `lib/imports/parsers/registry.ts`: `resolveParser(institutionName, importType)` por match de regex + tipo; 4 tests
+- [x] `lib/imports/category-suggest.ts`: match exacto case-insensitive contra histórico de `transactions.description` agrupado por categoría, devuelve la más frecuente o null. V1 sin match parcial
+- [x] `app/actions/imports/parse.ts`: server action que valida session + status, baja archivo de Storage, llama LLM, inserta `import_lines` con `proposed_category_id` sugerida, actualiza `imports.status` a `parsed`. Loggea solo IDs + counts, jamás contenido
+- [x] `app/actions/imports/set-line-status.ts`: server action para accept/reject/pending por línea o bulk con `inArray`
+- [x] `app/actions/imports/update-line.ts`: server action para edit inline; valida que la category nueva matchee el `kind`; persiste `parsed_data` actualizada + status='edited'
+- [x] `app/actions/imports/confirm.ts`: server action que reusa `buildTransactionFields` del Hito 3.B; recibe `accountId` común a todas las líneas; itera accepted+edited; crea txns con `source='import'` + `importBatchId`; linkea `import_lines.transaction_id`; transacción atómica con `db.transaction`; reporta `lineErrors` para casos individuales fallidos pero no aborta el batch entero
+- [x] UI ampliada en `/imports/[id]/page.tsx`: botón "Parsear con LLM" si status uploaded/error, mensaje de parsing, `<ImportReview>` con tabla editable
+- [x] `parse-button.tsx`: client component dispara `parseImport` con `useTransition` + toast
+- [x] `import-review.tsx`: tabla con badges de status, edit inline por fila (date/description/kind/amount/currency/category via shadcn Select), bulk accept/reject pending, summary counts (pending/accepted/edited/rejected), Select de cuenta destino + botón Confirmar deshabilitado si no hay aceptadas
+- [x] Validación verde: typecheck + lint + 202 tests + build + `db:smoke-rls` 8/8
+
+**8.C — Parser ICBC TC + Caja Ahorro (2026-05-20, hecho):**
+- [x] `lib/imports/parsers/icbc-tc.ts`: prompt para resúmenes TC ICBC (Visa). Separación por moneda, cuotas como línea del mes
+- [x] `lib/imports/parsers/icbc-banco.ts`: prompt para caja de ahorro ICBC. Trata transferencias como movimientos (el usuario decide si reclassificar en revisión); ignora saldos y filas resumen
+- [x] Sumados al registry; tests actualizados (5 tests del registry: galicia/icbc-tc/icbc-banco/desconocida)
+- [x] Validación verde: typecheck + lint + 203 tests + build
+
+**8.D — Parser HSBC US (TC + Cuenta, PDF + CSV) (2026-05-20, hecho):**
+- [x] `lib/imports/parsers/hsbc-us-tc.ts`: prompt EN para resúmenes TC HSBC US (USD-only, sin separación de moneda)
+- [x] `lib/imports/parsers/hsbc-us-banco.ts`: prompt EN para statement de cuenta HSBC US (acepta tanto PDF como CSV)
+- [x] **Refactor del dispatch**: el `mimeKind` del Parser se eliminó. El runner del server action decide pdf vs text por la **extensión del archivo** (`fileUrl.endsWith('.csv')`), no por el parser. Permite que un mismo parser acepte ambos formatos sin duplicar
+- [x] Match institución HSBC US: regex `/^hsbc(\s|-)?us$/i` cubre "HSBC US" (con espacio, como en seed) y "hsbc-us"
+- [x] Tests del registry sumados (los 5 parsers listados); 204 tests totales
+- [x] Validación verde: typecheck + lint + 204 tests + build
+
+**8.E — Cierre Hito 8 (2026-05-20, hecho):**
+- [x] CLAUDE.md actualizado: `claude-sonnet-4-6` / `claude-haiku-4-5-20251001` como defaults
+- [x] STATUS.md actualizado con cierre
+- [x] Validación verde final: typecheck + lint + 204 tests + build + `db:smoke-rls` 8/8
+
+**Hito 8 cerrado — Imports end-to-end para Galicia + ICBC + HSBC US.**
+
+**Acción operacional manual pendiente del usuario:**
+- Setear `ANTHROPIC_API_KEY` en `.env.local` y en Vercel Production.
+- Correr `npm run storage:setup` para crear el bucket privado `imports` en Supabase (o crearlo desde Supabase Studio: bucket "imports", privado, file size limit 20MB).
 
 ### ⏳ Hito 9 — Export contador
 
@@ -294,6 +346,26 @@ Sub-hito 7.B.4 (página + charts + nav):
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 8
+
+- **Alcance V1.1 expandido a Galicia + ICBC + HSBC US** (las 3 prioridad alta del PRD §12). Balanz/Cocos/BNA/MP postergan a V1.2.
+- **Modelos Anthropic actualizados**: el PRD/CLAUDE.md originales hablaban de Sonnet 4-5, que está deprecated. Se actualiza a `claude-sonnet-4-6` (default) y `claude-haiku-4-5-20251001` (modo barato). Ambos IDs viven en env vars (`IMPORT_PARSER_MODEL_DEFAULT`, `IMPORT_PARSER_MODEL_CHEAP`) para poder rotar sin redeploy.
+- **Dedup por hash SHA-256 del archivo, no por filename**: nueva columna `imports.file_hash` + idx `(household, hash)`. Si re-subo el mismo PDF y ya hay un import `confirmed` con ese hash, se muestra warning bloqueante con botón "Re-importar igual" (flag `force=1`). Hash se calcula con `crypto.subtle.digest`, no requiere lib externa.
+- **Bucket Storage privado, sin policies, acceso solo service-role server-side**. Path convention `{householdId}/{importId}.{ext}`. El bucket no tiene RLS — la separación por household la enforce el server action verificando `householdId` antes de cualquier download/insert.
+- **Sync, no async, para el parsing LLM**. Server action `parseImport` espera la respuesta de Anthropic (5-15s típicos). En Vercel Hobby el timeout es 60s; un PDF muy grande podría acercarse al límite — mitigación: el prompt pide JSON conciso y se acepta cap de 8000 max_tokens. Si emerge timeout en producción, migrar a job async (V1.2).
+- **Status `parsing` se setea ANTES del LLM call, no después**, para que el botón refleje el estado intermedio si el user refresca durante la corrida. Si falla → status='error' con `error_message` legible.
+- **Reintento 1 vez si JSON inválido o schema mismatch**, no retry para `api_failure`. Si la API de Anthropic falla, error de infra → no tiene sentido reintentar inmediatamente. El usuario aprieta de nuevo "Parsear" si quiere.
+- **Defensa contra credenciales en prompt, no en post-procesamiento regex**. El system prompt es explícito ("NUNCA incluyas números de tarjeta, CBU, alias, claves"). Confiar en el modelo es aceptable para V1; un regex post-LLM se suma en V1.2 si emerge un caso concreto.
+- **`raw_data` y `parsed_data` ambos guardan la línea como devuelta por el LLM**. En este hito no hay diff entre las dos — sería distinto si el parser hiciera pre-procesamiento (ej. masking) sobre `raw` para producir `parsed`. Queda igual estructura para mantener flexibilidad.
+- **Sugerencia de categoría V1 solo match exacto**, case-insensitive, agrupado por count desc para "más frecuente cuando hay múltiples categorías históricas". Match parcial (tokens, substring) queda para V1.2 — necesita más data histórica para tunear.
+- **`accountId` se pasa una sola vez al confirm, no por línea**. Cada import es de una cuenta (resumen Galicia Amex = account Galicia Amex). Forzar al user a elegir 1 vez antes de confirmar es más rápido que setearlo por fila. Si en V2 emerge un import multi-cuenta (raro), se agrega selector por línea.
+- **El parser ya NO declara `mimeKind`** después del refactor en 8.D. El runner del server action elige PDF (document block base64) o text (CSV crudo) según la extensión real del archivo en Storage. Permite que un mismo parser acepte ambos formatos sin duplicar (caso HSBC US Cuenta).
+- **Confirm es batch atómico (`db.transaction`) pero tolera errores por fila**: si una línea individual falla la validación de buildTransactionFields (ej. FX no disponible para esa fecha), se reporta en `lineErrors` y se sigue con las demás. Solo aborta el batch entero si hay un error de DB unexpected.
+- **Linkeo bidireccional**: `import_lines.transaction_id` apunta a la tx creada; `transactions.import_batch_id` apunta al import. Permite drill-down en ambas direcciones para auditoría.
+- **`source='import'` en cada tx creada** distingue de manual/recurring_match en el filtro de transacciones futuro.
+- **Editing inline marca status='edited'** (PRD §5.2 enum). El UI distingue accepted vs edited con badges separados pero el confirm los trata igual (ambos generan tx).
+- **Sub-nav del Hito 7.A (`/settings/categorias`) no se modifica acá** — el flag `is_investment` no se sugiere desde imports.
 
 ## Decisiones tomadas en Hito 7.B
 

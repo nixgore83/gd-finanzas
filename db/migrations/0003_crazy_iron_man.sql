@@ -1,0 +1,2 @@
+ALTER TABLE "imports" ADD COLUMN "file_hash" text DEFAULT '' NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "imports_household_hash_idx" ON "imports" USING btree ("household_id","file_hash");

@@ -32,9 +32,11 @@
     "fx:smoke": "tsx scripts/fx-smoke.ts",
     "fx:count": "tsx scripts/fx-count.ts",
     "tx:peek": "tsx scripts/tx-peek.ts",
-    "tx:wipe": "tsx scripts/tx-wipe.ts"
+    "tx:wipe": "tsx scripts/tx-wipe.ts",
+    "storage:setup": "tsx scripts/setup-storage.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-select": "^2.2.6",
