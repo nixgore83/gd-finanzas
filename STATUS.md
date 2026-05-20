@@ -583,6 +583,19 @@ Sub-hito 7.B.4 (página + charts + nav):
 - Region Supabase confirmada: **us-west-2** (Oregon). El PRD/CLAUDE.md original decía us-east-1; cambiamos a us-west-2 al crear el proyecto. Latencia +50ms desde AR, no relevante para uso doméstico.
 - **Custom SMTP** (Resend/Postmark) — considerar cuando el rate limit de 2 mails/hora del SMTP built-in moleste. Hoy con 2 users y login esporádico no es urgente. Si lo hacemos antes, sirve también para futuros mails transaccionales.
 
+## Operacional pendiente: wipe smoke data al cierre de Hito 10
+
+Toda la data acumulada en prod (transactions, imports, recurrences, budgets, accounts, archivos de Storage) durante hitos 0-8 es **smoke**, no real. Decisión 2026-05-20: NO wipear iterativamente. Mantener smoke hasta cerrar Hito 10 (V1.1 funcional) — hitos 9 (export contador) y 10 (backups Drive) necesitan data para validar.
+
+**Al cierre de Hito 10**, correr:
+```bash
+npm run db:wipe-smoke -- --all
+```
+
+El script preserva: `categories`, `tags`, `fx_rates`, `institutions`, `financial_goals`, `profiles`, `auth`. Borra el resto (incluyendo archivos del bucket Storage).
+
+Después: cargar info real (accounts definitivas, recurrences reales, re-importar resúmenes con la taxonomía de Nico).
+
 ## Procedimientos administrativos
 
 ### Reset de MFA (si un usuario pierde su device)
