@@ -3,14 +3,14 @@ import { buildCashflowReport, deltaTone } from './cashflow';
 import type { CategoryNode } from '@/lib/categories/tree';
 
 const tree: CategoryNode[] = [
-  { id: 'sueldo', name: 'Sueldo', kind: 'income', depth: 0, parentId: null },
-  { id: 'sueldo-nico', name: 'Sueldo Nico', kind: 'income', depth: 1, parentId: 'sueldo' },
-  { id: 'sueldo-pau', name: 'Sueldo Pau', kind: 'income', depth: 1, parentId: 'sueldo' },
-  { id: 'otros-ing', name: 'Otros ingresos', kind: 'income', depth: 0, parentId: null },
-  { id: 'vivienda', name: 'Vivienda', kind: 'expense', depth: 0, parentId: null },
-  { id: 'alquiler', name: 'Alquiler', kind: 'expense', depth: 1, parentId: 'vivienda' },
-  { id: 'expensas', name: 'Expensas', kind: 'expense', depth: 1, parentId: 'vivienda' },
-  { id: 'vacaciones', name: 'Vacaciones', kind: 'expense', depth: 0, parentId: null },
+  { id: 'sueldo', name: 'Sueldo', kind: 'income', depth: 0, parentId: null, isInvestment: false },
+  { id: 'sueldo-nico', name: 'Sueldo Nico', kind: 'income', depth: 1, parentId: 'sueldo', isInvestment: false },
+  { id: 'sueldo-pau', name: 'Sueldo Pau', kind: 'income', depth: 1, parentId: 'sueldo', isInvestment: false },
+  { id: 'otros-ing', name: 'Otros ingresos', kind: 'income', depth: 0, parentId: null, isInvestment: false },
+  { id: 'vivienda', name: 'Vivienda', kind: 'expense', depth: 0, parentId: null, isInvestment: false },
+  { id: 'alquiler', name: 'Alquiler', kind: 'expense', depth: 1, parentId: 'vivienda', isInvestment: false },
+  { id: 'expensas', name: 'Expensas', kind: 'expense', depth: 1, parentId: 'vivienda', isInvestment: false },
+  { id: 'vacaciones', name: 'Vacaciones', kind: 'expense', depth: 0, parentId: null, isInvestment: false },
 ];
 
 describe('buildCashflowReport', () => {

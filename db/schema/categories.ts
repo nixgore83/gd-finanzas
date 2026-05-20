@@ -25,6 +25,7 @@ export const categories = pgTable(
     color: text('color'),
     icon: text('icon'),
     archived: boolean('archived').notNull().default(false),
+    isInvestment: boolean('is_investment').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

@@ -3,12 +3,12 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-18 por Claude
+**Última actualización:** 2026-05-20 por Claude
 
 ---
 
 ## Hito en curso
-**Hito 7 — Reporte D + /settings/metas** (7.A metas hecho; falta 7.B = Reporte D)
+**Hito 7 cerrado — V1.0 + año económico completos. Próximo: Hito 8 (Imports con AI parser).**
 
 ---
 
@@ -236,15 +236,31 @@ Cerrar taxonomía.
 - [x] Nav link "Metas" en layout protegido
 - [x] Validación verde: typecheck + lint + 162 tests + build + `db:smoke-rls` 8/8
 
-**7.B — Pendiente: Reporte D (año económico + trayectoria a IF)**
-- [ ] `/reports/year-economy` con header KPIs anuales (Ingresos / Gastos / Neto / Tasa de ahorro YTD)
-- [ ] Bloque "Trayectoria a IF": ahorro mensual real YTD vs target, acumulado YTD vs trayectoria objetivo, semáforo 🟢🟡🔴
-- [ ] Bar chart mensual con línea horizontal del target
-- [ ] Tabla por categoría: real YTD | proyección a dic | budget anual | Δ
-- [ ] Stacked bar mensual: 12 cols, ingresos arriba, gastos abajo, neto line
-- [ ] Comparativo año vs año (cuando haya histórico) — postergable
-- [ ] Proyección a dic: real YTD + suma previsiones rolling hasta dic
-- [ ] Sumar tercer link "Año económico" al `ReportsNav`
+**7.B — Reporte D: año económico + trayectoria a IF (2026-05-20, hecho):**
+
+Sub-hito 7.B.1 (flag `is_investment` + UI minimal):
+- [x] Migración `0002_marvelous_jocasta.sql`: `categories.is_investment boolean default false`
+- [x] `lib/categories/tree.ts`: `CategoryNode` incluye `isInvestment`; `loadCategoryTree` lo selecciona
+- [x] `app/actions/categories/set-investment.ts`: server action UPDATE con WHERE doble (id + householdId), Zod inline, `revalidatePath` para `/settings/categorias` y `/reports/year-economy`
+- [x] `app/(protected)/settings/categorias/page.tsx`: lista de gastos (solo expense, solo hojas) con checkbox por fila
+- [x] `app/(protected)/settings/categorias/investment-toggle.tsx`: client component con `useTransition` + toast de error
+- [x] `app/(protected)/settings/settings-nav.tsx`: sub-nav reusable (Metas · Categorías), patrón hermano de `reports-nav.tsx`
+- [x] Layout nav: link "Metas" renombrado a "Settings" apuntando a `/settings` (redirect a `/settings/metas`)
+
+Sub-hito 7.B.2 (lógica pura + tests):
+- [x] `lib/reports/year-economy.ts`: `buildYearEconomyReport` puro. Computa KPIs YTD (income/expense/net/investment/savings + savingsRate), serie monthly de 12 cols con `isProjected`, trayectoria con semáforo (green ≥100% / yellow ≥80% / red <80% / neutral si expected=0), categoryRows agregando children en parents con realYtd vs projectedDec vs budget
+- [x] `lib/reports/year-economy.test.ts`: 14 tests cubriendo `computeMonthsElapsed` (pasado/futuro/actual), buckets vacíos, savingsRate edge income=0, semáforo green/yellow/red/neutral, investment categories sumando al savings, año pasado/futuro, categoryRows con parent agregando children, forecast con categoryId=null contado en KPIs pero no en categoryRows, proyección dic = real YTD + forecasts
+
+Sub-hito 7.B.3 (data loader):
+- [x] `lib/reports/year-economy-data.ts`: 4 queries — (1) SUM amountUsd GROUP BY extract(month), kind, categoryId WHERE household + kind IN income/expense + date BETWEEN year-01-01 y year-12-31; (2) forecasts pending JOIN recurrences (kind + categoryId) WHERE status='pending' + matched IS NULL + expectedDate BETWEEN max(today, year-01-01) y year-12-31, con conversión a USD via `getFxRate` row-by-row; (3) budgets SUM por categoryId del año; (4) financial_goals row con fallback a defaults
+
+Sub-hito 7.B.4 (página + charts + nav):
+- [x] `/reports/year-economy/page.tsx` (server): header con prev/next year, KPI cards row (4), bloque Trayectoria con badge de semáforo coloreado + 4 stats + Δ vs target, tabla categorías separada por kind (Income/Expense) con drill-down a `/transactions?categoryId=X&from=year-01-01&to=year-12-31` para hojas y badge "Inversión" para `isInvestment=true`
+- [x] `/reports/year-economy/charts.tsx` (client): `SavingsChart` con `ReferenceLine` horizontal en target + barras coloreadas distinto si `isProjected`; `MonthlyChart` con stacked bars income/expense + line del neto, similar a `evolution/chart.tsx` pero año calendario
+- [x] `reports-nav.tsx`: agregado 4to link "Año económico"
+- [x] Validación verde: typecheck + lint + 176 tests + build (`/reports/year-economy` y `/settings/categorias` registradas) + `db:smoke-rls` 8/8
+
+**Hito 7 cerrado.**
 
 ### ⏳ Hito 8 — Imports con AI parser
 
@@ -278,6 +294,24 @@ Cerrar taxonomía.
 - **`financial_goals` con `UNIQUE(household_id)`** para garantizar 1 fila por household. Sin policy DELETE — siempre debe existir tras setup inicial.
 - **`amount_usd` y `amount_ars` se calculan en server action** (no en trigger). PRD lo plantea como cálculo aplicacional y nos da flexibilidad para overrides manuales sin pelearnos con un trigger.
 - **Sin CHECK constraints en DB para reglas de negocio** (categorías de 2 niveles máx, transfer_pair_id en pares, month 1-12 en budgets). Validamos todo en Zod server-side. Razón: las CHECK constraints en Postgres son rígidas y poco expresivas para errores; preferimos errores tipados en server actions.
+
+## Decisiones tomadas en Hito 7.B
+
+- **"Ahorro mensual" = neto + categorías de inversión**. Razón: pagos a Rabbit Hole / Tijeritas (y futuras inversiones fuera del household) hoy caen como `expense`; restarlos del neto haría que el target USD 5.700/mes nunca cierre para alguien que invierte. Las inversiones via broker accounts (Balanz, Cocos, ICBC broker) ya son invisibles al cashflow (transfers entre cuentas), no requieren tratamiento especial.
+- **Flag `is_investment` se modela en `categories` table, no en config hardcoded**. Migración `0002_marvelous_jocasta.sql` agrega `boolean default false`. UX minimal `/settings/categorias` (toggle por fila, sólo expense leaves) — sin alta/edit/baja porque eso espera la sesión taxonomy con Nico. Match por id, no por nombre — sobrevive renames.
+- **Sub-nav settings reutilizable** (`settings-nav.tsx`) en lugar de convertir `/settings` en hub con cards. Nav link único del layout ("Settings" → `/settings` → redirect a metas); el sub-nav cubre la navegación entre sub-páginas. Patrón hermano de `reports-nav.tsx`.
+- **Proyección a dic = real YTD + suma de forecasts pending hasta dic 31**. Incluye income+expense forecasts (no solo expense), reflejando lo que el plan dice que va a pasar. Forecasts ya matched o cancelled no se cuentan. Forecasts del año pasado ya quedaron como `missed` por el cron de 4.B y no entran.
+- **`monthsElapsed` clamp**: año pasado → 12; año futuro → 0; año actual → `today.month`. Mes en curso cuenta como "transcurrido" para la trayectoria, aunque puede ser parcial. Sobreestima ligeramente el "expected" del mes en curso vs lo real ahorrado hasta hoy; aceptable porque la app es semestral, no diaria.
+- **Semáforo thresholds: ≥100% green / ≥80% yellow / <80% red / `expected=0` neutral**. Hardcoded en la función pura, no configurables. Si Pau quiere ajustar la sensibilidad del semáforo, se cambia en código.
+- **Conversión USD de forecasts row-by-row con `getFxRate`**, sin batch. Mismo patrón que `_candidates.ts`. A esta escala (decenas de forecasts en un año) es invisible. Si en V2 hay miles, batch.
+- **Per-categoría: parent agrega children, parent no recibe budget propio**. Consistente con Hito 5.A. `realYtdUsd` y `projectedDecUsd` de parent = suma de children. Si una categoría tiene budget cargado pero también children con budgets, los dos se suman (no se valida porque es input UX del Hito 5.A — leaf-only).
+- **forecasts con `categoryId=null` (recurrence sin categoría)**: se cuentan en KPIs y en monthly buckets, pero no aparecen en categoryRows (no tienen home). Caso raro porque las recurrences income/expense típicas tienen categoría.
+- **Real para meses futuros del año actual**: si el usuario carga una transacción manual con fecha futura (PRD lo permite), aporta a `projectedDec` pero no a `realYtd` (clamp por `monthsElapsed`). Evita inflar el "real YTD" con datos no realizados.
+- **Charts en un solo archivo `charts.tsx`** que exporta `SavingsChart` + `MonthlyChart`. Comparten formatters de USD y axisCompact; separar en dos archivos era duplicación inútil. Recharts ya estaba (Hito 6.A).
+- **`SavingsChart` con `Cell` por barra** para colorear meses proyectados con un indigo más claro (`#a5b4fc`) vs reales (`#4f46e5`). `ReferenceLine` horizontal en el target con label encima.
+- **Tabla categorías separada en Income/Expense** (no en una sola con sección colapsable). Más simple y refleja la mental model.
+- **Badge "Inversión"** como texto tinted (indigo), sin emoji. Mantiene el estilo del resto.
+- **`/reports/year-economy` accepta `?year=YYYY` parsed con regex `^\\d{4}$` + rango [2020, 2100]**, default = año actual. Sin estado del backend; la navegación es por links GET con prev/next.
 
 ## Decisiones tomadas en Hito 7.A
 

@@ -2,15 +2,13 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const LINKS = [
-  { href: '/reports/cashflow', label: 'Cashflow', key: 'cashflow' as const },
-  { href: '/reports/breakdown', label: 'Breakdown', key: 'breakdown' as const },
-  { href: '/reports/evolution', label: 'Evolución', key: 'evolution' as const },
-  { href: '/reports/year-economy', label: 'Año económico', key: 'year-economy' as const },
+  { href: '/settings/metas', label: 'Metas', key: 'metas' as const },
+  { href: '/settings/categorias', label: 'Categorías', key: 'categorias' as const },
 ];
 
-export type ReportKey = (typeof LINKS)[number]['key'];
+export type SettingsKey = (typeof LINKS)[number]['key'];
 
-export function ReportsNav({ active }: { active: ReportKey }) {
+export function SettingsNav({ active }: { active: SettingsKey }) {
   return (
     <div className="flex items-center gap-3 text-sm">
       {LINKS.map((link, i) => (
