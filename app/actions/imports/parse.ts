@@ -8,6 +8,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { downloadImportFile } from '@/lib/imports/storage';
 import { resolveParser } from '@/lib/imports/parsers/registry';
 import { runParser, LlmError } from '@/lib/imports/llm';
+import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
 import { getServerEnv } from '@/lib/env';
 
@@ -126,7 +127,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     return { ok: false, error: 'llm', message: msg };
   }
 
-  const lines = result.data.lines;
+  const lines = result.data.lines as ParsedTxLine[];
 
   // Sugerencia de categoría por línea (match exacto vs histórico).
   const lineRows = await Promise.all(

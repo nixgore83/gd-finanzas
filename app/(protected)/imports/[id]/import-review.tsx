@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
+import Decimal from 'decimal.js';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
+import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
 type LineRow = {
@@ -53,6 +55,8 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? '');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
 
   const summary = useMemo(() => {
     const c = { pending: 0, accepted: 0, rejected: 0, edited: 0 };
@@ -60,8 +64,76 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
     return c;
   }, [lines]);
 
+  const totals = useMemo(() => computeTotalsByCurrency(lines), [lines]);
+
   const isConfirmed = status === 'confirmed';
   const readOnly = isConfirmed;
+
+  const selectedLines = useMemo(
+    () => lines.filter((l) => selectedIds.has(l.id)),
+    [lines, selectedIds],
+  );
+
+  const selectedKinds = useMemo(() => {
+    const set = new Set<'income' | 'expense'>();
+    for (const l of selectedLines) set.add(l.parsedData.kind);
+    return set;
+  }, [selectedLines]);
+
+  const uniformKind: 'income' | 'expense' | null =
+    selectedKinds.size === 1 ? [...selectedKinds][0]! : null;
+
+  const bulkCategoryOptions = useMemo(
+    () => (uniformKind ? tree.filter((c) => c.kind === uniformKind) : []),
+    [tree, uniformKind],
+  );
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllPending() {
+    const pendingIds = lines.filter((l) => l.status !== 'rejected').map((l) => l.id);
+    const allSelected =
+      pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(pendingIds));
+  }
+
+  function doBulkCategory() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    if (!bulkCategoryId) {
+      toast.error('Elegí una categoría');
+      return;
+    }
+    if (!uniformKind) {
+      toast.error('Las líneas seleccionadas son de tipos distintos (ingreso y gasto). Filtrá por tipo antes.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await bulkSetCategory({
+        importId,
+        lineIds: [...selectedIds],
+        categoryId: bulkCategoryId,
+      });
+      if (res.ok) {
+        const skippedMsg = res.skipped > 0 ? ` · ${res.skipped} saltadas` : '';
+        toast.success(`Categoría asignada a ${res.updated} líneas${skippedMsg}`);
+        setSelectedIds(new Set());
+        setBulkCategoryId('');
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
 
   function doBulk(status: 'accepted' | 'rejected') {
     const ids = lines.filter((l) => l.status === 'pending').map((l) => l.id);
@@ -126,25 +198,81 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
       </div>
 
       {!readOnly && (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => doBulk('accepted')}
-            disabled={isPending || summary.pending === 0}
-          >
-            Aceptar todas las pending
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => doBulk('rejected')}
-            disabled={isPending || summary.pending === 0}
-          >
-            Rechazar todas las pending
-          </Button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => doBulk('accepted')}
+              disabled={isPending || summary.pending === 0}
+            >
+              Aceptar todas las pending
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => doBulk('rejected')}
+              disabled={isPending || summary.pending === 0}
+            >
+              Rechazar todas las pending
+            </Button>
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-end gap-3 rounded-md border border-blue-300 bg-blue-50 p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-blue-900">
+                  {selectedIds.size} línea{selectedIds.size === 1 ? '' : 's'} seleccionada
+                  {selectedIds.size === 1 ? '' : 's'}
+                </p>
+                {uniformKind === null ? (
+                  <p className="text-xs text-blue-800">
+                    Mezcla de ingresos y gastos. Filtrá por tipo antes de asignar
+                    categoría en lote.
+                  </p>
+                ) : (
+                  <p className="text-xs text-blue-800">
+                    Todas son {uniformKind === 'expense' ? 'gastos' : 'ingresos'}.
+                  </p>
+                )}
+              </div>
+              <Select
+                value={bulkCategoryId}
+                onValueChange={setBulkCategoryId}
+                disabled={uniformKind === null || isPending}
+              >
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Elegí categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bulkCategoryOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.depth === 1 ? '↳ ' : ''}
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="sm"
+                onClick={doBulkCategory}
+                disabled={isPending || !bulkCategoryId || uniformKind === null}
+              >
+                Aplicar a {selectedIds.size}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Limpiar selección
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -152,6 +280,22 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
         <table className="w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="text-left">
+              {!readOnly && (
+                <th className="px-2 py-2 w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Seleccionar todas"
+                    checked={
+                      lines.filter((l) => l.status !== 'rejected').length > 0 &&
+                      lines
+                        .filter((l) => l.status !== 'rejected')
+                        .every((l) => selectedIds.has(l.id))
+                    }
+                    onChange={toggleAllPending}
+                    className="size-4 rounded border-input"
+                  />
+                </th>
+              )}
               <th className="px-2 py-2 font-medium">Fecha</th>
               <th className="px-2 py-2 font-medium">Descripción</th>
               <th className="px-2 py-2 font-medium">Tipo</th>
@@ -172,11 +316,16 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
                 readOnly={readOnly}
                 isPending={isPending}
                 onSetStatus={doSetStatus}
+                isSelected={selectedIds.has(l.id)}
+                onToggleSelect={() => toggleOne(l.id)}
               />
             ))}
             {lines.length === 0 && (
               <tr>
-                <td colSpan={readOnly ? 7 : 8} className="px-3 py-6 text-center text-muted-foreground">
+                <td
+                  colSpan={readOnly ? 7 : 9}
+                  className="px-3 py-6 text-center text-muted-foreground"
+                >
                   Sin líneas. ¿Ya parseaste el archivo?
                 </td>
               </tr>
@@ -184,6 +333,38 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
           </tbody>
         </table>
       </div>
+
+      {totals.length > 0 && (
+        <div className="rounded-md border bg-muted/20 p-3">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            Totales extraídos (excluye rechazadas) — verificá contra los subtotales del
+            resumen.
+          </p>
+          <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+            {totals.map((t) => (
+              <div
+                key={t.currency}
+                className="flex items-center justify-between rounded border bg-card px-3 py-2"
+              >
+                <span className="font-medium">
+                  {t.currency} · {t.count} {t.count === 1 ? 'línea' : 'líneas'}
+                </span>
+                <span className="flex flex-wrap items-center gap-3 tabular-nums">
+                  <span className="text-rose-700">
+                    Gastos {formatAmount(t.expense, t.currency)}
+                  </span>
+                  <span className="text-emerald-700">
+                    Ingresos {formatAmount(t.income, t.currency)}
+                  </span>
+                  <span className="font-semibold">
+                    Neto {formatAmount(t.net, t.currency)}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!readOnly && (
         <div className="flex flex-wrap items-end justify-between gap-3 rounded-md border bg-card p-4">
@@ -224,6 +405,8 @@ function LineRowEditor({
   readOnly,
   isPending,
   onSetStatus,
+  isSelected,
+  onToggleSelect,
 }: {
   line: LineRow;
   importId: string;
@@ -231,6 +414,8 @@ function LineRowEditor({
   readOnly: boolean;
   isPending: boolean;
   onSetStatus: (id: string, status: 'accepted' | 'rejected' | 'pending') => void;
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -266,7 +451,24 @@ function LineRowEditor({
   }
 
   return (
-    <tr className="border-t align-top">
+    <tr
+      className={cn(
+        'border-t align-top',
+        isSelected && !readOnly && 'bg-blue-50/50',
+      )}
+    >
+      {!readOnly && (
+        <td className="px-2 py-1.5">
+          <input
+            type="checkbox"
+            aria-label="Seleccionar línea"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            disabled={line.status === 'rejected'}
+            className="size-4 rounded border-input"
+          />
+        </td>
+      )}
       <td className="px-2 py-1.5 tabular-nums">
         {editing ? (
           <Input
@@ -466,4 +668,50 @@ function Badge({
       {label} · {count}
     </span>
   );
+}
+
+type CurrencyTotals = {
+  currency: 'ARS' | 'USD';
+  count: number;
+  expense: string;
+  income: string;
+  net: string;
+};
+
+function computeTotalsByCurrency(lines: LineRow[]): CurrencyTotals[] {
+  const buckets = new Map<'ARS' | 'USD', { count: number; expense: Decimal; income: Decimal }>();
+  for (const l of lines) {
+    if (l.status === 'rejected') continue;
+    const ccy = l.parsedData.currencyOriginal;
+    const b = buckets.get(ccy) ?? { count: 0, expense: new Decimal(0), income: new Decimal(0) };
+    b.count += 1;
+    const amount = new Decimal(l.parsedData.amountOriginal);
+    if (l.parsedData.kind === 'expense') b.expense = b.expense.plus(amount);
+    else b.income = b.income.plus(amount);
+    buckets.set(ccy, b);
+  }
+  const out: CurrencyTotals[] = [];
+  for (const ccy of ['ARS', 'USD'] as const) {
+    const b = buckets.get(ccy);
+    if (!b) continue;
+    out.push({
+      currency: ccy,
+      count: b.count,
+      expense: b.expense.toFixed(2),
+      income: b.income.toFixed(2),
+      net: b.income.minus(b.expense).toFixed(2),
+    });
+  }
+  return out;
+}
+
+function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
+  const n = Number.parseFloat(amount);
+  if (!Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
 }

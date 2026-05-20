@@ -110,6 +110,20 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
     const json = extractJson(text);
     const parsed = input.outputSchema.safeParse(json);
     if (!parsed.success) {
+      // Diagnóstico defensivo: loggea la forma del output (keys del primer
+      // elemento, sin valores) para que podamos ajustar prompt o preprocess
+      // cuando el modelo se desvía. NUNCA loggea montos.
+      try {
+        const root = json as Record<string, unknown>;
+        const lines = Array.isArray(root?.lines) ? (root.lines as unknown[]) : [];
+        const sampleKeys =
+          lines[0] && typeof lines[0] === 'object'
+            ? Object.keys(lines[0] as Record<string, unknown>)
+            : Object.keys(root ?? {});
+        console.warn('[llm] schema mismatch — output keys:', sampleKeys, 'lineCount:', lines.length);
+      } catch {
+        /* swallow logging errors */
+      }
       throw new LlmError(
         `output failed schema: ${parsed.error.issues.map((i) => i.path.join('.') + ' ' + i.message).join('; ')}`,
         'schema_invalid',
