@@ -33,7 +33,8 @@
     "fx:count": "tsx scripts/fx-count.ts",
     "tx:peek": "tsx scripts/tx-peek.ts",
     "tx:wipe": "tsx scripts/tx-wipe.ts",
-    "storage:setup": "tsx scripts/setup-storage.ts"
+    "storage:setup": "tsx scripts/setup-storage.ts",
+    "db:wipe-smoke": "tsx scripts/db-wipe-smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
