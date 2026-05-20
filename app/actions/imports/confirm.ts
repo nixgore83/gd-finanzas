@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { imports, importLines, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
@@ -9,7 +9,13 @@ import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
 
 export type ConfirmImportResult =
-  | { ok: true; createdCount: number; rejectedCount: number }
+  | {
+      ok: true;
+      createdCount: number;
+      rejectedCount: number;
+      remaining: number;
+      lineErrors: Array<{ lineId: string; reason: string }>;
+    }
   | {
       ok: false;
       error: 'session' | 'not_found' | 'invalid_state' | 'no_account' | 'unknown';
@@ -47,11 +53,12 @@ export async function confirmImport(input: {
     .limit(1);
 
   if (!imp) return { ok: false, error: 'not_found' };
-  if (imp.status !== 'parsed' && imp.status !== 'reviewing') {
+  if (imp.status !== 'parsed' && imp.status !== 'reviewing' && imp.status !== 'confirmed') {
     return { ok: false, error: 'invalid_state' };
   }
 
-  // Líneas a procesar.
+  // Líneas a procesar: solo accepted/edited y SIN transaction_id aún (idempotente
+  // — re-ejecutar el confirm no duplica las que ya se crearon).
   const linesToProcess = await db
     .select({
       id: importLines.id,
@@ -64,11 +71,12 @@ export async function confirmImport(input: {
       and(
         eq(importLines.importId, input.importId),
         inArray(importLines.status, ['accepted', 'edited']),
+        isNull(importLines.transactionId),
       ),
     );
 
   if (linesToProcess.length === 0) {
-    return { ok: false, error: 'invalid_state', message: 'No hay líneas aceptadas para confirmar' };
+    return { ok: false, error: 'invalid_state', message: 'No hay líneas pendientes de confirmar' };
   }
 
   const lineErrors: Array<{ lineId: string; reason: string }> = [];
@@ -134,14 +142,58 @@ export async function confirmImport(input: {
         createdCount += 1;
       }
 
-      if (createdCount > 0) {
+      // Después de procesar, contar cuántas líneas aceptadas siguen sin transaction_id.
+      // Si quedan sin confirmar, el import permanece en 'reviewing' para que el user pueda
+      // arreglar y reintentar (no se "cierra" con éxitos parciales).
+      const remaining = await tx
+        .select({ id: importLines.id })
+        .from(importLines)
+        .where(
+          and(
+            eq(importLines.importId, input.importId),
+            inArray(importLines.status, ['accepted', 'edited']),
+            isNull(importLines.transactionId),
+          ),
+        );
+      const totalLinked = await tx
+        .select({ id: importLines.id })
+        .from(importLines)
+        .where(
+          and(
+            eq(importLines.importId, input.importId),
+            inArray(importLines.status, ['accepted', 'edited']),
+          ),
+        );
+      const linkedCount = totalLinked.length - remaining.length;
+      if (linkedCount > 0 && remaining.length === 0) {
+        // Todo OK → cerramos como confirmed.
         await tx
           .update(imports)
           .set({
             status: 'confirmed',
             confirmedAt: sql`now()`,
-            transactionCount: createdCount,
-            errorMessage: lineErrors.length > 0 ? `${lineErrors.length} líneas con problemas` : null,
+            transactionCount: linkedCount,
+            errorMessage: null,
+          })
+          .where(eq(imports.id, input.importId));
+      } else if (linkedCount > 0) {
+        // Éxito parcial → status='reviewing' para seguir editando.
+        await tx
+          .update(imports)
+          .set({
+            status: 'reviewing',
+            transactionCount: linkedCount,
+            errorMessage: `${linkedCount} confirmadas, ${remaining.length} pendientes con error`,
+          })
+          .where(eq(imports.id, input.importId));
+      } else {
+        // 0 confirmadas en esta corrida → quedar en reviewing si veníamos de parsed,
+        // o no tocar si ya estaba reviewing.
+        await tx
+          .update(imports)
+          .set({
+            status: 'reviewing',
+            errorMessage: `${remaining.length} líneas con error`,
           })
           .where(eq(imports.id, input.importId));
       }
@@ -155,14 +207,11 @@ export async function confirmImport(input: {
   revalidatePath('/imports');
   revalidatePath('/transactions');
 
-  if (createdCount === 0) {
-    return {
-      ok: false,
-      error: 'invalid_state',
-      message: 'Ninguna línea pudo confirmarse',
-      lineErrors,
-    };
-  }
-
-  return { ok: true, createdCount, rejectedCount: lineErrors.length };
+  return {
+    ok: true,
+    createdCount,
+    rejectedCount: lineErrors.length,
+    remaining: lineErrors.length,
+    lineErrors,
+  };
 }

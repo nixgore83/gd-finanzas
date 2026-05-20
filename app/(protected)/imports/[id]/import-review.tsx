@@ -66,7 +66,11 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
 
   const totals = useMemo(() => computeTotalsByCurrency(lines), [lines]);
 
-  const isConfirmed = status === 'confirmed';
+  // `readOnly` global: solo aplica si el import está confirmed Y todas las líneas
+  // tienen transactionId (estado terminal limpio). Si quedan sin tx, dejamos
+  // editar (necesario para corregir fallas parciales).
+  const allLinesLinked = lines.every((l) => l.transactionId !== null);
+  const isConfirmed = status === 'confirmed' && allLinesLinked;
   const readOnly = isConfirmed;
 
   const selectedLines = useMemo(
@@ -172,7 +176,14 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
     startTransition(async () => {
       const res = await confirmImport({ importId, accountId });
       if (res.ok) {
-        toast.success(`Import confirmado · ${res.createdCount} transacciones creadas`);
+        if (res.rejectedCount > 0) {
+          toast.warning(
+            `${res.createdCount} confirmadas · ${res.rejectedCount} con error (ver detalle abajo)`,
+          );
+        } else {
+          toast.success(`Import confirmado · ${res.createdCount} transacciones creadas`);
+        }
+        console.warn('[import] confirm result', res);
         router.refresh();
       } else {
         toast.error(res.message ?? `Error: ${res.error}`);
@@ -565,18 +576,30 @@ function LineRowEditor({
         )}
       </td>
       <td className="px-2 py-1.5">
-        <span
-          className={cn(
-            'inline-block rounded-full border px-2 py-0.5 text-xs',
-            STATUS_BADGE[line.status] ?? '',
+        <div className="flex flex-col gap-1">
+          <span
+            className={cn(
+              'inline-block rounded-full border px-2 py-0.5 text-xs',
+              STATUS_BADGE[line.status] ?? '',
+            )}
+          >
+            {STATUS_LABEL[line.status] ?? line.status}
+          </span>
+          {line.transactionId && (
+            <a
+              href={`/transactions/${line.transactionId}`}
+              className="text-[10px] text-emerald-700 hover:underline"
+            >
+              → tx
+            </a>
           )}
-        >
-          {STATUS_LABEL[line.status] ?? line.status}
-        </span>
+        </div>
       </td>
       {!readOnly && (
         <td className="px-2 py-1.5">
-          {editing ? (
+          {line.transactionId ? (
+            <span className="text-xs text-muted-foreground">linkeada</span>
+          ) : editing ? (
             <div className="flex gap-1">
               <Button size="sm" type="button" onClick={save} disabled={isPending}>
                 Guardar

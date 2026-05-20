@@ -134,9 +134,23 @@ export default async function ImportDetailPage({
       </dl>
 
       {row.errorMessage && (
-        <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">
-          <p className="font-medium">Error</p>
+        <div
+          className={
+            row.status === 'reviewing'
+              ? 'rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900'
+              : 'rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900'
+          }
+        >
+          <p className="font-medium">
+            {row.status === 'reviewing' ? 'Atención' : 'Error'}
+          </p>
           <p>{row.errorMessage}</p>
+          {row.status === 'reviewing' && (
+            <p className="mt-1 text-xs">
+              Las líneas sin transacción quedaron editables. Reintentá &ldquo;Confirmar
+              import&rdquo; tras corregir (o backfill de FX si fue ese el problema).
+            </p>
+          )}
         </div>
       )}
 
