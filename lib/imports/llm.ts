@@ -96,7 +96,27 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
         messages: [{ role: 'user', content }],
       });
     } catch (err) {
-      throw new LlmError('Anthropic API call failed', 'api_failure', err);
+      // Extraer info útil del error del SDK (sin loggear el body crudo, que
+      // podría contener prompt/contenido). Surface status + tipo + modelo.
+      const e = err as {
+        status?: number;
+        message?: string;
+        type?: string;
+        error?: { type?: string; message?: string };
+      };
+      const status = e.status ?? 0;
+      const innerType = e.error?.type ?? e.type ?? 'unknown';
+      const innerMsg = e.error?.message ?? e.message ?? 'no-message';
+      const detail = `status=${status} type=${innerType} model=${input.modelId} msg=${innerMsg}`;
+      console.error('[llm] anthropic api failure', {
+        status,
+        type: innerType,
+        model: input.modelId,
+        // El message del SDK suele incluir "404 model not found" o similar;
+        // no expone payload, es seguro loggearlo.
+        message: innerMsg.slice(0, 200),
+      });
+      throw new LlmError(`Anthropic API call failed (${detail})`, 'api_failure', err);
     }
 
     const text = response.content
