@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { fxRates } from '@/db/schema';
 import { getDb } from '@/lib/db/client';
 import { resolveFxRate, type ResolvedFxRate } from './resolve';
@@ -24,6 +24,12 @@ export class FxRateNotFoundError extends Error {
  */
 export async function getFxRate(args: { date: string }): Promise<ResolvedFxRate> {
   const db = getDb();
+  
+  // Calcular ventana de 30 días hacia atrás respecto a la fecha target
+  const targetDate = new Date(args.date);
+  const thirtyDaysAgoDate = new Date(targetDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = thirtyDaysAgoDate.toISOString().slice(0, 10);
+
   const rows = await db
     .select({
       date: fxRates.date,
@@ -32,9 +38,15 @@ export async function getFxRate(args: { date: string }): Promise<ResolvedFxRate>
       source: fxRates.source,
     })
     .from(fxRates)
-    .where(and(eq(fxRates.currencyPair, USD_ARS_PAIR), lte(fxRates.date, args.date)))
+    .where(
+      and(
+        eq(fxRates.currencyPair, USD_ARS_PAIR),
+        lte(fxRates.date, args.date),
+        gte(fxRates.date, thirtyDaysAgo),
+      ),
+    )
     .orderBy(desc(fxRates.date))
-    .limit(30);
+    .limit(1);
 
   const resolved = resolveFxRate(rows, args.date, USD_ARS_PAIR);
   if (!resolved) throw new FxRateNotFoundError(args.date, USD_ARS_PAIR);

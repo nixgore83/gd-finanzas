@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db/client';
 import { budgets, financialGoals, forecasts, recurrences, transactions } from '@/db/schema';
 import { loadCategoryTree, type CategoryNode } from '@/lib/categories/tree';
 import { getFxRate } from '@/lib/fx/get-fx-rate';
+import type { ResolvedFxRate } from '@/lib/fx/resolve';
 import { FINANCIAL_GOALS_DEFAULTS } from '@/lib/financial-goals/defaults';
 import {
   buildYearEconomyReport,
@@ -95,15 +96,38 @@ export async function loadYearEconomyData(
             ),
           );
 
-  // Convert + aggregate por (month, kind, categoryId)
+  // Convert + aggregate por (month, kind, categoryId).
+  // Obtenemos la cotización de "hoy" una sola vez para proyectar forecasts futuros sin hacer N+1 queries.
+  let todayFx: ResolvedFxRate | null = null;
+  try {
+    todayFx = await getFxRate({ date: today });
+  } catch (err) {
+    console.warn('[year-economy-data] No se pudo obtener la cotización de hoy para forecasts futuros:', err);
+  }
+
+  const fxCache = new Map<string, Decimal>();
   const fcAcc = new Map<string, Decimal>();
+
   for (const r of fcRows) {
     let usd: Decimal;
     if (r.currency === 'USD') {
       usd = new Decimal(r.expectedAmount);
     } else {
-      const fx = await getFxRate({ date: r.expectedDate });
-      usd = new Decimal(r.expectedAmount).div(fx.rate);
+      if (r.expectedDate > today) {
+        if (!todayFx) {
+          throw new Error(`Cotización de tipo de cambio no disponible para proyecciones futuras (fecha: ${r.expectedDate})`);
+        }
+        usd = new Decimal(r.expectedAmount).div(todayFx.rate);
+      } else {
+        // Forecast en el pasado o hoy: usar caché local para evitar consultas repetitivas a la BD
+        let rate = fxCache.get(r.expectedDate);
+        if (!rate) {
+          const fx = await getFxRate({ date: r.expectedDate });
+          rate = fx.rate;
+          fxCache.set(r.expectedDate, rate);
+        }
+        usd = new Decimal(r.expectedAmount).div(rate);
+      }
     }
     const parts = r.expectedDate.split('-');
     const month = Number(parts[1]);
