@@ -34,7 +34,8 @@
     "tx:peek": "tsx scripts/tx-peek.ts",
     "tx:wipe": "tsx scripts/tx-wipe.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
-    "db:wipe-smoke": "tsx scripts/db-wipe-smoke.ts"
+    "db:wipe-smoke": "tsx scripts/db-wipe-smoke.ts",
+    "oauth:drive-token": "tsx scripts/oauth-drive-token.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",

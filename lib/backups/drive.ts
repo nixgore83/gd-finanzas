@@ -14,32 +14,21 @@ export class DriveConfigError extends Error {
 function getDriveClient(): drive_v3.Drive {
   if (cachedDrive) return cachedDrive;
   const env = getServerEnv();
-  if (!env.GOOGLE_SERVICE_ACCOUNT_KEY_B64) {
+  if (
+    !env.GOOGLE_OAUTH_CLIENT_ID ||
+    !env.GOOGLE_OAUTH_CLIENT_SECRET ||
+    !env.GOOGLE_OAUTH_REFRESH_TOKEN
+  ) {
     throw new DriveConfigError(
-      'GOOGLE_SERVICE_ACCOUNT_KEY_B64 no está seteada (setup operacional en STATUS.md)',
+      'GOOGLE_OAUTH_CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN no están seteadas (setup operacional en STATUS.md)',
     );
-  }
-  let parsed: {
-    client_email?: string;
-    private_key?: string;
-  };
-  try {
-    const decoded = Buffer.from(env.GOOGLE_SERVICE_ACCOUNT_KEY_B64, 'base64').toString('utf8');
-    parsed = JSON.parse(decoded);
-  } catch (err) {
-    throw new DriveConfigError(
-      `No se pudo decodear la service account key: ${(err as Error).message}`,
-    );
-  }
-  if (!parsed.client_email || !parsed.private_key) {
-    throw new DriveConfigError('Service account key sin client_email o private_key');
   }
 
-  const auth = new google.auth.JWT({
-    email: parsed.client_email,
-    key: parsed.private_key,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+  const auth = new google.auth.OAuth2({
+    clientId: env.GOOGLE_OAUTH_CLIENT_ID,
+    clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
   });
+  auth.setCredentials({ refresh_token: env.GOOGLE_OAUTH_REFRESH_TOKEN });
 
   cachedDrive = google.drive({ version: 'v3', auth });
   return cachedDrive;
@@ -91,10 +80,14 @@ export async function uploadBackup(input: {
   };
 }
 
-export async function listBackups(folderId: string): Promise<BackupFile[]> {
+export async function listBackups(folderId: string, householdId?: string): Promise<BackupFile[]> {
   const drive = getDriveClient();
+  let q = `'${folderId}' in parents and trashed = false`;
+  if (householdId) {
+    q += ` and name contains '${householdId}'`;
+  }
   const response = await drive.files.list({
-    q: `'${folderId}' in parents and trashed = false`,
+    q,
     fields: 'files(id,name,createdTime,size)',
     orderBy: 'createdTime desc',
     pageSize: 100,
