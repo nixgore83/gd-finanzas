@@ -10,24 +10,31 @@ const LINKS = [
 
 export type ReportKey = (typeof LINKS)[number]['key'];
 
+/**
+ * Nav interna de reportes. Cuatro tabs con border-bottom sage cuando activa.
+ * Mismo treatment que los FilterPill que usamos en /accounts y /recurrences.
+ */
 export function ReportsNav({ active }: { active: ReportKey }) {
   return (
-    <div className="flex items-center gap-3 text-sm">
-      {LINKS.map((link, i) => (
-        <span key={link.key} className="flex items-center gap-3">
-          {i > 0 && <span className="text-muted-foreground">·</span>}
+    <nav className="flex items-baseline gap-1 border-b border-border/60" aria-label="Reportes">
+      {LINKS.map((link) => {
+        const isActive = active === link.key;
+        return (
           <Link
+            key={link.key}
             href={link.href}
+            aria-current={isActive ? 'page' : undefined}
             className={cn(
-              active === link.key
-                ? 'font-medium text-foreground'
-                : 'text-muted-foreground hover:underline',
+              'inline-block px-3 py-2.5 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors',
+              isActive
+                ? 'border-b-2 border-primary text-primary -mb-px'
+                : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {link.label}
           </Link>
-        </span>
-      ))}
-    </div>
+        );
+      })}
+    </nav>
   );
 }

@@ -3,25 +3,15 @@ import { redirect } from 'next/navigation';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadDashboardData } from '@/lib/reports/dashboard-data';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SparklineKpiCard } from '@/components/dashboard/sparkline-kpi-card';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 
 export const metadata = { title: 'Dashboard · gd-finanzas' };
 
 const MONTH_LABELS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 function formatUsd(amount: string | number, withDecimals = false): string {
@@ -54,19 +44,24 @@ function formatPct(pct: number | null): string {
 function deltaText(d: number): { text: string; tone: 'good' | 'bad' | 'neutral' } {
   if (Math.abs(d) < 0.005) return { text: '—', tone: 'neutral' };
   const sign = d > 0 ? '+' : '';
-  return {
-    text: `${sign}${formatUsd(d)}`,
-    tone: d >= 0 ? 'good' : 'bad',
-  };
+  return { text: `${sign}${formatUsd(d)}`, tone: d >= 0 ? 'good' : 'bad' };
 }
 
 function deltaTextExpense(d: number): { text: string; tone: 'good' | 'bad' | 'neutral' } {
   if (Math.abs(d) < 0.005) return { text: '—', tone: 'neutral' };
   const sign = d > 0 ? '+' : '';
-  return {
-    text: `${sign}${formatUsd(d)}`,
-    tone: d <= 0 ? 'good' : 'bad',
-  };
+  return { text: `${sign}${formatUsd(d)}`, tone: d <= 0 ? 'good' : 'bad' };
+}
+
+function shortDate(iso: string): string {
+  // Expects YYYY-MM-DD; renders "dd MMM" en mayúsculas chiquitas.
+  const parts = iso.split('-');
+  const m = parts[1];
+  const d = parts[2];
+  if (!m || !d) return iso;
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const mi = Number.parseInt(m, 10) - 1;
+  return `${d} ${months[mi] ?? ''}`;
 }
 
 export default async function DashboardPage() {
@@ -103,42 +98,93 @@ export default async function DashboardPage() {
     0,
   );
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">{monthLabel}</p>
-        </div>
-        <Link
-          href="/reports/cashflow"
-          className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-        >
-          Ver cashflow del mes →
-        </Link>
-      </div>
+  const netReal = Number.parseFloat(data.totals.net.real);
+  const netPositive = Number.isFinite(netReal) && netReal >= 0;
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  return (
+    <div className="space-y-10">
+      {/* ============ HERO ============ */}
+      <section className="flex flex-wrap items-end justify-between gap-8 pt-2">
+        <div className="min-w-0 flex-1">
+          <Label>Casa Garaglio · Dasso — {monthLabel}</Label>
+          <Display size="xl" className="mt-3 block tabular-nums">
+            {netPositive ? '+' : ''}
+            {formatUsd(data.totals.net.real)}
+          </Display>
+          <Body className="mt-2 max-w-xl">
+            Neto del mes — la diferencia entre lo que entró y lo que salió.{' '}
+            {prev && (
+              <span className="not-italic text-foreground">
+                <Num className={cn(netDelta >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]')}>
+                  {netDelta >= 0 ? '+' : ''}
+                  {formatUsd(netDelta)}
+                </Num>{' '}
+                vs el mes anterior.
+              </span>
+            )}
+          </Body>
+        </div>
+
+        {/* Right: tasa de ahorro */}
+        <div className="border-l border-border pl-8">
+          <Label>Tasa de ahorro</Label>
+          <div className="mt-3 flex items-baseline gap-1">
+            <Display size="lg" className="tabular-nums text-primary">
+              {savingsPct !== null ? savingsPct.toFixed(1) : '—'}
+            </Display>
+            {savingsPct !== null && (
+              <span className="font-display text-2xl font-light text-primary/70">%</span>
+            )}
+          </div>
+          {savingsDelta !== null && (
+            <div className="mt-1">
+              <Num
+                className={cn(
+                  'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                  savingsDelta >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
+                )}
+              >
+                {savingsDelta > 0 ? '+' : ''}
+                {savingsDelta.toFixed(1)} pp
+              </Num>{' '}
+              <span className="font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                vs mes ant.
+              </span>
+            </div>
+          )}
+          <Link
+            href="/reports/cashflow"
+            className="link mt-4 inline-block font-display text-sm italic text-muted-foreground"
+          >
+            Ver cashflow del mes →
+          </Link>
+        </div>
+      </section>
+
+      <Hair thick />
+
+      {/* ============ KPI STRIP ============ */}
+      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
         <SparklineKpiCard
           label="Ingresos del mes"
           value={formatUsd(data.totals.income.real)}
           delta={prev ? deltaText(incomeDelta) : null}
           data={data.monthly.map((m) => m.income)}
-          color="emerald"
+          variant="good"
         />
         <SparklineKpiCard
           label="Gastos del mes"
           value={formatUsd(data.totals.expense.real)}
           delta={prev ? deltaTextExpense(expenseDelta) : null}
           data={data.monthly.map((m) => m.expense)}
-          color="rose"
+          variant="bad"
         />
         <SparklineKpiCard
           label="Neto del mes"
           value={formatUsd(data.totals.net.real)}
           delta={prev ? deltaText(netDelta) : null}
           data={data.monthly.map((m) => m.net)}
-          color="violet"
+          variant="primary"
         />
         <SparklineKpiCard
           label="Tasa de ahorro"
@@ -154,139 +200,176 @@ export default async function DashboardPage() {
           data={data.monthly.map((m) =>
             m.income > 0 ? ((m.income - m.expense) / m.income) * 100 : 0,
           )}
-          color="sky"
+          variant="attn"
         />
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top 5 gastos del mes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.topExpenseCategories.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin gastos este mes.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {data.topExpenseCategories.map((c) => {
-                  const n = Number.parseFloat(c.total) || 0;
-                  const pct = topMax > 0 ? (n / topMax) * 100 : 0;
-                  return (
-                    <li key={c.id}>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate">{c.name}</span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {formatUsd(c.total)}
-                        </span>
-                      </div>
-                      <div
-                        className="mt-1 h-1 overflow-hidden rounded-full bg-muted"
-                        aria-hidden
-                      >
+      {/* ============ BODY GRID: top expenses + upcoming ============ */}
+      <section className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+        {/* Top expenses */}
+        <div>
+          <div className="flex items-baseline justify-between">
+            <Display size="md">Las cinco del mes</Display>
+            <Label>por categoría</Label>
+          </div>
+          <Hair className="mt-3 mb-1" />
+          {data.topExpenseCategories.length === 0 ? (
+            <Body className="mt-3">Sin gastos registrados este mes.</Body>
+          ) : (
+            <ol className="divide-y divide-border/60">
+              {data.topExpenseCategories.map((c, i) => {
+                const n = Number.parseFloat(c.total) || 0;
+                const pct = topMax > 0 ? (n / topMax) * 100 : 0;
+                return (
+                  <li
+                    key={c.id}
+                    className="grid grid-cols-[20px_1fr_auto] items-center gap-3 py-3"
+                  >
+                    <Num className="text-[10px] text-muted-foreground">
+                      {String(i + 1).padStart(2, '0')}
+                    </Num>
+                    <div className="min-w-0">
+                      <div className="font-display text-base text-foreground">{c.name}</div>
+                      <div className="mt-1 h-[3px] w-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-rose-500/70"
+                          className="h-full bg-[color:var(--bad)]/80"
                           style={{ width: `${pct}%` }}
+                          aria-hidden
                         />
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Próximos 14 días</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.upcomingForecasts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin previsiones próximas.</p>
-            ) : (
-              <ul className="divide-y divide-border text-sm">
-                {data.upcomingForecasts.slice(0, 8).map((f) => (
-                  <li key={f.id} className="flex items-center justify-between gap-3 py-1.5">
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium">{f.recurrenceName}</span>
-                      <span className="text-xs text-muted-foreground">{f.expectedDate}</span>
-                    </span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {formatAmount(f.expectedAmount, f.currency)}
-                    </span>
+                    </div>
+                    <Num className="text-sm text-foreground">{formatUsd(c.total)}</Num>
                   </li>
-                ))}
-              </ul>
-            )}
-            <Link
-              href="/forecasts"
-              className="mt-3 inline-block text-xs text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Ver todas las previsiones →
-            </Link>
-          </CardContent>
-        </Card>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+
+        {/* Upcoming forecasts */}
+        <div>
+          <div className="flex items-baseline justify-between">
+            <Display size="md">Lo que viene</Display>
+            <Label>previsiones · 14 d</Label>
+          </div>
+          <Hair className="mt-3 mb-1" />
+          {data.upcomingForecasts.length === 0 ? (
+            <Body className="mt-3">Nada en los próximos 14 días.</Body>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {data.upcomingForecasts.slice(0, 8).map((f) => (
+                <li
+                  key={f.id}
+                  className="grid grid-cols-[56px_1fr_auto] items-baseline gap-3 py-3"
+                >
+                  <Num className="text-[11px] uppercase tracking-[0.1em] text-primary">
+                    {shortDate(f.expectedDate)}
+                  </Num>
+                  <div className="min-w-0">
+                    <div className="truncate font-display text-base text-foreground">
+                      {f.recurrenceName}
+                    </div>
+                  </div>
+                  <Num className="text-sm text-foreground">
+                    {formatAmount(f.expectedAmount, f.currency)}
+                  </Num>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href="/forecasts"
+            className="link mt-4 inline-block font-display text-sm italic text-muted-foreground"
+          >
+            Ver todas las previsiones →
+          </Link>
+        </div>
       </section>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Últimas transacciones</CardTitle>
-            <Link
-              href="/transactions"
-              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Ver todas →
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {data.recentTransactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin transacciones todavía.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-muted-foreground">
-                  <tr>
-                    <th className="py-1.5 font-normal">Fecha</th>
-                    <th className="py-1.5 font-normal">Tipo</th>
-                    <th className="py-1.5 font-normal">Descripción</th>
-                    <th className="py-1.5 font-normal">Cuenta</th>
-                    <th className="py-1.5 text-right font-normal">Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentTransactions.map((tx) => (
-                    <tr key={tx.id} className="border-t">
-                      <td className="py-1.5 whitespace-nowrap text-muted-foreground">{tx.date}</td>
-                      <td className="py-1.5">
-                        <span
-                          className={cn(
-                            'rounded px-1.5 py-0.5 text-xs',
-                            tx.kind === 'income' &&
-                              'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-                            tx.kind === 'expense' &&
-                              'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
-                            tx.kind === 'transfer' &&
-                              'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-                          )}
-                        >
-                          {ALL_KIND_LABELS[tx.kind]}
-                        </span>
-                      </td>
-                      <td className="py-1.5">{tx.description}</td>
-                      <td className="py-1.5 text-muted-foreground">{tx.accountName ?? '—'}</td>
-                      <td className="py-1.5 text-right tabular-nums">
-                        {formatAmount(tx.amountOriginal, tx.currencyOriginal)}
-                      </td>
-                    </tr>
+      {/* ============ RECENT TRANSACTIONS ============ */}
+      <section>
+        <div className="flex items-baseline justify-between">
+          <Display size="md">Últimos movimientos</Display>
+          <Link
+            href="/transactions"
+            className="link font-display text-sm italic text-muted-foreground"
+          >
+            Ver todos →
+          </Link>
+        </div>
+        <Hair className="mt-3 mb-1" />
+
+        {data.recentTransactions.length === 0 ? (
+          <Body className="mt-3">Sin transacciones todavía.</Body>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  {['Fecha', 'Tipo', 'Concepto', 'Cuenta', 'Monto'].map((h, i) => (
+                    <th
+                      key={h}
+                      className={cn(
+                        'py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground',
+                        i === 4 ? 'text-right' : 'text-left',
+                      )}
+                    >
+                      {h}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentTransactions.map((tx) => (
+                  <tr
+                    key={tx.id}
+                    className="border-b border-border/40 transition-colors hover:bg-primary/[0.04]"
+                  >
+                    <td className="py-3 whitespace-nowrap">
+                      <Num className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                        {shortDate(tx.date)}
+                      </Num>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <span
+                        className={cn(
+                          'inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]',
+                          tx.kind === 'income' &&
+                            'bg-[color:var(--good)]/15 text-[color:var(--good)]',
+                          tx.kind === 'expense' &&
+                            'bg-[color:var(--bad)]/15 text-[color:var(--bad)]',
+                          tx.kind === 'transfer' &&
+                            'bg-[color:var(--attn)]/15 text-[color:var(--attn)]',
+                        )}
+                      >
+                        {ALL_KIND_LABELS[tx.kind]}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 font-display text-base text-foreground">
+                      {tx.description}
+                    </td>
+                    <td className="py-3 pr-3 font-sans text-xs text-muted-foreground">
+                      {tx.accountName ?? '—'}
+                    </td>
+                    <td className="py-3 text-right">
+                      <Num
+                        className={cn(
+                          'text-sm',
+                          tx.kind === 'income' && 'text-[color:var(--good)]',
+                          tx.kind === 'expense' && 'text-foreground',
+                          tx.kind === 'transfer' && 'text-[color:var(--attn)]',
+                        )}
+                      >
+                        {formatAmount(tx.amountOriginal, tx.currencyOriginal)}
+                      </Num>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

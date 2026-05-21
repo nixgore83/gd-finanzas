@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db/client';
 import { financialGoals, profiles } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { FINANCIAL_GOALS_DEFAULTS } from '@/lib/financial-goals/defaults';
+import { Display, Label, Body, Hair } from '@/components/ui/typography';
 import { FinancialGoalsForm } from './financial-goals-form';
 
 export const metadata = {
@@ -71,13 +72,20 @@ export default async function MetasPage() {
       };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Metas</h1>
-        <p className="text-sm text-muted-foreground">
-          Plan financiero — target ahorro, número de retiro, educación, buffer.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <header className="pt-2">
+        <Label>Settings · Metas IF</Label>
+        <Display size="lg" className="mt-2 block">
+          Metas financieras
+        </Display>
+        <Body className="mt-2 max-w-2xl">
+          Los números que validamos con Pau el 5 de mayo 2026. Editables — alimentan
+          el bloque <em className="not-italic text-foreground">Trayectoria a IF</em> del Reporte D.
+        </Body>
+      </header>
+
+      <Hair thick />
+
       <FinancialGoalsForm initial={initial} />
     </div>
   );

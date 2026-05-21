@@ -1,8 +1,42 @@
 import type { Metadata } from 'next';
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+import { Space_Grotesk, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
+
+/**
+ * Display / headings — Space Grotesk.
+ * Geometric grotesque con carácter; weights 500-700 dan presencia
+ * sin caer en el peso de un display "hero" genérico.
+ */
+const displayFont = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-display',
+  display: 'swap',
+});
+
+/**
+ * Body sans — Plus Jakarta Sans.
+ * Más neutro y legíble que Manrope; mediumweight como default para
+ * que el cuerpo del texto tenga más presencia que el muted standard.
+ */
+const sansFont = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+/**
+ * Tabular numeric — JetBrains Mono.
+ * Solo para montos, fechas y cualquier columna numérica que se compara.
+ */
+const monoFont = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'gd-finanzas',
@@ -19,7 +53,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`h-full antialiased ${GeistSans.variable} ${GeistMono.variable}`}
+      className={`h-full antialiased ${displayFont.variable} ${sansFont.variable} ${monoFont.variable}`}
       suppressHydrationWarning
     >
       <head>

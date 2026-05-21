@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db/client';
 import { tags, transactionTags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { Button } from '@/components/ui/button';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { DeleteTagButton } from './delete-button';
 
 export const metadata = {
@@ -34,63 +35,84 @@ export default async function TagsPage() {
     .groupBy(tags.id, tags.name, tags.color)
     .orderBy(asc(tags.name));
 
+  const totalUses = rows.reduce((s, r) => s + r.txCount, 0);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Etiquetas</h1>
-        <Button asChild>
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
+        <div className="min-w-0">
+          <Label>Operar · Etiquetas</Label>
+          <Display size="lg" className="mt-2 block">
+            Etiquetas
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            {rows.length === 0 ? (
+              <>Sin etiquetas todavía — sirven para cortar transacciones por dimensión libre.</>
+            ) : (
+              <>
+                <span className="text-foreground">{rows.length}</span> etiquetas ·{' '}
+                <span className="text-foreground">{totalUses}</span> usos en transacciones
+              </>
+            )}
+          </Body>
+        </div>
+        <Button asChild size="lg">
           <Link href="/tags/new">+ Nueva etiqueta</Link>
         </Button>
-      </div>
+      </header>
+
+      <Hair thick />
 
       {rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Sin etiquetas todavía. Cargá la primera.
+        <div className="border border-dashed border-border p-12 text-center">
+          <Display size="sm">Sin etiquetas</Display>
+          <Body className="mx-auto mt-3 max-w-md">
+            Las etiquetas son una dimensión libre que se superpone a las categorías —
+            sirven para marcar &laquo;reintegrable&raquo;, &laquo;pau&raquo;, &laquo;rabbit-hole&raquo;
+            o lo que quieras agrupar.
+          </Body>
+          <Button asChild className="mt-6" size="lg">
+            <Link href="/tags/new">+ Crear la primera</Link>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-medium">Color</th>
-                <th className="px-3 py-2 font-medium">Nombre</th>
-                <th className="px-3 py-2 font-medium">Transacciones</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">
-                    {row.color ? (
-                      <span
-                        className="inline-block h-4 w-4 rounded border"
-                        style={{ backgroundColor: row.color }}
-                        aria-label={row.color}
-                      />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Link href={`/tags/${row.id}`} className="hover:underline">
-                      {row.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.txCount}</td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/tags/${row.id}`}>Editar</Link>
-                      </Button>
-                      <DeleteTagButton id={row.id} name={row.name} txCount={row.txCount} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((row) => (
+            <li
+              key={row.id}
+              className="group flex items-center justify-between gap-4 border border-border bg-card/40 px-4 py-3 transition-colors hover:border-primary/40"
+            >
+              <Link
+                href={`/tags/${row.id}`}
+                className="flex min-w-0 flex-1 items-center gap-3"
+              >
+                <span
+                  aria-hidden
+                  className="inline-block size-3 shrink-0 rounded-full ring-1 ring-border"
+                  style={{ background: row.color ?? 'var(--muted)' }}
+                />
+                <span className="truncate font-mono text-sm text-foreground transition-colors group-hover:text-primary">
+                  {row.name}
+                </span>
+              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/transactions?tagId=${row.id}`}
+                  className="link font-mono text-xs text-muted-foreground"
+                  title="Ver transacciones con esta etiqueta"
+                >
+                  <Num>{row.txCount}</Num>
+                </Link>
+                <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/tags/${row.id}`}>Editar</Link>
+                  </Button>
+                  <DeleteTagButton id={row.id} name={row.name} txCount={row.txCount} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

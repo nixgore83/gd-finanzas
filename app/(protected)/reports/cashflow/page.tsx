@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCashflowData } from '@/lib/reports/cashflow-data';
 import { deltaTone } from '@/lib/reports/cashflow';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 import { ReportsNav } from '../reports-nav';
 
@@ -11,18 +12,8 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 function pad2(n: number): string {
@@ -73,6 +64,12 @@ function formatPct(pct: number | null): string {
   return `${sign}${pct.toFixed(1)}%`;
 }
 
+function toneVar(tone: 'good' | 'bad' | 'neutral'): string {
+  if (tone === 'good') return 'var(--good)';
+  if (tone === 'bad') return 'var(--bad)';
+  return 'var(--muted-foreground)';
+}
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function CashflowReportPage({
@@ -104,170 +101,265 @@ export default async function CashflowReportPage({
     return `/transactions?${params.toString()}`;
   }
 
+  // Toplevel summary tones
+  const netTone = deltaTone('income', report.totals.net.delta);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <ReportsNav active="cashflow" />
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Cashflow · {monthLabel}</h1>
-        <div className="flex items-center gap-3 text-sm">
+
+      {/* HEADER */}
+      <header className="flex flex-wrap items-end justify-between gap-6">
+        <div className="min-w-0">
+          <Label>Reportes · Cashflow del mes</Label>
+          <Display size="lg" className="mt-2 block">
+            {monthLabel}
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            Real vs presupuesto en USD. Click en categoría hoja para ver las transacciones.
+          </Body>
+        </div>
+        <nav className="flex items-baseline gap-5 font-display">
           <Link
             href={`/reports/cashflow?year=${prev.year}&month=${pad2(prev.month)}`}
-            className="text-muted-foreground hover:underline"
+            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
           >
-            ◀ {MONTH_LABELS[prev.month - 1]} {prev.year}
+            ◀ {MONTH_LABELS[prev.month - 1]}
           </Link>
           <Link
             href={`/reports/cashflow?year=${next.year}&month=${pad2(next.month)}`}
-            className="text-muted-foreground hover:underline"
+            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
           >
-            {MONTH_LABELS[next.month - 1]} {next.year} ▶
+            {MONTH_LABELS[next.month - 1]} ▶
           </Link>
-        </div>
-      </div>
+        </nav>
+      </header>
 
-      <p className="text-sm text-muted-foreground">
-        Budgets y montos reales en USD. Clic en categoría hoja para ver las transacciones del mes.
-      </p>
+      {/* TOPLINE KPI STRIP */}
+      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-3">
+        <KpiBox
+          label="Ingresos"
+          real={report.totals.income.real}
+          budget={report.totals.income.budget}
+          deltaUsd={report.totals.income.delta}
+          tone={deltaTone('income', report.totals.income.delta)}
+          variant="good"
+        />
+        <KpiBox
+          label="Gastos"
+          real={report.totals.expense.real}
+          budget={report.totals.expense.budget}
+          deltaUsd={report.totals.expense.delta}
+          tone={deltaTone('expense', report.totals.expense.delta)}
+          variant="bad"
+        />
+        <KpiBox
+          label="Neto"
+          real={report.totals.net.real}
+          budget={report.totals.net.budget}
+          deltaUsd={report.totals.net.delta}
+          tone={netTone}
+          variant="primary"
+        />
+      </section>
 
+      {/* DETAIL TABLE */}
       {report.rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No hay categorías cargadas. Corré <code>npm run db:seed:categories</code>.
+        <div className="border border-dashed border-border p-12 text-center">
+          <Body>
+            Sin categorías cargadas. Corré{' '}
+            <code className="font-mono text-foreground">npm run db:seed:categories</code>.
+          </Body>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-medium">Categoría</th>
-                <th className="px-3 py-2 text-right font-medium">Budget</th>
-                <th className="px-3 py-2 text-right font-medium">Real</th>
-                <th className="px-3 py-2 text-right font-medium">Δ USD</th>
-                <th className="px-3 py-2 text-right font-medium">Δ %</th>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-y border-border">
+                <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Categoría
+                </th>
+                {['Budget', 'Real', 'Δ USD', 'Δ %'].map((h) => (
+                  <th
+                    key={h}
+                    className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {report.rows.map((row) => {
                 const tone = deltaTone(row.category.kind, row.deltaUsd);
-                const toneClass =
-                  tone === 'good'
-                    ? 'text-emerald-700'
-                    : tone === 'bad'
-                      ? 'text-rose-700'
-                      : 'text-muted-foreground';
+                const cVar = toneVar(tone);
                 const isParent = !row.isLeaf;
                 return (
                   <tr
                     key={row.category.id}
-                    className={cn('border-t', isParent && 'bg-muted/10 font-medium')}
+                    className={cn(
+                      'border-t transition-colors',
+                      isParent
+                        ? 'border-border bg-card/30'
+                        : 'border-border/40 hover:bg-primary/[0.04]',
+                    )}
                   >
                     <td
                       className={cn(
-                        'px-3 py-1.5',
-                        row.category.depth === 1 && 'pl-8 text-muted-foreground',
+                        'px-3 py-2.5',
+                        row.category.depth === 1 && 'pl-10',
                       )}
                     >
-                      {row.isLeaf ? (
+                      {isParent ? (
+                        <div className="flex items-center gap-2">
+                          <span
+                            aria-hidden
+                            className="inline-block h-3 w-[3px]"
+                            style={{
+                              background:
+                                row.category.kind === 'income'
+                                  ? 'var(--good)'
+                                  : 'var(--bad)',
+                            }}
+                          />
+                          <span className="font-display text-base font-semibold text-foreground">
+                            {row.category.name}
+                          </span>
+                        </div>
+                      ) : (
                         <Link
                           href={drillHref(row.category.id)}
-                          className="hover:underline"
+                          className="font-display text-base text-foreground transition-colors hover:text-primary hover:underline"
                         >
-                          {row.category.depth === 1 ? '↳ ' : ''}
                           {row.category.name}
                         </Link>
-                      ) : (
-                        <>
-                          {row.category.depth === 1 ? '↳ ' : ''}
-                          {row.category.name}
-                        </>
                       )}
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {formatUsd(row.budget)}
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm text-muted-foreground">{formatUsd(row.budget)}</Num>
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {formatUsd(row.real)}
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm text-foreground">{formatUsd(row.real)}</Num>
                     </td>
-                    <td className={cn('px-3 py-1.5 text-right tabular-nums', toneClass)}>
-                      {formatUsd(row.deltaUsd)}
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm font-semibold" style={{ color: cVar }}>
+                        {formatUsd(row.deltaUsd)}
+                      </Num>
                     </td>
-                    <td className={cn('px-3 py-1.5 text-right tabular-nums', toneClass)}>
-                      {formatPct(row.deltaPct)}
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm" style={{ color: cVar }}>
+                        {formatPct(row.deltaPct)}
+                      </Num>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
-            <tfoot className="bg-muted/30 text-sm">
-              <tr className="border-t">
-                <td className="px-3 py-2 font-medium">Total Ingresos</td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatUsd(report.totals.income.budget)}
+            <tfoot>
+              {(['income', 'expense'] as const).map((k) => {
+                const t = deltaTone(k, report.totals[k].delta);
+                const cVar = toneVar(t);
+                return (
+                  <tr key={k} className="border-t border-border/60">
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={cn(
+                          'font-display text-base font-semibold',
+                          k === 'income' ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
+                        )}
+                      >
+                        Total {k === 'income' ? 'Ingresos' : 'Gastos'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm text-muted-foreground">
+                        {formatUsd(report.totals[k].budget)}
+                      </Num>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm text-foreground">
+                        {formatUsd(report.totals[k].real)}
+                      </Num>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm font-semibold" style={{ color: cVar }}>
+                        {formatUsd(report.totals[k].delta)}
+                      </Num>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Num className="text-sm text-muted-foreground">—</Num>
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-t-2 border-border bg-card/50">
+                <td className="px-3 py-3">
+                  <span className="font-display text-lg font-semibold text-foreground">
+                    Neto
+                  </span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatUsd(report.totals.income.real)}
+                <td className="px-3 py-3 text-right">
+                  <Num className="text-sm text-muted-foreground">
+                    {formatUsd(report.totals.net.budget)}
+                  </Num>
                 </td>
-                <td
-                  className={cn(
-                    'px-3 py-2 text-right tabular-nums',
-                    deltaTone('income', report.totals.income.delta) === 'good'
-                      ? 'text-emerald-700'
-                      : deltaTone('income', report.totals.income.delta) === 'bad'
-                        ? 'text-rose-700'
-                        : 'text-muted-foreground',
-                  )}
-                >
-                  {formatUsd(report.totals.income.delta)}
+                <td className="px-3 py-3 text-right">
+                  <Num className="text-base font-semibold text-foreground">
+                    {formatUsd(report.totals.net.real)}
+                  </Num>
                 </td>
-                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-              </tr>
-              <tr className="border-t">
-                <td className="px-3 py-2 font-medium">Total Gastos</td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatUsd(report.totals.expense.budget)}
+                <td className="px-3 py-3 text-right">
+                  <Num className="text-base font-semibold" style={{ color: toneVar(netTone) }}>
+                    {formatUsd(report.totals.net.delta)}
+                  </Num>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatUsd(report.totals.expense.real)}
+                <td className="px-3 py-3 text-right">
+                  <Num className="text-sm text-muted-foreground">—</Num>
                 </td>
-                <td
-                  className={cn(
-                    'px-3 py-2 text-right tabular-nums',
-                    deltaTone('expense', report.totals.expense.delta) === 'good'
-                      ? 'text-emerald-700'
-                      : deltaTone('expense', report.totals.expense.delta) === 'bad'
-                        ? 'text-rose-700'
-                        : 'text-muted-foreground',
-                  )}
-                >
-                  {formatUsd(report.totals.expense.delta)}
-                </td>
-                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-              </tr>
-              <tr className="border-t bg-muted/50">
-                <td className="px-3 py-2 font-semibold">Neto</td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">
-                  {formatUsd(report.totals.net.budget)}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">
-                  {formatUsd(report.totals.net.real)}
-                </td>
-                <td
-                  className={cn(
-                    'px-3 py-2 text-right tabular-nums font-medium',
-                    deltaTone('income', report.totals.net.delta) === 'good'
-                      ? 'text-emerald-700'
-                      : deltaTone('income', report.totals.net.delta) === 'bad'
-                        ? 'text-rose-700'
-                        : 'text-muted-foreground',
-                  )}
-                >
-                  {formatUsd(report.totals.net.delta)}
-                </td>
-                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
               </tr>
             </tfoot>
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function KpiBox({
+  label,
+  real,
+  budget,
+  deltaUsd,
+  tone,
+  variant,
+}: {
+  label: string;
+  real: string;
+  budget: string;
+  deltaUsd: string;
+  tone: 'good' | 'bad' | 'neutral';
+  variant: 'good' | 'bad' | 'primary';
+}) {
+  const colorVar =
+    variant === 'good'
+      ? 'var(--good)'
+      : variant === 'bad'
+        ? 'var(--bad)'
+        : 'var(--primary)';
+  const toneColor = toneVar(tone);
+  return (
+    <div className="bg-card p-5">
+      <Label>{label}</Label>
+      <Display size="md" className="mt-3 block tabular-nums" style={{ color: colorVar }}>
+        {formatUsd(real)}
+      </Display>
+      <Hair className="my-3 bg-border/60" />
+      <div className="flex items-baseline justify-between gap-2">
+        <Num className="text-xs text-muted-foreground">budget {formatUsd(budget)}</Num>
+        <Num className="text-xs font-semibold" style={{ color: toneColor }}>
+          {formatUsd(deltaUsd)}
+        </Num>
+      </div>
     </div>
   );
 }

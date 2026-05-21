@@ -6,11 +6,12 @@ import { accounts, categories, forecasts, recurrences } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import {
   RECURRENCE_FREQUENCY_LABELS,
-  RECURRENCE_KIND_LABELS,
   type RecurrenceFrequency,
   type RecurrenceKind,
 } from '@/lib/schemas/recurrence';
 import { Button } from '@/components/ui/button';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
+import { cn } from '@/lib/utils';
 import { DeleteRecurrenceButton } from './delete-button';
 
 export const metadata = {
@@ -27,6 +28,27 @@ function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number.isFinite(n) ? n : 0);
+}
+
+function shortDate(iso: string | null): string {
+  if (!iso) return '—';
+  const parts = iso.split('-');
+  if (parts.length !== 3) return iso;
+  const d = parts[2];
+  const m = parts[1];
+  if (!d || !m) return iso;
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const mi = Number.parseInt(m, 10) - 1;
+  return `${d} ${months[mi] ?? ''}`;
+}
+
+function daysUntil(iso: string | null): number | null {
+  if (!iso) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${iso}T00:00:00`);
+  const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  return Number.isFinite(diff) ? diff : null;
 }
 
 async function toggleActive(formData: FormData): Promise<void> {
@@ -91,109 +113,212 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
     )
     .orderBy(asc(recurrences.name));
 
+  const active = rows.filter((r) => r.active);
+  const paused = rows.filter((r) => !r.active);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Recurrencias</h1>
-        <Button asChild>
+    <div className="space-y-8">
+      {/* HEADER */}
+      <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
+        <div className="min-w-0">
+          <Label>Planificar · Recurrencias</Label>
+          <Display size="lg" className="mt-2 block">
+            Recurrencias
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            {rows.length === 0 ? (
+              <>Sin recurrencias todavía. Cargá la primera para empezar a generar previsiones.</>
+            ) : (
+              <>
+                <span className="text-foreground">{active.length}</span>{' '}
+                {active.length === 1 ? 'activa' : 'activas'}
+                {showAll && paused.length > 0 && (
+                  <>
+                    {' '}·{' '}
+                    <span className="text-foreground">{paused.length}</span>{' '}
+                    pausada{paused.length === 1 ? '' : 's'}
+                  </>
+                )}
+              </>
+            )}
+          </Body>
+        </div>
+        <Button asChild size="lg">
           <Link href="/recurrences/new">+ Nueva recurrencia</Link>
         </Button>
-      </div>
+      </header>
 
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <Link
-          href="/recurrences"
-          className={!showAll ? 'font-medium text-foreground' : 'hover:underline'}
-        >
+      <Hair thick />
+
+      {/* FILTER PILLS */}
+      <nav className="flex items-baseline gap-1" aria-label="Filtros">
+        <FilterPill href="/recurrences" active={!showAll}>
           Activas
-        </Link>
-        <span>·</span>
-        <Link
-          href="/recurrences?archived=1"
-          className={showAll ? 'font-medium text-foreground' : 'hover:underline'}
-        >
-          Todas (incluye pausadas)
-        </Link>
-      </div>
+        </FilterPill>
+        <FilterPill href="/recurrences?archived=1" active={showAll}>
+          Incluir pausadas
+        </FilterPill>
+      </nav>
 
       {rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {showAll
-            ? 'No hay recurrencias todavía.'
-            : 'No hay recurrencias activas. Cargá la primera.'}
+        <div className="border border-dashed border-border p-12 text-center">
+          <Display size="sm">Sin recurrencias</Display>
+          <Body className="mx-auto mt-3 max-w-md">
+            Una recurrencia genera previsiones automáticas en el futuro — pago de alquiler,
+            sueldo, suscripciones. Cargá la primera y aparecerán en{' '}
+            <Link href="/forecasts" className="link not-italic">
+              /forecasts
+            </Link>
+            .
+          </Body>
+          <Button asChild className="mt-6" size="lg">
+            <Link href="/recurrences/new">+ Crear la primera</Link>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-medium">Nombre</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium">Cuenta</th>
-                <th className="px-3 py-2 font-medium">Categoría</th>
-                <th className="px-3 py-2 text-right font-medium">Monto</th>
-                <th className="px-3 py-2 font-medium">Frecuencia</th>
-                <th className="px-3 py-2 font-medium">Próxima</th>
-                <th className="px-3 py-2 font-medium" />
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-y border-border">
+                {['Nombre', 'Frecuencia', 'Cuenta · Categoría'].map((h) => (
+                  <th
+                    key={h}
+                    className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  >
+                    {h}
+                  </th>
+                ))}
+                {['Monto', 'Próxima'].map((h) => (
+                  <th
+                    key={h}
+                    className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  >
+                    {h}
+                  </th>
+                ))}
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">
-                    <Link href={`/recurrences/${row.id}`} className="hover:underline">
-                      {row.name}
-                    </Link>
-                    {!row.active && (
-                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                        pausada
-                      </span>
+              {rows.map((row) => {
+                const dt = daysUntil(row.nextDate);
+                const urgent = dt !== null && dt >= 0 && dt <= 7;
+                return (
+                  <tr
+                    key={row.id}
+                    className={cn(
+                      'group border-t border-border/40 transition-colors hover:bg-primary/[0.04]',
+                      !row.active && 'opacity-60',
                     )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        row.kind === 'income'
-                          ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'
-                          : 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
-                      }
-                    >
-                      {RECURRENCE_KIND_LABELS[row.kind as RecurrenceKind] ?? row.kind}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.accountName ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.categoryName ?? '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {formatAmount(row.amount, row.currency)}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {RECURRENCE_FREQUENCY_LABELS[row.frequency as RecurrenceFrequency] ??
-                      row.frequency}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                    {row.nextDate ?? '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/recurrences/${row.id}`}>Editar</Link>
-                      </Button>
-                      <form action={toggleActive}>
-                        <input type="hidden" name="id" value={row.id} />
-                        <input
-                          type="hidden"
-                          name="active"
-                          value={row.active ? 'false' : 'true'}
+                  >
+                    {/* Name + kind badge */}
+                    <td className="px-3 py-3">
+                      <div className="flex items-baseline gap-3">
+                        <span
+                          aria-hidden
+                          className="inline-block size-2 rounded-full"
+                          style={{
+                            background:
+                              row.kind === ('income' as RecurrenceKind)
+                                ? 'var(--good)'
+                                : 'var(--bad)',
+                          }}
                         />
-                        <Button variant="ghost" size="sm" type="submit">
-                          {row.active ? 'Pausar' : 'Reactivar'}
+                        <Link
+                          href={`/recurrences/${row.id}`}
+                          className="font-display text-base font-semibold text-foreground hover:text-primary"
+                        >
+                          {row.name}
+                        </Link>
+                        {!row.active && (
+                          <span className="rounded-full bg-muted px-2 py-[1px] font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            pausada
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span
+                        className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold uppercase tracking-[0.14em]"
+                        style={{
+                          borderColor: 'color-mix(in oklab, var(--primary) 40%, transparent)',
+                          color: 'var(--primary)',
+                        }}
+                      >
+                        {RECURRENCE_FREQUENCY_LABELS[row.frequency as RecurrenceFrequency] ??
+                          row.frequency}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
+                      {row.accountName ?? '—'}
+                      {row.categoryName && (
+                        <>
+                          {' · '}
+                          <span className="text-foreground/70">{row.categoryName}</span>
+                        </>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <Num className="text-sm text-foreground">
+                        {formatAmount(row.amount, row.currency)}
+                      </Num>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      {row.nextDate ? (
+                        <>
+                          <Num
+                            className={cn(
+                              'text-sm',
+                              urgent ? 'text-[color:var(--attn)]' : 'text-foreground',
+                            )}
+                          >
+                            {shortDate(row.nextDate)}
+                          </Num>
+                          {dt !== null && (
+                            <div>
+                              <Label
+                                className={cn(
+                                  'normal-case tracking-[0.1em]',
+                                  urgent && 'text-[color:var(--attn)]',
+                                )}
+                              >
+                                {dt === 0
+                                  ? 'hoy'
+                                  : dt === 1
+                                    ? 'mañana'
+                                    : dt > 0
+                                      ? `en ${dt} días`
+                                      : `hace ${-dt} días`}
+                              </Label>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <Num className="text-sm text-muted-foreground">—</Num>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/recurrences/${row.id}`}>Editar</Link>
                         </Button>
-                      </form>
-                      <DeleteRecurrenceButton id={row.id} name={row.name} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <form action={toggleActive}>
+                          <input type="hidden" name="id" value={row.id} />
+                          <input
+                            type="hidden"
+                            name="active"
+                            value={row.active ? 'false' : 'true'}
+                          />
+                          <Button variant="ghost" size="sm" type="submit">
+                            {row.active ? 'Pausar' : 'Reactivar'}
+                          </Button>
+                        </form>
+                        <DeleteRecurrenceButton id={row.id} name={row.name} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -202,3 +327,26 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
   );
 }
 
+function FilterPill({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+        active
+          ? 'border-b-2 border-primary text-primary'
+          : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {children}
+    </Link>
+  );
+}

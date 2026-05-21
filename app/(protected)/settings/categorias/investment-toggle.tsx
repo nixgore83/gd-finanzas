@@ -3,7 +3,14 @@
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { setCategoryInvestment } from '@/app/actions/categories/set-investment';
+import { cn } from '@/lib/utils';
 
+/**
+ * Toggle pill estilo iOS para marcar categorías como "inversión".
+ * - On: track gold/attn, knob oscuro
+ * - Off: track muted, knob cream
+ * Persiste optimisticamente, con revert si la action falla.
+ */
 export function InvestmentToggle({
   categoryId,
   initial,
@@ -27,15 +34,29 @@ export function InvestmentToggle({
   };
 
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2">
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(e) => handleChange(e.target.checked)}
-        disabled={isPending}
-        className="size-4 rounded border-input"
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={value ? 'Inversión activada' : 'Inversión desactivada'}
+      disabled={isPending}
+      onClick={() => handleChange(!value)}
+      className={cn(
+        'relative h-7 w-12 cursor-pointer rounded-full transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        value ? 'bg-[color:var(--attn)]' : 'bg-muted',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'absolute top-1 size-5 rounded-full transition-all',
+          value
+            ? 'left-6 bg-background shadow-sm'
+            : 'left-1 bg-foreground/70',
+        )}
       />
-      <span className="text-xs text-muted-foreground">Inversión</span>
-    </label>
+    </button>
   );
 }
