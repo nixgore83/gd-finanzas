@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Label, Num } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import type { CategoryNode } from '@/lib/categories/tree';
@@ -43,13 +44,21 @@ function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
 }
 
 function formatDayHeader(date: string): string {
-  // YYYY-MM-DD → dd MMM
+  // YYYY-MM-DD → "dd mmm yyyy"
   const [y, m, d] = date.split('-').map(Number);
   if (!y || !m || !d) return date;
-  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }).format(
-    new Date(Date.UTC(y, m - 1, d)),
-  );
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(y, m - 1, d)));
 }
+
+const TYPE_VAR: Record<TxRow['kind'], string> = {
+  income: 'var(--good)',
+  expense: 'var(--bad)',
+  transfer: 'var(--attn)',
+};
 
 type Props = {
   rows: TxRow[];
@@ -148,82 +157,103 @@ export function TransactionsTable({ rows, categories }: Props) {
     return out;
   }, [rows]);
 
-  const allSelected =
-    rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* ============ BULK ACTION PANEL ============ */}
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-end gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
-          <div className="space-y-1">
-            <p className="text-sm font-medium">
-              {selected.size} seleccionada{selected.size === 1 ? '' : 's'}
-            </p>
+        <div className="flex flex-wrap items-end justify-between gap-4 border-l-2 border-primary bg-primary/[0.06] p-4">
+          <div>
+            <Label className="text-primary">Selección activa</Label>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-display text-2xl font-light text-foreground">
+                {selected.size}
+              </span>
+              <span className="font-display text-sm italic text-muted-foreground">
+                {selected.size === 1 ? 'movimiento seleccionado' : 'movimientos seleccionados'}
+              </span>
+            </div>
             {uniformKind === null && selectedKinds.size > 1 && (
-              <p className="text-xs text-muted-foreground">
-                Tipos mixtos: la recategorización solo funciona con selección de un mismo
-                kind.
+              <p className="mt-2 font-display text-sm italic text-[color:var(--bad)]">
+                Tipos mixtos — la recategorización solo aplica a una sola categoría kind.
               </p>
             )}
           </div>
-          <Select
-            value={bulkCategoryId}
-            onValueChange={setBulkCategoryId}
-            disabled={uniformKind === null || isPending}
-          >
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Recategorizar a…" />
-            </SelectTrigger>
-            <SelectContent>
-              {bulkCategoryOptions.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.depth === 1 ? '↳ ' : ''}
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            onClick={doBulkCategory}
-            disabled={isPending || !bulkCategoryId || uniformKind === null}
-          >
-            Aplicar
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={doBulkDelete}
-            disabled={isPending}
-          >
-            Borrar {selected.size}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-            Limpiar
-          </Button>
+          <div className="flex flex-wrap items-end gap-2">
+            <Select
+              value={bulkCategoryId}
+              onValueChange={setBulkCategoryId}
+              disabled={uniformKind === null || isPending}
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Recategorizar a…" />
+              </SelectTrigger>
+              <SelectContent>
+                {bulkCategoryOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.depth === 1 ? '↳ ' : ''}
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={doBulkCategory}
+              disabled={isPending || !bulkCategoryId || uniformKind === null}
+            >
+              Aplicar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={doBulkDelete}
+              disabled={isPending}
+            >
+              Borrar {selected.size}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+              Limpiar
+            </Button>
+          </div>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40">
-            <tr className="text-left">
-              <th className="px-3 py-2 w-8">
+      {/* ============ TABLE ============ */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-y border-border">
+              <th className="w-8 px-3 py-2.5">
                 <input
                   type="checkbox"
                   aria-label="Seleccionar todas"
                   checked={allSelected}
                   onChange={toggleAll}
-                  className="size-4 rounded border-input"
+                  className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
                 />
               </th>
-              <th className="px-3 py-2 font-medium">Tipo</th>
-              <th className="px-3 py-2 font-medium">Cuenta</th>
-              <th className="px-3 py-2 font-medium">Categoría</th>
-              <th className="px-3 py-2 text-right font-medium">Monto</th>
-              <th className="px-3 py-2 text-right font-medium">USD</th>
-              <th className="px-3 py-2 font-medium">Descripción</th>
-              <th className="px-3 py-2 font-medium" />
+              {['Tipo', 'Cuenta', 'Categoría'].map((h) => (
+                <th
+                  key={h}
+                  className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                >
+                  {h}
+                </th>
+              ))}
+              {['Monto', 'USD'].map((h) => (
+                <th
+                  key={h}
+                  className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                >
+                  {h}
+                </th>
+              ))}
+              <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Concepto
+              </th>
+              <th className="px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
@@ -254,61 +284,115 @@ function ByDayGroup({
   selected: Set<string>;
   onToggle: (id: string) => void;
 }) {
+  // Sum signed USD net for the day's strapline
+  const dayNet = rows.reduce((s, r) => {
+    const n = Number.parseFloat(r.amountUsd) || 0;
+    if (r.kind === 'income') return s + n;
+    if (r.kind === 'expense') return s - n;
+    return s;
+  }, 0);
+  const formatUsd = (n: number) =>
+    new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(n);
+
   return (
     <>
-      <tr className="border-t bg-muted/20">
-        <td colSpan={8} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-          {formatDayHeader(date)}
+      {/* Day separator row */}
+      <tr className="border-t border-border bg-card/30">
+        <td colSpan={8} className="px-3 py-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+              {formatDayHeader(date)}
+            </span>
+            <Num className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              {rows.length} {rows.length === 1 ? 'mov' : 'movs'} · neto{' '}
+              <span
+                className={cn(
+                  dayNet >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
+                )}
+              >
+                {dayNet >= 0 ? '+' : ''}
+                {formatUsd(dayNet)}
+              </span>
+            </Num>
+          </div>
         </td>
       </tr>
+
+      {/* Movement rows */}
       {rows.map((row) => (
         <tr
           key={row.id}
-          className={cn('border-t', selected.has(row.id) && 'bg-primary/5')}
+          className={cn(
+            'border-t border-border/40 transition-colors hover:bg-primary/[0.04]',
+            selected.has(row.id) && 'bg-primary/[0.08]',
+          )}
         >
-          <td className="px-3 py-2">
+          <td className="px-3 py-3">
             <input
               type="checkbox"
-              aria-label={`Seleccionar transacción ${row.description}`}
+              aria-label={`Seleccionar ${row.description}`}
               checked={selected.has(row.id)}
               onChange={() => onToggle(row.id)}
-              className="size-4 rounded border-input"
+              className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
             />
           </td>
-          <td className="px-3 py-2">
+          <td className="px-3 py-3">
             <span
-              className={cn(
-                'rounded px-1.5 py-0.5 text-xs',
-                row.kind === 'income' &&
-                  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-                row.kind === 'expense' &&
-                  'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
-                row.kind === 'transfer' &&
-                  'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-              )}
+              className="inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                background: `color-mix(in oklab, ${TYPE_VAR[row.kind]} 15%, transparent)`,
+                color: TYPE_VAR[row.kind],
+              }}
             >
               {ALL_KIND_LABELS[row.kind]}
             </span>
           </td>
-          <td className="px-3 py-2 text-muted-foreground">{row.accountName ?? '—'}</td>
-          <td className="px-3 py-2 text-muted-foreground">{row.categoryName ?? '—'}</td>
-          <td className="px-3 py-2 text-right tabular-nums">
-            {formatAmount(row.amountOriginal, row.currencyOriginal)}
+          <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
+            {row.accountName ?? '—'}
           </td>
-          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-            {formatAmount(row.amountUsd, 'USD')}
+          <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
+            {row.categoryName ?? '—'}
           </td>
-          <td className="px-3 py-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span>{row.description}</span>
+          <td className="px-3 py-3 text-right">
+            <Num
+              className={cn(
+                'text-sm',
+                row.kind === 'income' && 'text-[color:var(--good)]',
+                row.kind === 'transfer' && 'text-[color:var(--attn)]',
+                row.kind === 'expense' && 'text-foreground',
+              )}
+            >
+              {formatAmount(row.amountOriginal, row.currencyOriginal)}
+            </Num>
+          </td>
+          <td className="px-3 py-3 text-right">
+            <Num className="text-xs text-muted-foreground">
+              {formatAmount(row.amountUsd, 'USD')}
+            </Num>
+          </td>
+          <td className="px-3 py-3">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="font-display text-base text-foreground">{row.description}</span>
               {row.tags.map((t, i) => (
                 <span
                   key={i}
-                  className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
+                  className="inline-block rounded-full border px-2 py-[1px] font-sans text-[10px] font-medium"
                   style={
                     t.color
-                      ? { borderColor: t.color, color: t.color }
-                      : undefined
+                      ? {
+                          borderColor: `color-mix(in oklab, ${t.color} 60%, transparent)`,
+                          color: t.color,
+                          background: `color-mix(in oklab, ${t.color} 12%, transparent)`,
+                        }
+                      : {
+                          borderColor: 'var(--border)',
+                          color: 'var(--muted-foreground)',
+                        }
                   }
                 >
                   {t.name}
@@ -316,8 +400,8 @@ function ByDayGroup({
               ))}
             </div>
           </td>
-          <td className="px-3 py-2 text-right">
-            <div className="flex justify-end gap-2">
+          <td className="px-3 py-3 text-right">
+            <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 [tr:hover_&]:opacity-100">
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/transactions/${row.id}`}>Editar</Link>
               </Button>

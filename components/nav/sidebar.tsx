@@ -81,18 +81,24 @@ export function Sidebar({ userDisplayName, onNavigate }: Props) {
   }
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-border px-4 py-4">
+    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
+      {/* Brand header */}
+      <div className="px-5 pt-7 pb-5">
         <Link
           href="/dashboard"
           onClick={onNavigate}
-          className="text-base font-semibold tracking-tight hover:text-primary"
+          className="inline-block transition-colors"
         >
-          gd-finanzas
+          <div className="font-display text-[28px] font-light leading-none tracking-tight text-foreground">
+            G<span className="text-primary">·</span>D
+          </div>
+          <div className="mt-1.5 font-sans text-[9px] font-semibold uppercase tracking-[0.32em] text-muted-foreground">
+            Privatbanken
+          </div>
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
+      <nav className="flex-1 overflow-y-auto px-3 pb-3">
         {SIDEBAR_SECTIONS.map((section) => (
           <SectionBlock
             key={section.key}
@@ -105,21 +111,37 @@ export function Sidebar({ userDisplayName, onNavigate }: Props) {
         ))}
       </nav>
 
-      <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-3 text-sm">
-        <span className="truncate text-muted-foreground" title={userDisplayName ?? ''}>
+      {/* Footer: user + theme + signout */}
+      <div className="border-t border-border/60 px-4 py-4">
+        <div
+          className="truncate font-display text-[15px] italic text-foreground"
+          title={userDisplayName ?? ''}
+        >
           {userDisplayName ?? '—'}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <ThemeToggle />
-          <form action="/auth/sign-out" method="post">
-            <button
-              type="submit"
-              className="inline-flex h-8 items-center rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="Cerrar sesión"
-            >
-              Salir
-            </button>
-          </form>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="flex gap-1.5">
+            {(['ARS', 'USD'] as const).map((c) => (
+              <span
+                key={c}
+                className="rounded-full border border-primary/40 px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <form action="/auth/sign-out" method="post">
+              <button
+                type="submit"
+                className="inline-flex h-8 items-center rounded-md border border-border px-2.5 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
+                title="Cerrar sesión"
+              >
+                Salir
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </aside>
@@ -141,28 +163,26 @@ function SectionBlock({
 }) {
   const hasActive = section.links.some((l) => isActiveLink(pathname, l));
   return (
-    <div className="mb-2">
+    <div className="mt-4 first:mt-0">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
         className={cn(
-          'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-widest transition-colors',
-          hasActive
-            ? 'text-foreground'
-            : 'text-muted-foreground hover:text-foreground',
+          'flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] transition-colors',
+          hasActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
         )}
       >
         <span>{section.title}</span>
         <ChevronDown
           className={cn(
-            'size-3.5 transition-transform',
+            'size-3 transition-transform',
             isOpen ? 'rotate-0' : '-rotate-90',
           )}
         />
       </button>
       {isOpen && (
-        <ul className="mt-1 space-y-0.5 pl-1">
+        <ul className="mt-1 space-y-px">
           {section.links.map((link) => (
             <li key={link.href}>
               <NavLink link={link} pathname={pathname} onNavigate={onNavigate} />
@@ -188,11 +208,13 @@ function NavLink({
     <Link
       href={link.href}
       onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex rounded-md px-2 py-1.5 text-sm transition-colors',
+        // Serif italic-friendly nav items — feels editorial, not OS-chrome.
+        'group flex items-center rounded-md border-l-2 py-1.5 pl-2.5 pr-2 font-display text-[15px] font-normal leading-snug transition-colors',
         active
-          ? 'bg-primary/10 font-medium text-primary'
-          : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+          ? 'border-primary bg-primary/10 text-primary'
+          : 'border-transparent text-foreground/85 hover:border-border hover:bg-accent hover:text-foreground',
       )}
     >
       {link.label}

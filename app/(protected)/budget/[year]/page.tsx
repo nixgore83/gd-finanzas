@@ -6,6 +6,7 @@ import { getDb } from '@/lib/db/client';
 import { budgets } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
+import { Display, Label, Body, Hair } from '@/components/ui/typography';
 import { BudgetGrid } from '../budget-grid';
 
 export const metadata = {
@@ -35,11 +36,11 @@ export default async function BudgetYearPage({ params }: { params: RouteParams }
 
   if (categories.length === 0) {
     return (
-      <div className="mx-auto max-w-xl space-y-4 rounded-md border border-dashed p-8 text-center">
-        <h2 className="text-lg font-medium">No hay categorías cargadas</h2>
-        <p className="text-sm text-muted-foreground">
-          Corré <code>npm run db:seed:categories</code> primero.
-        </p>
+      <div className="mx-auto max-w-xl space-y-4 border border-dashed border-border p-10 text-center">
+        <Display size="md">Sin categorías cargadas</Display>
+        <Body>
+          Corré <code className="font-mono not-italic text-foreground">npm run db:seed:categories</code> primero.
+        </Body>
       </div>
     );
   }
@@ -57,23 +58,42 @@ export default async function BudgetYearPage({ params }: { params: RouteParams }
   const currentYearMonth = { year: now.getFullYear(), month: now.getMonth() + 1 };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Presupuesto {year}</h1>
-        <div className="flex items-center gap-3 text-sm">
-          <Link href={`/budget/${year - 1}`} className="text-muted-foreground hover:underline">
+    <div className="space-y-8">
+      {/* ============ HEADER ============ */}
+      <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
+        <div className="min-w-0">
+          <Label>Planificar · Presupuesto</Label>
+          <div className="mt-2 flex items-baseline gap-4">
+            <Display size="lg">Presupuesto</Display>
+            <Display size="lg" className="tabular-nums text-primary">
+              {year}
+            </Display>
+          </div>
+          <Body className="mt-1 max-w-2xl">
+            Cifras en USD. Solo las hojas son editables — los padres muestran subtotales
+            calculados. Meses pasados son read-only.
+          </Body>
+        </div>
+
+        {/* Year navigation */}
+        <nav className="flex items-baseline gap-5 font-display">
+          <Link
+            href={`/budget/${year - 1}`}
+            className="text-base italic text-muted-foreground transition-colors hover:text-primary"
+          >
             ◀ {year - 1}
           </Link>
-          <Link href={`/budget/${year + 1}`} className="text-muted-foreground hover:underline">
+          <span className="text-2xl font-light tabular-nums text-foreground">{year}</span>
+          <Link
+            href={`/budget/${year + 1}`}
+            className="text-base italic text-muted-foreground transition-colors hover:text-primary"
+          >
             {year + 1} ▶
           </Link>
-        </div>
-      </div>
+        </nav>
+      </header>
 
-      <p className="text-sm text-muted-foreground">
-        Valores en USD. Solo las categorías hoja son editables — las filas padre muestran
-        subtotales calculados. Meses pasados son read-only.
-      </p>
+      <Hair thick />
 
       <BudgetGrid
         year={year}

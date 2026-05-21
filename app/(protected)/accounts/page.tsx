@@ -6,7 +6,9 @@ import { accounts, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/account';
 import { Button } from '@/components/ui/button';
+import { Display, Label, Body, Hair } from '@/components/ui/typography';
 import { setAccountArchived } from '@/app/actions/accounts/archive';
+import { cn } from '@/lib/utils';
 
 async function toggleArchive(formData: FormData): Promise<void> {
   'use server';
@@ -18,6 +20,24 @@ export const metadata = {
 };
 
 type SearchParams = Promise<{ archived?: string }>;
+
+type AccountRow = {
+  id: string;
+  name: string;
+  type: keyof typeof ACCOUNT_TYPE_LABELS;
+  currencyDefault: 'ARS' | 'USD';
+  institutionName: string | null;
+  ownerTag: string;
+  archived: boolean;
+};
+
+/** Bullet color by account type — keeps the page scannable at a glance. */
+function dotVarFor(type: AccountRow['type']): string {
+  if (type === 'credit_card') return 'var(--bad)';      // debt-bearing
+  if (type === 'broker') return 'var(--attn)';          // investment vehicle
+  if (type === 'cash') return 'var(--muted-foreground)';
+  return 'var(--good)';                                 // bank / wallet / etc
+}
 
 export default async function AccountsPage({ searchParams }: { searchParams: SearchParams }) {
   let session;
@@ -32,7 +52,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
   const showArchived = params.archived === '1';
 
   const db = getDb();
-  const rows = await db
+  const rows: AccountRow[] = await db
     .select({
       id: accounts.id,
       name: accounts.name,
@@ -51,95 +71,223 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
     )
     .orderBy(asc(accounts.name));
 
+  // Group by institution (null → "Sin institución" bucket, useful for Cash).
+  const byBank = new Map<string, AccountRow[]>();
+  for (const r of rows) {
+    const key = r.institutionName ?? 'Sin institución';
+    const arr = byBank.get(key) ?? [];
+    arr.push(r);
+    byBank.set(key, arr);
+  }
+  const groups = [...byBank.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'));
+
+  const activeCount = rows.filter((r) => !r.archived).length;
+  const archivedCount = rows.filter((r) => r.archived).length;
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Cuentas</h1>
-        <Button asChild>
+    <div className="space-y-8">
+      {/* ============ HEADER ============ */}
+      <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
+        <div className="min-w-0">
+          <Label>Operar · Cuentas</Label>
+          <Display size="lg" className="mt-2 block">
+            Cuentas
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            {rows.length === 0 ? (
+              <>Todavía no hay cuentas cargadas. Arrancá creando la primera.</>
+            ) : (
+              <>
+                <span className="not-italic text-foreground">{activeCount}</span>{' '}
+                {activeCount === 1 ? 'activa' : 'activas'} ·{' '}
+                <span className="not-italic text-foreground">{groups.length}</span>{' '}
+                {groups.length === 1 ? 'institución' : 'instituciones'}
+                {showArchived && archivedCount > 0 && (
+                  <>
+                    {' '}·{' '}
+                    <span className="not-italic text-foreground">{archivedCount}</span>{' '}
+                    archivada{archivedCount === 1 ? '' : 's'}
+                  </>
+                )}
+              </>
+            )}
+          </Body>
+        </div>
+        <Button asChild size="lg">
           <Link href="/accounts/new">+ Nueva cuenta</Link>
         </Button>
-      </div>
+      </header>
 
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <Link
-          href="/accounts"
-          className={!showArchived ? 'font-medium text-foreground' : 'hover:underline'}
-        >
+      <Hair thick />
+
+      {/* ============ FILTER PILLS ============ */}
+      <nav className="flex items-baseline gap-1" aria-label="Filtros de archivado">
+        <FilterPill href="/accounts" active={!showArchived}>
           Activas
-        </Link>
-        <span>·</span>
-        <Link
-          href="/accounts?archived=1"
-          className={showArchived ? 'font-medium text-foreground' : 'hover:underline'}
-        >
-          Todas (incluye archivadas)
-        </Link>
-      </div>
+        </FilterPill>
+        <FilterPill href="/accounts?archived=1" active={showArchived}>
+          Incluir archivadas
+        </FilterPill>
+      </nav>
 
+      {/* ============ BODY ============ */}
       {rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {showArchived
-            ? 'No hay cuentas todavía.'
-            : 'No hay cuentas activas. Crear una con "+ Nueva cuenta".'}
+        <div className="border border-dashed border-border p-12 text-center">
+          <Display size="sm">Sin cuentas todavía</Display>
+          <Body className="mx-auto mt-3 max-w-md">
+            Las cuentas son el lugar donde &laquo;vive&raquo; el dinero — una caja de ahorro,
+            una tarjeta, una billetera virtual, cash. Después conectás recurrencias y
+            transacciones a ellas.
+          </Body>
+          <Button asChild className="mt-6" size="lg">
+            <Link href="/accounts/new">+ Crear la primera</Link>
+          </Button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-medium">Nombre</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium">Moneda</th>
-                <th className="px-3 py-2 font-medium">Institución</th>
-                <th className="px-3 py-2 font-medium">Titular</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">
-                    <Link href={`/accounts/${row.id}`} className="hover:underline">
-                      {row.name}
-                    </Link>
-                    {row.archived && (
-                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                        archivada
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {ACCOUNT_TYPE_LABELS[row.type]}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.currencyDefault}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {row.institutionName ?? '—'}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.ownerTag}</td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/accounts/${row.id}`}>Editar</Link>
-                      </Button>
-                      <form action={toggleArchive}>
-                        <input type="hidden" name="id" value={row.id} />
-                        <input
-                          type="hidden"
-                          name="archived"
-                          value={row.archived ? 'false' : 'true'}
-                        />
-                        <Button variant="ghost" size="sm" type="submit">
-                          {row.archived ? 'Reactivar' : 'Archivar'}
-                        </Button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-10">
+          {groups.map(([bankName, bankAccounts]) => (
+            <BankSection
+              key={bankName}
+              name={bankName}
+              accounts={bankAccounts}
+              toggleArchive={toggleArchive}
+            />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+function FilterPill({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+        active
+          ? 'border-b-2 border-primary text-primary'
+          : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function BankSection({
+  name,
+  accounts: bankAccounts,
+  toggleArchive,
+}: {
+  name: string;
+  accounts: AccountRow[];
+  toggleArchive: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <section>
+      <header className="flex items-baseline justify-between border-b border-border pb-2">
+        <div className="flex items-baseline gap-3">
+          <Display size="sm">{name}</Display>
+          <Label>
+            {bankAccounts.length} {bankAccounts.length === 1 ? 'cuenta' : 'cuentas'}
+          </Label>
+        </div>
+      </header>
+
+      <ul>
+        {bankAccounts.map((row) => (
+          <li
+            key={row.id}
+            className={cn(
+              'group grid grid-cols-[16px_minmax(0,1fr)_80px_140px_auto] items-center gap-4 border-b border-border/40 py-4 transition-colors hover:bg-primary/[0.04]',
+              row.archived && 'opacity-60',
+            )}
+          >
+            {/* Dot */}
+            <span
+              aria-hidden
+              className="inline-block size-2 rounded-full"
+              style={{ background: dotVarFor(row.type) }}
+            />
+
+            {/* Name + type/archived */}
+            <div className="min-w-0">
+              <Link
+                href={`/accounts/${row.id}`}
+                className="block font-display text-lg text-foreground hover:text-primary"
+              >
+                {row.name}
+              </Link>
+              <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
+                <Label className="normal-case tracking-[0.14em] text-muted-foreground">
+                  {ACCOUNT_TYPE_LABELS[row.type]}
+                </Label>
+                {row.ownerTag && (
+                  <Label className="normal-case tracking-[0.14em] text-muted-foreground">
+                    · {row.ownerTag}
+                  </Label>
+                )}
+                {row.archived && (
+                  <span
+                    className="rounded-full px-2 py-[1px] font-sans text-[9px] font-semibold uppercase tracking-[0.18em]"
+                    style={{
+                      background: 'color-mix(in oklab, var(--muted-foreground) 14%, transparent)',
+                      color: 'var(--muted-foreground)',
+                    }}
+                  >
+                    archivada
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Currency pill */}
+            <div>
+              <span
+                className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold uppercase tracking-[0.18em]"
+                style={{
+                  borderColor: 'color-mix(in oklab, var(--primary) 40%, transparent)',
+                  color: 'var(--primary)',
+                }}
+              >
+                {row.currencyDefault}
+              </span>
+            </div>
+
+            {/* Spacer (era institución, ahora redundante) */}
+            <div className="font-display text-sm italic text-muted-foreground">
+              {/* placeholder for future: balance, last activity, etc */}
+            </div>
+
+            {/* Actions — quiet by default, full on hover/focus */}
+            <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/accounts/${row.id}`}>Editar</Link>
+              </Button>
+              <form action={toggleArchive}>
+                <input type="hidden" name="id" value={row.id} />
+                <input
+                  type="hidden"
+                  name="archived"
+                  value={row.archived ? 'false' : 'true'}
+                />
+                <Button variant="ghost" size="sm" type="submit">
+                  {row.archived ? 'Reactivar' : 'Archivar'}
+                </Button>
+              </form>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

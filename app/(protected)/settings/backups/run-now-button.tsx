@@ -12,6 +12,7 @@ export function RunNowButton() {
 
   return (
     <Button
+      size="lg"
       onClick={() => {
         startTransition(async () => {
           const res = await runBackupNow();
@@ -26,7 +27,7 @@ export function RunNowButton() {
       }}
       disabled={isPending}
     >
-      {isPending ? 'Ejecutando…' : 'Backup ahora'}
+      {isPending ? 'Ejecutando…' : '↻ Backup ahora'}
     </Button>
   );
 }

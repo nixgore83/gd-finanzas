@@ -21,11 +21,12 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label as FormLabel } from '@/components/ui/label';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { TransactionsTable, type TxRow } from './transactions-table';
 
 export const metadata = {
-  title: 'Transacciones · gd-finanzas',
+  title: 'Movimientos · gd-finanzas',
 };
 
 const PAGE_LIMIT = 50;
@@ -137,9 +138,6 @@ export default async function TransactionsPage({
 
   const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
 
-  // El COUNT necesita los mismos JOINs que la query principal cuando `q` filtra
-  // sobre accounts.name / categories.name. LEFT JOIN no duplica filas
-  // (each tx tiene 1 account y 1 category).
   const totalRows = await db
     .select({ total: count() })
     .from(transactions)
@@ -172,7 +170,6 @@ export default async function TransactionsPage({
     .limit(PAGE_LIMIT)
     .offset(offset);
 
-  // Segunda query batch: tags por transacción visible.
   const txIds = rows.map((r) => r.id);
   const tagLinks =
     txIds.length === 0
@@ -194,7 +191,6 @@ export default async function TransactionsPage({
     tagsByTx.set(link.transactionId, arr);
   }
 
-  // Empty state guard: ¿el household tiene siquiera 1 cuenta?
   const accountCount = await db
     .select({ id: accounts.id })
     .from(accounts)
@@ -204,198 +200,234 @@ export default async function TransactionsPage({
   const showStart = total === 0 ? 0 : offset + 1;
   const showEnd = Math.min(offset + rows.length, total);
 
+  // Compute summary for the strapline
+  const netUsd = rows.reduce((sum, r) => {
+    const n = Number.parseFloat(r.amountUsd) || 0;
+    if (r.kind === 'income') return sum + n;
+    if (r.kind === 'expense') return sum - n;
+    return sum;
+  }, 0);
+  const daysCount = new Set(rows.map((r) => r.date)).size;
+
+  const activeChips: Array<{ label: string; value: string }> = [];
+  if (filters.kind) {
+    const kindLabel =
+      filters.kind === 'income' ? 'Ingreso' : filters.kind === 'expense' ? 'Gasto' : 'Transferencia';
+    activeChips.push({ label: 'Tipo', value: kindLabel });
+  }
+  if (filters.accountId) {
+    const acc = accountOptions.find((a) => a.id === filters.accountId);
+    activeChips.push({ label: 'Cuenta', value: acc?.name ?? '—' });
+  }
+  if (filters.categoryId) {
+    const cat = categoryOptions.find((c) => c.id === filters.categoryId);
+    activeChips.push({ label: 'Categoría', value: cat?.name ?? '—' });
+  }
+  if (filters.tagId) {
+    const tag = tagOptions.find((t) => t.id === filters.tagId);
+    activeChips.push({ label: 'Tag', value: tag?.name ?? '—' });
+  }
+  if (filters.from) activeChips.push({ label: 'Desde', value: filters.from });
+  if (filters.to) activeChips.push({ label: 'Hasta', value: filters.to });
+  if (filters.q) activeChips.push({ label: 'Texto', value: filters.q });
+
+  const hasActiveFilters = activeChips.length > 0;
+
+  const formatUsd = (n: number) =>
+    new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(n);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Transacciones</h1>
+    <div className="space-y-8">
+      {/* ============ HEADER ============ */}
+      <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
+        <div className="min-w-0">
+          <Label>Operar · Movimientos</Label>
+          <Display size="lg" className="mt-2 block">
+            Movimientos
+          </Display>
+          {total > 0 ? (
+            <Body className="mt-1">
+              {total} {total === 1 ? 'movimiento' : 'movimientos'} en total ·{' '}
+              {daysCount} {daysCount === 1 ? 'día' : 'días'} en la página · neto{' '}
+              <Num
+                className={
+                  netUsd >= 0
+                    ? 'not-italic text-[color:var(--good)]'
+                    : 'not-italic text-[color:var(--bad)]'
+                }
+              >
+                {netUsd >= 0 ? '+' : ''}
+                {formatUsd(netUsd)}
+              </Num>
+            </Body>
+          ) : (
+            <Body className="mt-1">Sin movimientos que mostrar todavía.</Body>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link href="/transactions/new-transfer">↔ Transferencia</Link>
           </Button>
           <Button asChild>
-            <Link href="/transactions/new">+ Nueva transacción</Link>
+            <Link href="/transactions/new">+ Nuevo movimiento</Link>
           </Button>
         </div>
-      </div>
+      </header>
+
+      <Hair thick />
 
       {accountCount.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Necesitás al menos una cuenta. Andá a{' '}
-          <Link href="/accounts/new" className="underline">
-            /accounts/new
-          </Link>
-          .
+        <div className="border border-dashed border-border p-10 text-center">
+          <Body className="mx-auto max-w-md">
+            Necesitás al menos una cuenta para empezar a cargar movimientos. Andá a{' '}
+            <Link href="/accounts/new" className="link not-italic">
+              /accounts/new
+            </Link>
+            .
+          </Body>
         </div>
       ) : (
         <>
-          {(() => {
-            const activeChips: Array<{ label: string; value: string }> = [];
-            if (filters.kind) {
-              const kindLabel =
-                filters.kind === 'income'
-                  ? 'Ingreso'
-                  : filters.kind === 'expense'
-                    ? 'Gasto'
-                    : 'Transferencia';
-              activeChips.push({ label: 'Tipo', value: kindLabel });
-            }
-            if (filters.accountId) {
-              const acc = accountOptions.find((a) => a.id === filters.accountId);
-              activeChips.push({ label: 'Cuenta', value: acc?.name ?? '—' });
-            }
-            if (filters.categoryId) {
-              const cat = categoryOptions.find((c) => c.id === filters.categoryId);
-              activeChips.push({ label: 'Categoría', value: cat?.name ?? '—' });
-            }
-            if (filters.tagId) {
-              const tag = tagOptions.find((t) => t.id === filters.tagId);
-              activeChips.push({ label: 'Tag', value: tag?.name ?? '—' });
-            }
-            if (filters.from) activeChips.push({ label: 'Desde', value: filters.from });
-            if (filters.to) activeChips.push({ label: 'Hasta', value: filters.to });
-            if (filters.q) activeChips.push({ label: 'Texto', value: filters.q });
-            if (activeChips.length === 0) return null;
-            return (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-                <span className="text-muted-foreground">Filtros activos:</span>
-                {activeChips.map((c, i) => (
-                  <span
-                    key={i}
-                    className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary"
-                  >
-                    {c.label}: {c.value}
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 border-l-2 border-primary bg-primary/[0.06] px-4 py-2.5">
+              <Label className="text-foreground">Filtros activos</Label>
+              {activeChips.map((c, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-baseline gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 font-sans text-[11px] font-medium text-primary"
+                >
+                  <span className="text-[9px] uppercase tracking-[0.14em] opacity-70">
+                    {c.label}
                   </span>
-                ))}
-                <Link
-                  href="/transactions"
-                  className="ml-auto text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Limpiar
-                </Link>
-              </div>
-            );
-          })()}
+                  <span>{c.value}</span>
+                </span>
+              ))}
+              <Link
+                href="/transactions"
+                className="link ml-auto font-display text-sm italic text-muted-foreground"
+              >
+                Limpiar
+              </Link>
+            </div>
+          )}
 
-          {/* Form GET collapsible. Default cerrado para no robar vertical;
-              si hay filtros activos, abierto. */}
+          {/* Filters details */}
           <details
-            className="rounded-md border bg-muted/20"
-            open={
-              !!(
-                filters.kind ||
-                filters.accountId ||
-                filters.categoryId ||
-                filters.tagId ||
-                filters.from ||
-                filters.to ||
-                filters.q
-              )
-            }
+            className="group border border-border bg-card/40"
+            open={hasActiveFilters}
           >
-            <summary className="cursor-pointer select-none px-4 py-2 text-sm font-medium">
-              Filtros
+            <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-3 hover:bg-accent/50">
+              <Label className="text-foreground">Filtrar y buscar</Label>
+              <span className="font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-transform group-open:rotate-180">
+                ▼
+              </span>
             </summary>
-          <form
-            method="get"
-            action="/transactions"
-            className="p-4 pt-2 space-y-3"
-          >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="space-y-1.5 md:col-span-2">
-                <Label htmlFor="q">Búsqueda</Label>
-                <Input
-                  id="q"
-                  name="q"
-                  defaultValue={filters.q ?? ''}
-                  maxLength={200}
-                  placeholder="texto en descripción, cuenta o categoría…"
-                />
+
+            <form method="get" action="/transactions" className="border-t border-border p-5 pt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5 md:col-span-2">
+                  <FormLabel htmlFor="q">Búsqueda</FormLabel>
+                  <Input
+                    id="q"
+                    name="q"
+                    defaultValue={filters.q ?? ''}
+                    maxLength={200}
+                    placeholder="texto en descripción, cuenta o categoría…"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <FormLabel htmlFor="kind">Tipo</FormLabel>
+                  <select
+                    id="kind"
+                    name="kind"
+                    defaultValue={filters.kind ?? ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Todos</option>
+                    <option value="income">Ingreso</option>
+                    <option value="expense">Gasto</option>
+                    <option value="transfer">Transferencia</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <FormLabel htmlFor="accountId">Cuenta</FormLabel>
+                  <select
+                    id="accountId"
+                    name="accountId"
+                    defaultValue={filters.accountId ?? ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Todas</option>
+                    {accountOptions.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <FormLabel htmlFor="categoryId">Categoría</FormLabel>
+                  <select
+                    id="categoryId"
+                    name="categoryId"
+                    defaultValue={filters.categoryId ?? ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Todas</option>
+                    {categoryOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.depth === 1 ? `    ↳ ${c.name}` : c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <FormLabel htmlFor="tagId">Etiqueta</FormLabel>
+                  <select
+                    id="tagId"
+                    name="tagId"
+                    defaultValue={filters.tagId ?? ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Todas</option>
+                    {tagOptions.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <FormLabel htmlFor="from">Desde</FormLabel>
+                  <Input id="from" name="from" type="date" defaultValue={filters.from ?? ''} />
+                </div>
+                <div className="space-y-1.5">
+                  <FormLabel htmlFor="to">Hasta</FormLabel>
+                  <Input id="to" name="to" type="date" defaultValue={filters.to ?? ''} />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="kind">Tipo</Label>
-                <select
-                  id="kind"
-                  name="kind"
-                  defaultValue={filters.kind ?? ''}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Todos</option>
-                  <option value="income">Ingreso</option>
-                  <option value="expense">Gasto</option>
-                  <option value="transfer">Transferencia</option>
-                </select>
+              <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+                <Button variant="ghost" asChild>
+                  <Link href="/transactions">Limpiar</Link>
+                </Button>
+                <Button type="submit">Aplicar filtros</Button>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="accountId">Cuenta</Label>
-                <select
-                  id="accountId"
-                  name="accountId"
-                  defaultValue={filters.accountId ?? ''}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Todas</option>
-                  {accountOptions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="categoryId">Categoría</Label>
-                <select
-                  id="categoryId"
-                  name="categoryId"
-                  defaultValue={filters.categoryId ?? ''}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Todas</option>
-                  {categoryOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.depth === 1 ? `    ↳ ${c.name}` : c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tagId">Etiqueta</Label>
-                <select
-                  id="tagId"
-                  name="tagId"
-                  defaultValue={filters.tagId ?? ''}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Todas</option>
-                  {tagOptions.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="from">Desde</Label>
-                <Input id="from" name="from" type="date" defaultValue={filters.from ?? ''} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="to">Hasta</Label>
-                <Input id="to" name="to" type="date" defaultValue={filters.to ?? ''} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" asChild>
-                <Link href="/transactions">Limpiar</Link>
-              </Button>
-              <Button type="submit">Aplicar</Button>
-            </div>
-          </form>
+            </form>
           </details>
 
           {rows.length === 0 ? (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {total === 0
-                ? 'Sin transacciones que coincidan con esos filtros.'
-                : 'Esta página está fuera de rango. Volvé a la primera.'}
+            <div className="border border-dashed border-border p-10 text-center">
+              <Body className="mx-auto max-w-md">
+                {total === 0
+                  ? 'Sin movimientos que coincidan con esos filtros.'
+                  : 'Esta página está fuera de rango. Volvé a la primera.'}
+              </Body>
             </div>
           ) : (
             <>
@@ -415,29 +447,23 @@ export default async function TransactionsPage({
                 return <TransactionsTable rows={tableRows} categories={categoryOptions} />;
               })()}
 
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>
+              {/* Pagination */}
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                   Mostrando {showStart}–{showEnd} de {total}
-                </span>
+                </Num>
                 {totalPages > 1 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild={page > 1}
-                      disabled={page <= 1}
-                    >
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" asChild={page > 1} disabled={page <= 1}>
                       {page > 1 ? (
-                        <Link href={buildHref('/transactions', filters, page - 1)}>
-                          ← Anterior
-                        </Link>
+                        <Link href={buildHref('/transactions', filters, page - 1)}>← Anterior</Link>
                       ) : (
                         <span>← Anterior</span>
                       )}
                     </Button>
-                    <span className="text-xs">
-                      Página {page} de {totalPages}
-                    </span>
+                    <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                      Pág. {page} de {totalPages}
+                    </Num>
                     <Button
                       variant="outline"
                       size="sm"
@@ -462,4 +488,3 @@ export default async function TransactionsPage({
     </div>
   );
 }
-
