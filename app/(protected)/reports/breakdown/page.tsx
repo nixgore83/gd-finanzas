@@ -4,6 +4,8 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadBreakdownData } from '@/lib/reports/breakdown-data';
 import type { BreakdownLevel } from '@/lib/reports/breakdown';
 import { monthRange } from '@/lib/reports/cashflow-data';
+import { Display, Label, Num, Body } from '@/components/ui/typography';
+import { cn } from '@/lib/utils';
 import { BreakdownDonut } from './donut';
 import { ReportsNav } from '../reports-nav';
 
@@ -12,18 +14,8 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 function pad2(n: number): string {
@@ -77,6 +69,16 @@ function formatUsd(amount: string): string {
   }).format(n);
 }
 
+/** Mismo arreglo de colores que donut.tsx — mantener sincronizado. */
+const FALLBACK_PALETTE = [
+  '#8fb89a', '#c9a96e', '#d97a4a', '#7fa3b5', '#a48bb5',
+  '#d4b85a', '#769d83', '#b56b53', '#8a9bc4',
+];
+
+function colorForRow(row: { color: string | null }, i: number): string {
+  return row.color ?? FALLBACK_PALETTE[i % FALLBACK_PALETTE.length] ?? '#7a7a6a';
+}
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function BreakdownReportPage({
@@ -118,114 +120,141 @@ export default async function BreakdownReportPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <ReportsNav active="breakdown" />
 
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Breakdown · {monthLabel}</h1>
-        <div className="flex items-center gap-3 text-sm">
+      <header className="flex flex-wrap items-end justify-between gap-6">
+        <div className="min-w-0">
+          <Label>Reportes · Breakdown</Label>
+          <Display size="lg" className="mt-2 block">
+            Gastos por categoría
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            {monthLabel} · USD. Click en una hoja para ver las transacciones.
+          </Body>
+        </div>
+        <nav className="flex items-baseline gap-5 font-display">
           <Link
             href={`/reports/breakdown?year=${prev.year}&month=${pad2(prev.month)}&level=${level}`}
-            className="text-muted-foreground hover:underline"
+            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
           >
-            ◀ {MONTH_LABELS[prev.month - 1]} {prev.year}
+            ◀ {MONTH_LABELS[prev.month - 1]}
           </Link>
           <Link
             href={`/reports/breakdown?year=${next.year}&month=${pad2(next.month)}&level=${level}`}
-            className="text-muted-foreground hover:underline"
+            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
           >
-            {MONTH_LABELS[next.month - 1]} {next.year} ▶
+            {MONTH_LABELS[next.month - 1]} ▶
           </Link>
-        </div>
-      </div>
+        </nav>
+      </header>
 
-      <div className="flex items-center gap-3 text-sm">
-        <span className="text-muted-foreground">Nivel:</span>
-        <Link
-          href={levelHref('parent')}
-          className={
-            level === 'parent'
-              ? 'rounded bg-foreground px-2 py-0.5 text-background'
-              : 'rounded px-2 py-0.5 text-muted-foreground hover:underline'
-          }
-        >
+      {/* LEVEL TOGGLE */}
+      <div className="flex items-baseline gap-1">
+        <FilterPill href={levelHref('parent')} active={level === 'parent'}>
           Categoría padre
-        </Link>
-        <Link
-          href={levelHref('leaf')}
-          className={
-            level === 'leaf'
-              ? 'rounded bg-foreground px-2 py-0.5 text-background'
-              : 'rounded px-2 py-0.5 text-muted-foreground hover:underline'
-          }
-        >
+        </FilterPill>
+        <FilterPill href={levelHref('leaf')} active={level === 'leaf'}>
           Hoja
-        </Link>
+        </FilterPill>
       </div>
 
       {data.rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Sin gastos en este mes.
+        <div className="border border-dashed border-border p-12 text-center">
+          <Display size="sm">Sin gastos este mes</Display>
+          <Body className="mt-3">No hay transacciones tipo gasto en {monthLabel}.</Body>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           <BreakdownDonut rows={data.rows} total={data.total} />
 
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr className="text-left">
-                  <th className="px-3 py-2 font-medium">Categoría</th>
-                  <th className="px-3 py-2 text-right font-medium">Monto</th>
-                  <th className="px-3 py-2 text-right font-medium">% del total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((row) => (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-1.5">
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="inline-block h-3 w-3 rounded-sm"
-                          style={{ backgroundColor: row.color ?? '#94a3b8' }}
+          {/* Detail list — same style as dashboard "Las cinco del mes" */}
+          <div>
+            <div className="flex items-baseline justify-between border-b border-border pb-2">
+              <Display size="sm">Detalle</Display>
+              <Label>
+                {data.rows.length} {level === 'leaf' ? 'hojas' : 'padres'}
+              </Label>
+            </div>
+            <ol className="divide-y divide-border/40">
+              {data.rows.map((row, i) => {
+                const swatch = colorForRow(row, i);
+                return (
+                  <li
+                    key={row.id}
+                    className="grid grid-cols-[18px_1fr_auto] items-center gap-3 py-3"
+                  >
+                    <span
+                      aria-hidden
+                      className="inline-block size-3"
+                      style={{ background: swatch }}
+                    />
+                    <div className="min-w-0">
+                      {row.isLeaf ? (
+                        <Link
+                          href={drillHref(row.id)}
+                          className="font-display text-base text-foreground transition-colors hover:text-primary hover:underline"
+                        >
+                          {row.name}
+                        </Link>
+                      ) : (
+                        <span className="font-display text-base font-semibold text-foreground">
+                          {row.name}
+                        </span>
+                      )}
+                      <div className="mt-1 h-[3px] w-full bg-muted/60">
+                        <div
+                          className="h-full"
+                          style={{
+                            width: `${row.pct}%`,
+                            background: swatch,
+                          }}
+                          aria-hidden
                         />
-                        {row.isLeaf ? (
-                          <Link href={drillHref(row.id)} className="hover:underline">
-                            {row.name}
-                          </Link>
-                        ) : (
-                          <span>{row.name}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {formatUsd(row.amount)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                      {row.pct.toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-muted/30">
-                <tr className="border-t">
-                  <td className="px-3 py-2 font-medium">Total</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-medium">
-                    {formatUsd(data.total)}
-                  </td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">100%</td>
-                </tr>
-              </tfoot>
-            </table>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Num className="block text-sm text-foreground">{formatUsd(row.amount)}</Num>
+                      <Num className="block text-[10px] text-muted-foreground">
+                        {row.pct.toFixed(1)}%
+                      </Num>
+                    </div>
+                  </li>
+                );
+              })}
+              <li className="grid grid-cols-[18px_1fr_auto] items-center gap-3 border-t-2 border-border pt-3">
+                <span aria-hidden />
+                <span className="font-display text-base font-semibold text-foreground">Total</span>
+                <Num className="text-base font-semibold text-primary">{formatUsd(data.total)}</Num>
+              </li>
+            </ol>
           </div>
         </div>
       )}
-
-      <p className="text-xs text-muted-foreground">
-        Sólo se muestran transacciones tipo Gasto. En nivel “Categoría padre” el drill-down no
-        aplica — clickeá una fila hoja para ver las transacciones.
-      </p>
     </div>
   );
 }
 
+function FilterPill({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+        active
+          ? 'border-b-2 border-primary text-primary'
+          : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {children}
+    </Link>
+  );
+}

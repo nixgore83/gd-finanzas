@@ -5,7 +5,9 @@ import { loadCategoryTree } from '@/lib/categories/tree';
 import { loadEvolutionData } from '@/lib/reports/evolution-data';
 import { buildEvolutionSeries, type EvolutionCurrency } from '@/lib/reports/evolution';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Label as FormLabel } from '@/components/ui/label';
+import { Display, Label, Body } from '@/components/ui/typography';
+import { cn } from '@/lib/utils';
 import { ReportsNav } from '../reports-nav';
 import { EvolutionChart } from './chart';
 
@@ -14,18 +16,8 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 function pad2(n: number): string {
@@ -125,6 +117,8 @@ export default async function EvolutionReportPage({
   const totalExpense = series.reduce((acc, p) => acc + p.expense, 0);
   const totalNet = totalIncome - totalExpense;
 
+  const activeCategory = categoryId ? tree.find((c) => c.id === categoryId) : null;
+
   function format(n: number): string {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -135,54 +129,68 @@ export default async function EvolutionReportPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <ReportsNav active="evolution" />
 
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Evolución · 12 meses a {monthLabel}</h1>
-        <div className="flex items-center gap-3 text-sm">
+      <header className="flex flex-wrap items-end justify-between gap-6">
+        <div className="min-w-0">
+          <Label>Reportes · Evolución 12 meses</Label>
+          <Display size="lg" className="mt-2 block">
+            Hasta {monthLabel}
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            Ventana móvil de 12 meses.
+            {activeCategory && (
+              <>
+                {' '}Filtrando por{' '}
+                <span className="text-foreground">{activeCategory.name}</span>.
+              </>
+            )}
+          </Body>
+        </div>
+        <nav className="flex items-baseline gap-5 font-display">
           <Link
             href={buildHref({ endYear: prev.year, endMonth: prev.month, currency, categoryId })}
-            className="text-muted-foreground hover:underline"
+            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
           >
-            ◀ Mover ventana atrás
+            ◀ atrás
           </Link>
           <Link
             href={buildHref({ endYear: next.year, endMonth: next.month, currency, categoryId })}
-            className="text-muted-foreground hover:underline"
+            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
           >
-            Mover ventana adelante ▶
+            adelante ▶
           </Link>
-        </div>
-      </div>
+        </nav>
+      </header>
 
-      {/* Controles */}
+      {/* CONTROLS */}
       <form
         method="get"
         action="/reports/evolution"
-        className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/20 p-3"
+        className="flex flex-wrap items-end gap-4 border border-border bg-card/30 px-5 py-4"
       >
         <input type="hidden" name="endYear" value={endYear} />
         <input type="hidden" name="endMonth" value={pad2(endMonth)} />
-        <div className="space-y-1">
-          <Label htmlFor="currency">Moneda</Label>
+        <div className="space-y-1.5">
+          <FormLabel htmlFor="currency">Moneda</FormLabel>
           <select
             id="currency"
             name="currency"
             defaultValue={currency}
-            className="flex h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
+            className="flex h-10 w-28 rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="USD">USD</option>
             <option value="ARS">ARS</option>
           </select>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="categoryId">Categoría</Label>
+        <div className="space-y-1.5">
+          <FormLabel htmlFor="categoryId">Categoría</FormLabel>
           <select
             id="categoryId"
             name="categoryId"
             defaultValue={categoryId ?? ''}
-            className="flex h-9 w-64 rounded-md border border-input bg-background px-2 text-sm"
+            className="flex h-10 w-72 rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="">Todas</option>
             {tree.map((c) => (
@@ -192,11 +200,9 @@ export default async function EvolutionReportPage({
             ))}
           </select>
         </div>
-        <Button type="submit" size="sm">
-          Aplicar
-        </Button>
+        <Button type="submit">Aplicar</Button>
         {(currency !== 'USD' || categoryId) && (
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost" asChild>
             <Link
               href={buildHref({ endYear, endMonth, currency: 'USD', categoryId: null })}
             >
@@ -208,34 +214,46 @@ export default async function EvolutionReportPage({
 
       <EvolutionChart data={series} currency={currency} />
 
-      {/* Totales de la ventana */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-md border p-3">
-          <p className="text-xs text-muted-foreground">Ingresos totales (12m)</p>
-          <p className="text-lg font-semibold tabular-nums">{format(totalIncome)}</p>
-        </div>
-        <div className="rounded-md border p-3">
-          <p className="text-xs text-muted-foreground">Gastos totales (12m)</p>
-          <p className="text-lg font-semibold tabular-nums">{format(totalExpense)}</p>
-        </div>
-        <div className="rounded-md border p-3">
-          <p className="text-xs text-muted-foreground">Neto (12m)</p>
-          <p
-            className={
-              totalNet >= 0
-                ? 'text-lg font-semibold tabular-nums text-emerald-700'
-                : 'text-lg font-semibold tabular-nums text-rose-700'
-            }
-          >
-            {format(totalNet)}
-          </p>
-        </div>
-      </div>
+      {/* TOTALS STRIP */}
+      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-3">
+        <TotalBox label="Ingresos 12m" value={format(totalIncome)} variant="good" />
+        <TotalBox label="Gastos 12m" value={format(totalExpense)} variant="bad" />
+        <TotalBox
+          label="Neto 12m"
+          value={format(totalNet)}
+          variant={totalNet >= 0 ? 'good' : 'bad'}
+        />
+      </section>
 
-      <p className="text-xs text-muted-foreground">
-        Ventana móvil de 12 meses. El filtro por categoría es exacto — para ver el agregado de
-        un padre y sus children juntos, usá el breakdown del mes.
-      </p>
+      <Body className="text-xs">
+        Para ver el agregado de un padre + sus children juntos, usá el breakdown del mes.
+      </Body>
+    </div>
+  );
+}
+
+function TotalBox({
+  label,
+  value,
+  variant,
+}: {
+  label: string;
+  value: string;
+  variant: 'good' | 'bad';
+}) {
+  return (
+    <div className="bg-card p-5">
+      <Label>{label}</Label>
+      <Display
+        size="md"
+        className={cn(
+          'mt-3 block tabular-nums',
+          variant === 'good' && 'text-[color:var(--good)]',
+          variant === 'bad' && 'text-[color:var(--bad)]',
+        )}
+      >
+        {value}
+      </Display>
     </div>
   );
 }

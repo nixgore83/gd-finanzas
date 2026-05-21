@@ -4,13 +4,20 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, forecasts, recurrences } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { RECURRENCE_KIND_LABELS, type RecurrenceKind } from '@/lib/schemas/recurrence';
+import type { RecurrenceKind } from '@/lib/schemas/recurrence';
 import { Button } from '@/components/ui/button';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
+import { cn } from '@/lib/utils';
 import { CancelForecastButton } from './cancel-button';
 
 export const metadata = {
   title: 'Previsiones · gd-finanzas',
 };
+
+const MONTH_LABELS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 
 function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
   const n = Number.parseFloat(amount);
@@ -23,8 +30,23 @@ function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
 }
 
 function monthLabel(iso: string): string {
-  // 'YYYY-MM-DD' → 'YYYY-MM'
-  return iso.slice(0, 7);
+  // 'YYYY-MM-DD' → human "Mayo 2026"
+  const parts = iso.split('-');
+  const y = parts[0];
+  const m = parts[1];
+  if (!y || !m) return iso.slice(0, 7);
+  const idx = Number.parseInt(m, 10) - 1;
+  return `${MONTH_LABELS[idx] ?? m} ${y}`;
+}
+
+function shortDate(iso: string): string {
+  const parts = iso.split('-');
+  const d = parts[2];
+  const m = parts[1];
+  if (!d || !m) return iso;
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const mi = Number.parseInt(m, 10) - 1;
+  return `${d} ${months[mi] ?? ''}`;
 }
 
 export default async function ForecastsPage() {
@@ -61,84 +83,142 @@ export default async function ForecastsPage() {
   // Agrupar por mes
   const byMonth = new Map<string, typeof rows>();
   for (const r of rows) {
-    const key = monthLabel(r.expectedDate);
+    const key = r.expectedDate.slice(0, 7);
     const arr = byMonth.get(key) ?? [];
     arr.push(r);
     byMonth.set(key, arr);
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Previsiones</h1>
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
+        <div className="min-w-0">
+          <Label>Planificar · Previsiones</Label>
+          <Display size="lg" className="mt-2 block">
+            Previsiones
+          </Display>
+          <Body className="mt-2 max-w-2xl">
+            {rows.length === 0 ? (
+              <>Sin previsiones pendientes. Creá una recurrencia para que aparezcan acá.</>
+            ) : (
+              <>
+                <span className="text-foreground">{rows.length}</span> previsiones pendientes ·{' '}
+                <span className="text-foreground">{byMonth.size}</span>{' '}
+                {byMonth.size === 1 ? 'mes' : 'meses'}
+              </>
+            )}
+          </Body>
+        </div>
         <Button variant="outline" asChild>
-          <Link href="/recurrences">Recurrencias</Link>
+          <Link href="/recurrences">Ir a recurrencias</Link>
         </Button>
-      </div>
+      </header>
+
+      <Hair thick />
 
       {rows.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Sin previsiones pendientes. Creá una recurrencia en{' '}
-          <Link href="/recurrences" className="underline">
-            /recurrences
-          </Link>{' '}
-          y las próximas 12 ocurrencias aparecen acá.
+        <div className="border border-dashed border-border p-12 text-center">
+          <Display size="sm">Nada en cola</Display>
+          <Body className="mx-auto mt-3 max-w-md">
+            Una previsión se genera automáticamente desde cada recurrencia activa. Si no
+            tenés ninguna, andá a{' '}
+            <Link href="/recurrences" className="link not-italic">
+              /recurrences
+            </Link>
+            .
+          </Body>
         </div>
       ) : (
-        <div className="space-y-6">
-          {[...byMonth.entries()].map(([month, items]) => (
-            <div key={month} className="space-y-2">
-              <h2 className="text-sm font-medium text-muted-foreground">{month}</h2>
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40">
-                    <tr className="text-left">
-                      <th className="px-3 py-2 font-medium">Fecha</th>
-                      <th className="px-3 py-2 font-medium">Recurrencia</th>
-                      <th className="px-3 py-2 font-medium">Cuenta</th>
-                      <th className="px-3 py-2 font-medium">Tipo</th>
-                      <th className="px-3 py-2 text-right font-medium">Monto</th>
-                      <th className="px-3 py-2 font-medium" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((row) => (
-                      <tr key={row.id} className="border-t">
-                        <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                          {row.expectedDate}
-                        </td>
-                        <td className="px-3 py-2">{row.recurrenceName}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {row.accountName ?? '—'}
-                        </td>
-                        <td className="px-3 py-2">
+        <div className="space-y-10">
+          {[...byMonth.entries()].map(([monthKey, items]) => {
+            const monthTotal = items.reduce((s, r) => {
+              const n = Number.parseFloat(r.expectedAmount) || 0;
+              return s + (r.recurrenceKind === 'income' ? n : -n);
+            }, 0);
+            return (
+              <section key={monthKey}>
+                <header className="flex items-baseline justify-between border-b border-border pb-2">
+                  <div className="flex items-baseline gap-3">
+                    <Display size="sm">{monthLabel(`${monthKey}-01`)}</Display>
+                    <Label>
+                      {items.length} {items.length === 1 ? 'previsión' : 'previsiones'}
+                    </Label>
+                  </div>
+                  <div className="text-right">
+                    <Label>Neto del mes</Label>
+                    <Num
+                      className={cn(
+                        'mt-1 block text-base',
+                        monthTotal >= 0
+                          ? 'text-[color:var(--good)]'
+                          : 'text-[color:var(--bad)]',
+                      )}
+                    >
+                      {monthTotal >= 0 ? '+' : ''}
+                      {/* Show in original-currency totals not feasible across mixed currency;
+                          we display in the dominant currency or fall back to ARS */}
+                      {new Intl.NumberFormat('es-AR', {
+                        style: 'currency',
+                        currency: items[0]?.currency ?? 'ARS',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      }).format(monthTotal)}
+                    </Num>
+                  </div>
+                </header>
+
+                <ul>
+                  {items.map((row) => (
+                    <li
+                      key={row.id}
+                      className="group grid grid-cols-[80px_1fr_auto_auto] items-baseline gap-4 border-b border-border/40 py-3 transition-colors hover:bg-primary/[0.04]"
+                    >
+                      <Num className="text-[11px] uppercase tracking-[0.1em] text-primary">
+                        {shortDate(row.expectedDate)}
+                      </Num>
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-3">
                           <span
-                            className={
-                              row.recurrenceKind === 'income'
-                                ? 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'
-                                : 'rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700'
-                            }
-                          >
-                            {RECURRENCE_KIND_LABELS[row.recurrenceKind as RecurrenceKind] ??
-                              row.recurrenceKind}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {formatAmount(row.expectedAmount, row.currency)}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <CancelForecastButton
-                            id={row.id}
-                            recurrenceName={row.recurrenceName}
+                            aria-hidden
+                            className="inline-block size-2 shrink-0 rounded-full"
+                            style={{
+                              background:
+                                row.recurrenceKind === ('income' as RecurrenceKind)
+                                  ? 'var(--good)'
+                                  : 'var(--bad)',
+                            }}
                           />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+                          <span className="truncate font-display text-base font-semibold text-foreground">
+                            {row.recurrenceName}
+                          </span>
+                        </div>
+                        <Label className="mt-1 normal-case tracking-[0.1em]">
+                          {row.accountName ?? '—'}
+                        </Label>
+                      </div>
+                      <Num
+                        className={cn(
+                          'text-sm',
+                          row.recurrenceKind === 'income'
+                            ? 'text-[color:var(--good)]'
+                            : 'text-foreground',
+                        )}
+                      >
+                        {row.recurrenceKind === 'income' ? '+' : '−'}
+                        {formatAmount(row.expectedAmount, row.currency).replace('−', '')}
+                      </Num>
+                      <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        <CancelForecastButton
+                          id={row.id}
+                          recurrenceName={row.recurrenceName}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>

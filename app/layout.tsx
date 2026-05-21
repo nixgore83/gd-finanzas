@@ -1,26 +1,26 @@
 import type { Metadata } from 'next';
-import { Cormorant_Garamond, Manrope, JetBrains_Mono } from 'next/font/google';
+import { Space_Grotesk, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
 /**
- * Display serif — Cormorant Garamond.
- * Vault Sage usa light/regular para titulares y números prominentes.
- * Italics están disponibles para "el toque editorial".
+ * Display / headings — Space Grotesk.
+ * Geometric grotesque con carácter; weights 500-700 dan presencia
+ * sin caer en el peso de un display "hero" genérico.
  */
-const displayFont = Cormorant_Garamond({
+const displayFont = Space_Grotesk({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
-  style: ['normal', 'italic'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-display',
   display: 'swap',
 });
 
 /**
- * Body grotesk — Manrope.
- * Para UI chrome, labels, párrafos, botones.
+ * Body sans — Plus Jakarta Sans.
+ * Más neutro y legíble que Manrope; mediumweight como default para
+ * que el cuerpo del texto tenga más presencia que el muted standard.
  */
-const sansFont = Manrope({
+const sansFont = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-sans',

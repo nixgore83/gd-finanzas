@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
+import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { ExportsClient } from './exports-client';
 
 export const metadata = {
@@ -18,37 +19,82 @@ export default async function ExportsPage() {
   const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Exports</h1>
-        <p className="text-sm text-muted-foreground">
-          Genera archivos para llevar al contador al cierre del año fiscal.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <header className="pt-2">
+        <Label>Tools · Exports</Label>
+        <Display size="lg" className="mt-2 block">
+          Exports
+        </Display>
+        <Body className="mt-2 max-w-2xl">
+          Paquetes preformateados para llevar al contador al cierre del año fiscal.
+        </Body>
+      </header>
 
-      <section className="space-y-3 rounded-md border bg-card p-4">
-        <div>
-          <h2 className="text-base font-semibold">Ganancias · resumen anual</h2>
-          <p className="text-sm text-muted-foreground">
-            Descarga un{' '}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">.zip</code> con 5 CSVs
-            (ingresos, consumos TC, servicio doméstico, gastos deducibles, otros ingresos)
-            + un README. Formato UTF-8 con BOM (compatible con Excel).
-          </p>
-        </div>
+      <Hair thick />
 
-        <ExportsClient years={years} defaultYear={currentYear} />
+      {/* Main card */}
+      <section className="border border-border bg-card/40 p-8">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.4fr_280px]">
+          <div>
+            <Label>Pack contable · Ganancias</Label>
+            <Display size="md" className="mt-3 block">
+              Ganancias · resumen anual
+            </Display>
+            <Body className="mt-3 max-w-prose">
+              ZIP con 5 archivos CSV preformateados:{' '}
+              <span className="text-foreground">ingresos</span>,{' '}
+              <span className="text-foreground">consumos TC</span>,{' '}
+              <span className="text-foreground">servicio doméstico</span>,{' '}
+              <span className="text-foreground">gastos deducibles</span> y{' '}
+              <span className="text-foreground">otros ingresos</span>, más un README con
+              disclaimer y procedencia. UTF-8 con BOM (compatible Excel). No se persiste —
+              se genera al momento.
+            </Body>
 
-        <div className="mt-2 rounded-md bg-amber-50 border border-amber-300 p-3 text-xs text-amber-900">
-          <p className="font-medium">Alcance</p>
-          <p>
-            Este export cubre aproximadamente el 30% del checklist de Ganancias — la parte
-            de movimientos transaccionales del año. NO incluye items patrimoniales (saldos
-            al 31/12, inmuebles, rodados, tenencias). Esos van aparte (V2 los va a
-            cubrir).
-          </p>
+            {/* File list */}
+            <div className="mt-6 grid grid-cols-1 gap-y-2 sm:grid-cols-2 sm:gap-x-6">
+              {[
+                ['01_ingresos.csv', 'sueldos + freelance'],
+                ['02_consumos_tc.csv', 'agrupado por TC y mes'],
+                ['03_servicio_domestico.csv', 'con CUIL + concepto'],
+                ['04_gastos_deducibles.csv', 'flag deducible=true'],
+                ['05_otros_ingresos.csv', 'income sin sueldo'],
+                ['readme.md', 'disclaimer + alcance'],
+              ].map(([f, hint]) => (
+                <div
+                  key={f}
+                  className="flex items-baseline justify-between gap-3 border-b border-border/40 py-2"
+                >
+                  <Num className="text-xs text-foreground">{f}</Num>
+                  <span className="font-display text-xs text-muted-foreground">{hint}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <ExportsClient years={years} defaultYear={currentYear} />
+            <Body className="mt-4 text-xs">
+              Se genera ahora — no se guarda en el server. Pesa entre 80&nbsp;KB y 400&nbsp;KB
+              según el año.
+            </Body>
+          </div>
         </div>
       </section>
+
+      {/* Disclaimer */}
+      <div
+        className="border-l-2 border-[color:var(--attn)] px-5 py-4"
+        style={{ background: 'color-mix(in oklab, var(--attn) 8%, transparent)' }}
+      >
+        <Label style={{ color: 'var(--attn)' }}>Alcance · PRD § 5.7</Label>
+        <Body className="mt-2 max-w-3xl">
+          Este export cubre <span className="text-foreground">~30 %</span> del checklist de
+          Ganancias — la parte transaccional del año. <span className="text-foreground">NO</span>{' '}
+          incluye items patrimoniales (saldos al 31/12, inmuebles, rodados, tenencias). Esos van
+          aparte (V2).
+        </Body>
+      </div>
     </div>
   );
 }

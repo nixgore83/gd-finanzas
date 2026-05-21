@@ -18,10 +18,10 @@ type SpanProps = ComponentPropsWithoutRef<'span'>;
 type DivProps = ComponentPropsWithoutRef<'div'>;
 
 const DISPLAY_SIZES = {
-  sm: 'text-xl leading-[1.1]',
-  md: 'text-3xl leading-[1.05]',
-  lg: 'text-5xl leading-[1.02] tracking-[-0.015em]',
-  xl: 'text-7xl leading-[0.98] tracking-[-0.02em]',
+  sm: 'text-xl leading-[1.15]',
+  md: 'text-2xl leading-[1.1]',
+  lg: 'text-4xl leading-[1.05] tracking-[-0.015em]',
+  xl: 'text-6xl leading-[1] tracking-[-0.025em]',
 } as const;
 
 type DisplaySize = keyof typeof DISPLAY_SIZES;
@@ -32,6 +32,9 @@ type DisplaySize = keyof typeof DISPLAY_SIZES;
  *
  * Renderiza como <span> para componer inline ("US$ {value}") sin romper flow.
  * Si necesitás block, envolvélo o pasale className="block".
+ *
+ * Weight 600 (semibold) por default — más presencia que el Cormorant 300
+ * que usábamos antes; los hero overrides pueden bajar a 500 si necesitan respirar.
  */
 export function Display({
   size = 'md',
@@ -41,7 +44,7 @@ export function Display({
   return (
     <span
       className={cn(
-        'font-display font-light text-foreground',
+        'font-display font-semibold text-foreground',
         DISPLAY_SIZES[size],
         className,
       )}
@@ -101,14 +104,15 @@ export function Hair({
 }
 
 /**
- * Cuerpos editoriales largos (intros, notas, párrafos en la página de
- * Año económico, Settings). Serif con leading cómodo + italic-friendly.
+ * Cuerpos de párrafo (intros, notas, copy explicativo).
+ * Sans medium, leading cómodo. Antes era serif italic — lo cambiamos
+ * para mejorar legibilidad en bloques largos.
  */
 export function Body({ className, ...props }: DivProps) {
   return (
     <div
       className={cn(
-        'font-display text-base italic leading-[1.55] text-muted-foreground',
+        'font-sans text-sm font-normal leading-relaxed text-muted-foreground',
         className,
       )}
       {...props}
