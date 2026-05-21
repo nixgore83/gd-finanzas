@@ -383,18 +383,10 @@ Sub-hito 7.B.4 (página + charts + nav):
 
 **Hito 10 cerrado — V1.1 funcional COMPLETO. 🎉**
 
-**Acción operacional manual pendiente (sin esto el cron falla silencioso):**
-1. Google Cloud Console → proyecto → habilitar Drive API.
-2. Crear service account `gd-finanzas-backup` → Keys → New JSON.
-3. Base64-encode la key: `base64 -i sa-key.json | tr -d '\n' | pbcopy` (mac).
-4. Crear carpeta en Drive personal "gd-finanzas backups".
-5. Compartirla con el email del SA con rol Editor.
-6. Copiar el folder ID del URL.
-7. Cargar en `.env.local` + Vercel Production (Sensitive ✓):
-   - `GOOGLE_SERVICE_ACCOUNT_KEY_B64`
-   - `GOOGLE_DRIVE_BACKUP_FOLDER_ID`
-8. Redeploy Vercel.
-9. Smoke: `/settings/backups` → "Backup ahora" → ver archivo en Drive.
+**Setup operacional (completado 2026-05-21 vía PR #2):** el plan original de
+SA + JSON key no funciona en gmail.com (sin storage quota). Migramos a OAuth
+user creds. Pasos archivados en la sección "Operacional pendiente al cierre
+de V1.1" abajo y en `.env.example`.
 
 ### 🟢 Hito UI — Polish V1.1 (2026-05-20)
 
@@ -751,11 +743,33 @@ Post-V1.1 funcional, antes de cargar info real:
 
 ## Operacional pendiente al cierre de V1.1
 
-**1. Setup Google Drive (Hito 10):**
-- Crear service account + JSON key + carpeta en Drive + compartirla con el SA email.
-- Cargar `GOOGLE_SERVICE_ACCOUNT_KEY_B64` (Sensitive) y `GOOGLE_DRIVE_BACKUP_FOLDER_ID` en `.env.local` y Vercel Production.
-- Redeploy. Smoke con "Backup ahora" en `/settings/backups`.
-- Detalles paso a paso arriba en la sección de Hito 10.
+**1. Setup Google Drive (Hito 10): ✅ HECHO (2026-05-21)** vía OAuth user creds.
+
+El plan original (service account + JSON key) **no funciona** contra cuentas
+personales gmail.com: las SAs no tienen storage quota propia, así que el
+upload falla con `Service Accounts do not have storage quota`. Las salidas
+oficiales (Shared Drives, domain-wide delegation) son solo Workspace pago.
+
+Migración (PR #2): JWT/SA → `OAuth2Client` con refresh token. El cron sube
+los `.zip` "como el usuario" contra su quota de Drive (15 GB free).
+
+Env vars en Vercel Production (todas Sensitive):
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`
+- `GOOGLE_DRIVE_BACKUP_FOLDER_ID`
+
+Bootstrap del refresh token: `npm run oauth:drive-token` (abre browser,
+autorizás, captura el token vía callback localhost y lo escribe a `.env.local`).
+Re-correrlo solo si se revoca acceso o se cambia el OAuth Client.
+
+OAuth consent screen está en estado **"In production"** (no "Testing"), por lo
+que el refresh token no expira a los 7 días. El scope `drive.file` es
+no-sensitive: Google muestra un warning "unverified app" al autorizar (lo
+aceptamos manualmente) pero no exige verificación.
+
+**Limpieza pendiente (no bloquea, hacer cuando convenga):**
+- Borrar la JSON key del SA viejo de `~/Downloads/`.
+- Borrar la service account `gd-finanzas-backup@...iam.gserviceaccount.com` en GCP (sin uso).
+- Re-habilitar la org policy `iam.disableServiceAccountKeyCreation` (heredada de la org) que desactivamos para crear la SA key. Ya no necesitamos crear keys de SA — defensivamente conviene re-aplicar la restricción.
 
 **2. Wipe smoke data + cargar info real:**
 
