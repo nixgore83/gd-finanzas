@@ -74,7 +74,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
   await db
     .update(imports)
     .set({ status: 'parsing', errorMessage: null })
-    .where(eq(imports.id, importId));
+    .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
   revalidatePath(`/imports/${importId}`);
 
   let bytes: Uint8Array;
@@ -85,7 +85,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     await db
       .update(imports)
       .set({ status: 'error', errorMessage: 'No se pudo bajar el archivo de Storage' })
-      .where(eq(imports.id, importId));
+      .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
     return { ok: false, error: 'unknown' };
   }
 
@@ -123,7 +123,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     await db
       .update(imports)
       .set({ status: 'error', errorMessage: msg })
-      .where(eq(imports.id, importId));
+      .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
     return { ok: false, error: 'llm', message: msg };
   }
 
@@ -158,7 +158,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
       transactionCount: lineRows.length,
       errorMessage: null,
     })
-    .where(eq(imports.id, importId));
+    .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
 
   revalidatePath(`/imports/${importId}`);
   revalidatePath('/imports');

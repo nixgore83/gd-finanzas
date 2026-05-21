@@ -141,7 +141,12 @@ export async function confirmImport(input: {
         await tx
           .update(importLines)
           .set({ transactionId: txRow.id })
-          .where(eq(importLines.id, line.id));
+          .where(
+            and(
+              eq(importLines.id, line.id),
+              eq(importLines.importId, input.importId),
+            ),
+          );
         createdCount += 1;
       }
 
@@ -178,7 +183,7 @@ export async function confirmImport(input: {
             transactionCount: linkedCount,
             errorMessage: null,
           })
-          .where(eq(imports.id, input.importId));
+          .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
       } else if (linkedCount > 0) {
         // Éxito parcial → status='reviewing' para seguir editando.
         await tx
@@ -188,7 +193,7 @@ export async function confirmImport(input: {
             transactionCount: linkedCount,
             errorMessage: `${linkedCount} confirmadas, ${remaining.length} pendientes con error`,
           })
-          .where(eq(imports.id, input.importId));
+          .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
       } else {
         // 0 confirmadas en esta corrida → quedar en reviewing si veníamos de parsed,
         // o no tocar si ya estaba reviewing.
@@ -198,7 +203,7 @@ export async function confirmImport(input: {
             status: 'reviewing',
             errorMessage: `${remaining.length} líneas con error`,
           })
-          .where(eq(imports.id, input.importId));
+          .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
       }
     });
   } catch (err) {

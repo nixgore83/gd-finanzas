@@ -95,27 +95,45 @@ export async function loadHouseholdSnapshot(householdId: string): Promise<Househ
     db.select().from(institutions),
   ]);
 
-  // transaction_tags y import_lines + forecasts dependen de subselects.
-  const txIds = transactionsRows.map((t) => t.id);
-  const transactionTagsRows =
-    txIds.length === 0
-      ? []
-      : await db
-          .select()
-          .from(transactionTags)
-          .where(inArray(transactionTags.transactionId, txIds));
+  // transaction_tags, import_lines y forecasts dependen de subqueries de Drizzle scopeados a householdId.
+  const transactionTagsRows = await db
+    .select()
+    .from(transactionTags)
+    .where(
+      inArray(
+        transactionTags.transactionId,
+        db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(eq(transactions.householdId, householdId)),
+      ),
+    );
 
-  const importIds = importsRows.map((i) => i.id);
-  const importLinesRows =
-    importIds.length === 0
-      ? []
-      : await db.select().from(importLines).where(inArray(importLines.importId, importIds));
+  const importLinesRows = await db
+    .select()
+    .from(importLines)
+    .where(
+      inArray(
+        importLines.importId,
+        db
+          .select({ id: imports.id })
+          .from(imports)
+          .where(eq(imports.householdId, householdId)),
+      ),
+    );
 
-  const recurrenceIds = recurrencesRows.map((r) => r.id);
-  const forecastsRows =
-    recurrenceIds.length === 0
-      ? []
-      : await db.select().from(forecasts).where(inArray(forecasts.recurrenceId, recurrenceIds));
+  const forecastsRows = await db
+    .select()
+    .from(forecasts)
+    .where(
+      inArray(
+        forecasts.recurrenceId,
+        db
+          .select({ id: recurrences.id })
+          .from(recurrences)
+          .where(eq(recurrences.householdId, householdId)),
+      ),
+    );
 
   return {
     generatedAt: new Date().toISOString(),

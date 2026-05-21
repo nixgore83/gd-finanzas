@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { getMfaState } from '@/lib/auth/mfa';
 import { getDb } from '@/lib/db/client';
@@ -27,7 +28,7 @@ export class SessionError extends Error {
  * eso la responsabilidad de "household propia" recae acá y en cada query
  * (con WHERE household_id = …). RLS queda como defensa en profundidad.
  */
-export async function requireHouseholdSession(): Promise<ResolvedSession> {
+export const requireHouseholdSession = cache(async (): Promise<ResolvedSession> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -46,4 +47,5 @@ export async function requireHouseholdSession(): Promise<ResolvedSession> {
 
   if (!memb) throw new SessionError('no_household');
   return { userId: user.id, householdId: memb.householdId };
-}
+});
+
