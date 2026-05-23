@@ -9,6 +9,7 @@ const parsedTxLineStrictSchema = z.object({
   kind: z.enum(['income', 'expense']),
   merchant: z.string().max(200).optional(),
   notes: z.string().max(500).optional(),
+  suggestedCategory: z.string().max(200).optional(),
 });
 
 /**

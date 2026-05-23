@@ -10,6 +10,8 @@ import { resolveParser } from '@/lib/imports/parsers/registry';
 import { runParser, LlmError } from '@/lib/imports/llm';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
+import { loadCategoryTree } from '@/lib/categories/tree';
+import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { getServerEnv } from '@/lib/env';
 
 export type ParseImportResult =
@@ -99,6 +101,11 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
   const env = getServerEnv();
   const modelId = env.IMPORT_PARSER_MODEL_DEFAULT;
 
+  // Enriquecer prompt con categorías del household para sugerencia del LLM.
+  const tree = await loadCategoryTree(session.householdId);
+  const categoryBlock = buildCategoryPromptBlock(tree);
+  const enrichedSystemPrompt = parser.systemPrompt + '\n\n' + categoryBlock;
+
   // Dispatch por extensión real del archivo: pdf → document block, csv → text block.
   const isCsv = row.fileUrl.toLowerCase().endsWith('.csv');
 
@@ -107,7 +114,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     if (isCsv) {
       result = await runParser({
         modelId,
-        systemPrompt: parser.systemPrompt,
+        systemPrompt: enrichedSystemPrompt,
         userPrompt: parser.userPrompt,
         file: { kind: 'text', text: new TextDecoder().decode(bytes) },
         outputSchema: parser.schema,
@@ -115,7 +122,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     } else {
       result = await runParser({
         modelId,
-        systemPrompt: parser.systemPrompt,
+        systemPrompt: enrichedSystemPrompt,
         userPrompt: parser.userPrompt,
         file: { kind: 'pdf', base64: Buffer.from(bytes).toString('base64') },
         outputSchema: parser.schema,
@@ -134,15 +141,29 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     return { ok: false, error: 'llm', message: msg };
   }
 
-  const lines = result.data.lines as ParsedTxLine[];
+  const lines = result.data.lines as (ParsedTxLine & { suggestedCategory?: string })[];
 
-  // Sugerencia de categoría por línea (match exacto vs histórico).
+  // Mapa nombre→id para resolver sugerencias del LLM (case-insensitive).
+  const catByName = new Map(
+    tree.map((c) => [c.name.toLowerCase(), c.id]),
+  );
+
+  // Sugerencia de categoría por línea:
+  // 1) Match histórico (exacto/normalizado contra transactions + import_lines)
+  // 2) Sugerencia del LLM (si devolvió suggestedCategory con nombre válido)
+  // 3) null
   const lineRows = await Promise.all(
     lines.map(async (line) => {
-      const proposedCategoryId = await suggestCategoryForDescription(
+      let proposedCategoryId = await suggestCategoryForDescription(
         session.householdId,
         line.description,
       );
+
+      // Fallback: sugerencia del LLM
+      if (!proposedCategoryId && line.suggestedCategory) {
+        proposedCategoryId = catByName.get(line.suggestedCategory.toLowerCase()) ?? null;
+      }
+
       return {
         importId,
         rawData: line,
