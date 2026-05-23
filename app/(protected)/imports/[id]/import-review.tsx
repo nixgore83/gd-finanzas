@@ -180,11 +180,11 @@ export function ImportReview({ importId, status, lines, tree, accounts }: Props)
           toast.warning(
             `${res.createdCount} confirmadas · ${res.rejectedCount} con error (ver detalle abajo)`,
           );
+          router.refresh();
         } else {
           toast.success(`Import confirmado · ${res.createdCount} transacciones creadas`);
+          router.push('/transactions');
         }
-        console.warn('[import] confirm result', res);
-        router.refresh();
       } else {
         toast.error(res.message ?? `Error: ${res.error}`);
         if (res.lineErrors && res.lineErrors.length > 0) {
