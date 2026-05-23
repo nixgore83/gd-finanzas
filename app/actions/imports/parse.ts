@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { imports, importLines, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
@@ -53,7 +53,8 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     .limit(1);
 
   if (!row) return { ok: false, error: 'not_found' };
-  if (row.status !== 'uploaded' && row.status !== 'error') {
+  const reparseable = ['uploaded', 'error', 'parsed', 'reviewing'];
+  if (!reparseable.includes(row.status)) {
     return { ok: false, error: 'invalid_state' };
   }
   if (!row.fileUrl) return { ok: false, error: 'no_file' };
@@ -69,6 +70,12 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
       message: `parser no implementado para ${row.institutionName}/${row.type}`,
     };
   }
+
+  // Re-parse: borrar import_lines que no tienen transacción vinculada (las
+  // confirmadas se preservan). Esto permite re-parsear sin duplicar líneas.
+  await db
+    .delete(importLines)
+    .where(and(eq(importLines.importId, importId), isNull(importLines.transactionId)));
 
   // status → parsing
   await db
