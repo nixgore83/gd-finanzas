@@ -25,6 +25,7 @@
     "db:seed:categories-placeholder": "tsx scripts/seed-categories-placeholder.ts",
     "db:seed:categories": "tsx scripts/seed-categories.ts",
     "db:seed:accounts": "tsx scripts/seed-accounts.ts",
+    "db:seed:budget-2026": "tsx scripts/seed-budget-2026.ts",
     "db:confirm-emails": "tsx scripts/confirm-emails.ts",
     "dev:login": "tsx scripts/dev-login.ts",
     "db:smoke-rls": "tsx scripts/smoke-rls.ts",

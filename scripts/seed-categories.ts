@@ -74,7 +74,12 @@ const EXPENSE: Cat[] = [
     children: ['Actividades', 'Viajes de estudio'],
   },
   { name: 'Vacaciones', color: '#14b8a6', icon: 'Plane' },
-  { name: 'Personales', color: '#64748b', icon: 'Shirt' },
+  {
+    name: 'Personales',
+    color: '#64748b',
+    icon: 'Shirt',
+    children: ['Regalos', 'Varios'],
+  },
   {
     name: 'Impuestos',
     color: '#f59e0b',
