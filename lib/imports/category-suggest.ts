@@ -15,105 +15,10 @@ export function normalizeDescription(raw: string): string {
     .trim();
 }
 
-/**
- * Busca categoría en una tabla dada, primero exacto y luego normalizado.
- * Devuelve categoryId o null.
- */
-async function searchInTable(
-  table: 'transactions' | 'import_lines',
-  householdId: string,
-  trimmed: string,
-  normalized: string,
-): Promise<string | null> {
-  const db = getDb();
-
-  if (table === 'transactions') {
-    // Exact match
-    const exact = await db
-      .select({
-        categoryId: transactions.categoryId,
-        cnt: sql<number>`count(*)::int`,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.householdId, householdId),
-          isNotNull(transactions.categoryId),
-          sql`lower(${transactions.description}) = lower(${trimmed})`,
-        ),
-      )
-      .groupBy(transactions.categoryId)
-      .orderBy(desc(sql`count(*)`))
-      .limit(1);
-    if (exact[0]) return exact[0].categoryId;
-
-    // Normalized match
-    if (normalized !== trimmed && normalized) {
-      const fuzzy = await db
-        .select({
-          categoryId: transactions.categoryId,
-          cnt: sql<number>`count(*)::int`,
-        })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.householdId, householdId),
-            isNotNull(transactions.categoryId),
-            sql`lower(regexp_replace(regexp_replace(${transactions.description}, E'\\s+C\\.\\d+/\\d+', '', 'gi'), E'\\s+\\([\\d.,]+\\)', '', 'g')) = lower(${normalized})`,
-          ),
-        )
-        .groupBy(transactions.categoryId)
-        .orderBy(desc(sql`count(*)`))
-        .limit(1);
-      if (fuzzy[0]) return fuzzy[0].categoryId;
-    }
-  } else {
-    // import_lines: busca en parsed_data->>'description', filtrado por
-    // household via JOIN imports. Solo líneas con categoría asignada.
-    const exact = await db
-      .select({
-        categoryId: importLines.proposedCategoryId,
-        cnt: sql<number>`count(*)::int`,
-      })
-      .from(importLines)
-      .innerJoin(imports, eq(imports.id, importLines.importId))
-      .where(
-        and(
-          eq(imports.householdId, householdId),
-          isNotNull(importLines.proposedCategoryId),
-          sql`lower(${importLines.parsedData}->>'description') = lower(${trimmed})`,
-        ),
-      )
-      .groupBy(importLines.proposedCategoryId)
-      .orderBy(desc(sql`count(*)`))
-      .limit(1);
-    if (exact[0]) return exact[0].categoryId;
-
-    // Normalized match
-    if (normalized !== trimmed && normalized) {
-      const fuzzy = await db
-        .select({
-          categoryId: importLines.proposedCategoryId,
-          cnt: sql<number>`count(*)::int`,
-        })
-        .from(importLines)
-        .innerJoin(imports, eq(imports.id, importLines.importId))
-        .where(
-          and(
-            eq(imports.householdId, householdId),
-            isNotNull(importLines.proposedCategoryId),
-            sql`lower(regexp_replace(regexp_replace(${importLines.parsedData}->>'description', E'\\s+C\\.\\d+/\\d+', '', 'gi'), E'\\s+\\([\\d.,]+\\)', '', 'g')) = lower(${normalized})`,
-          ),
-        )
-        .groupBy(importLines.proposedCategoryId)
-        .orderBy(desc(sql`count(*)`))
-        .limit(1);
-      if (fuzzy[0]) return fuzzy[0].categoryId;
-    }
-  }
-
-  return null;
-}
+// Postgres regexp_replace with properly escaped backslashes.
+// JS template literal eats one layer, Postgres E-string eats another.
+const PG_STRIP_CUOTA = String.raw`E'\\s+C\\.\\d+/\\d+'`;
+const PG_STRIP_PARENS = String.raw`E'\\s+\\([\\d.,]+\\)'`;
 
 /**
  * Sugiere `category_id` para una descripción dada. Busca en:
@@ -130,11 +35,97 @@ export async function suggestCategoryForDescription(
   const trimmed = description.trim();
   if (!trimmed) return null;
   const normalized = normalizeDescription(trimmed);
+  const db = getDb();
 
-  // Transactions first (higher confidence — user confirmed these)
-  const fromTx = await searchInTable('transactions', householdId, trimmed, normalized);
-  if (fromTx) return fromTx;
+  // ── 1) Transactions ──────────────────────────────────────────────
 
-  // Fallback: import_lines (user assigned category but tx may not exist yet)
-  return searchInTable('import_lines', householdId, trimmed, normalized);
+  // 1a) Exact match
+  const txExact = await db
+    .select({
+      categoryId: transactions.categoryId,
+      cnt: sql<number>`count(*)::int`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.householdId, householdId),
+        isNotNull(transactions.categoryId),
+        sql`lower(${transactions.description}) = lower(${trimmed})`,
+      ),
+    )
+    .groupBy(transactions.categoryId)
+    .orderBy(desc(sql`count(*)`))
+    .limit(1);
+  if (txExact[0]) return txExact[0].categoryId;
+
+  // 1b) Normalized match
+  if (normalized && normalized !== trimmed) {
+    const txNorm = await db
+      .select({
+        categoryId: transactions.categoryId,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          isNotNull(transactions.categoryId),
+          sql.raw(
+            `lower(regexp_replace(regexp_replace(description, ${PG_STRIP_CUOTA}, '', 'gi'), ${PG_STRIP_PARENS}, '', 'g')) = lower('${normalized.replace(/'/g, "''")}')`,
+          ),
+        ),
+      )
+      .groupBy(transactions.categoryId)
+      .orderBy(desc(sql`count(*)`))
+      .limit(1);
+    if (txNorm[0]) return txNorm[0].categoryId;
+  }
+
+  // ── 2) Import lines (fallback) ───────────────────────────────────
+
+  // 2a) Exact match
+  const ilExact = await db
+    .select({
+      categoryId: importLines.proposedCategoryId,
+      cnt: sql<number>`count(*)::int`,
+    })
+    .from(importLines)
+    .innerJoin(imports, eq(imports.id, importLines.importId))
+    .where(
+      and(
+        eq(imports.householdId, householdId),
+        isNotNull(importLines.proposedCategoryId),
+        sql`lower(${importLines.parsedData}->>'description') = lower(${trimmed})`,
+      ),
+    )
+    .groupBy(importLines.proposedCategoryId)
+    .orderBy(desc(sql`count(*)`))
+    .limit(1);
+  if (ilExact[0]) return ilExact[0].categoryId;
+
+  // 2b) Normalized match
+  if (normalized && normalized !== trimmed) {
+    const ilNorm = await db
+      .select({
+        categoryId: importLines.proposedCategoryId,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(importLines)
+      .innerJoin(imports, eq(imports.id, importLines.importId))
+      .where(
+        and(
+          eq(imports.householdId, householdId),
+          isNotNull(importLines.proposedCategoryId),
+          sql.raw(
+            `lower(regexp_replace(regexp_replace(parsed_data->>'description', ${PG_STRIP_CUOTA}, '', 'gi'), ${PG_STRIP_PARENS}, '', 'g')) = lower('${normalized.replace(/'/g, "''")}')`,
+          ),
+        ),
+      )
+      .groupBy(importLines.proposedCategoryId)
+      .orderBy(desc(sql`count(*)`))
+      .limit(1);
+    if (ilNorm[0]) return ilNorm[0].categoryId;
+  }
+
+  return null;
 }
