@@ -48,6 +48,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
       fileUrl: imports.fileUrl,
       institutionId: imports.institutionId,
       institutionName: institutions.name,
+      pdfPassword: institutions.pdfPassword,
       accountId: imports.accountId,
       accountName: accounts.name,
     })
@@ -101,6 +102,23 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     return { ok: false, error: 'unknown' };
   }
 
+  // Desbloquear PDF protegido con contraseña si la institución tiene una configurada.
+  const isPdf = !row.fileUrl.toLowerCase().endsWith('.csv');
+  if (isPdf && row.pdfPassword) {
+    try {
+      const { decryptPDF } = await import('@pdfsmaller/pdf-decrypt');
+      const decrypted = await decryptPDF(bytes, row.pdfPassword);
+      bytes = new Uint8Array(decrypted);
+    } catch (err) {
+      console.error('[imports] pdf unlock failed', { importId });
+      await db
+        .update(imports)
+        .set({ status: 'error', errorMessage: 'No se pudo desbloquear el PDF. Verificá la contraseña en la institución.' })
+        .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
+      return { ok: false, error: 'unknown', message: `PDF protegido: ${(err as Error).message?.slice(0, 100)}` };
+    }
+  }
+
   const env = getServerEnv();
   const modelId = env.IMPORT_PARSER_MODEL_DEFAULT;
 
@@ -110,7 +128,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
   const enrichedSystemPrompt = parser.systemPrompt + '\n\n' + categoryBlock;
 
   // Dispatch por extensión real del archivo: pdf → document block, csv → text block.
-  const isCsv = row.fileUrl.toLowerCase().endsWith('.csv');
+  const isCsv = !isPdf;
 
   let result;
   try {

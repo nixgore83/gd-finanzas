@@ -6,6 +6,7 @@ export const institutions = pgTable('institutions', {
   name: text('name').notNull().unique(),
   country: text('country').notNull(),
   defaultCurrency: currencyEnum('default_currency').notNull(),
+  pdfPassword: text('pdf_password'),
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

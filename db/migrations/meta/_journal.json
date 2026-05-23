@@ -36,6 +36,13 @@
       "when": 1779549511954,
       "tag": "0004_cynical_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779573513446,
+      "tag": "0005_majestic_christian_walker",
+      "breakpoints": true
     }
   ]
 }
