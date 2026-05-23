@@ -59,7 +59,7 @@ async function searchInTable(
           and(
             eq(transactions.householdId, householdId),
             isNotNull(transactions.categoryId),
-            sql`lower(regexp_replace(regexp_replace(${transactions.description}, '\s+C\.\d+/\d+', '', 'gi'), '\s+\([\d.,]+\)', '', 'g')) = lower(${normalized})`,
+            sql`lower(regexp_replace(regexp_replace(${transactions.description}, E'\\s+C\\.\\d+/\\d+', '', 'gi'), E'\\s+\\([\\d.,]+\\)', '', 'g')) = lower(${normalized})`,
           ),
         )
         .groupBy(transactions.categoryId)
@@ -102,7 +102,7 @@ async function searchInTable(
           and(
             eq(imports.householdId, householdId),
             isNotNull(importLines.proposedCategoryId),
-            sql`lower(regexp_replace(regexp_replace(${importLines.parsedData}->>'description', '\s+C\.\d+/\d+', '', 'gi'), '\s+\([\d.,]+\)', '', 'g')) = lower(${normalized})`,
+            sql`lower(regexp_replace(regexp_replace(${importLines.parsedData}->>'description', E'\\s+C\\.\\d+/\\d+', '', 'gi'), E'\\s+\\([\\d.,]+\\)', '', 'g')) = lower(${normalized})`,
           ),
         )
         .groupBy(importLines.proposedCategoryId)
