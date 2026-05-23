@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
@@ -144,7 +144,19 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     return { ok: false, error: 'llm', message: msg };
   }
 
-  const lines = result.data.lines as (ParsedTxLine & { suggestedCategory?: string })[];
+  const allLines = result.data.lines as (ParsedTxLine & { suggestedCategory?: string })[];
+
+  // Dedup: cargar descripciones de líneas ya confirmadas (con transaction_id)
+  // para no reinsertar duplicadas al re-parsear.
+  const confirmedRows = await db
+    .select({ desc: sql<string>`${importLines.parsedData}->>'description'` })
+    .from(importLines)
+    .where(and(eq(importLines.importId, importId), isNotNull(importLines.transactionId)));
+  const confirmedDescs = new Set(confirmedRows.map((r) => r.desc?.toLowerCase()));
+
+  const lines = allLines.filter(
+    (line) => !confirmedDescs.has(line.description.toLowerCase()),
+  );
 
   // Mapa nombre→id para resolver sugerencias del LLM (case-insensitive).
   const catByName = new Map(
@@ -186,7 +198,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     .set({
       status: 'parsed',
       parserModel: result.model,
-      transactionCount: lineRows.length,
+      transactionCount: confirmedDescs.size + lineRows.length,
       errorMessage: null,
     })
     .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
