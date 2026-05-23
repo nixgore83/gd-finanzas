@@ -506,7 +506,14 @@ function LineRowEditor({
       className={cn(
         'border-t align-top',
         isSelected && !readOnly && 'bg-blue-50/50',
+        !readOnly && !editing && line.status !== 'rejected' && 'cursor-pointer',
       )}
+      onClick={(e) => {
+        if (readOnly || editing || line.status === 'rejected') return;
+        const tag = (e.target as HTMLElement).closest('button, input, select, a, [role="combobox"]');
+        if (tag) return;
+        onToggleSelect();
+      }}
     >
       {!readOnly && (
         <td className="px-2 py-1.5">
