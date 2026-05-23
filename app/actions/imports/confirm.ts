@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { imports, importLines, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
@@ -76,6 +76,45 @@ export async function confirmImport(input: {
     );
 
   if (linesToProcess.length === 0) {
+    // Check if all lines are already resolved (confirmed + rejected, 0 pending).
+    // If so, close the import.
+    const unresolved = await db
+      .select({ id: importLines.id })
+      .from(importLines)
+      .where(
+        and(
+          eq(importLines.importId, input.importId),
+          inArray(importLines.status, ['pending']),
+        ),
+      )
+      .limit(1);
+
+    if (unresolved.length === 0) {
+      const linked = await db
+        .select({ id: importLines.id })
+        .from(importLines)
+        .where(
+          and(
+            eq(importLines.importId, input.importId),
+            isNotNull(importLines.transactionId),
+          ),
+        );
+
+      await db
+        .update(imports)
+        .set({
+          status: 'confirmed',
+          confirmedAt: sql`now()`,
+          transactionCount: linked.length,
+          errorMessage: null,
+        })
+        .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
+
+      revalidatePath(`/imports/${input.importId}`);
+      revalidatePath('/imports');
+      return { ok: true, createdCount: 0, rejectedCount: 0, remaining: 0, lineErrors: [] };
+    }
+
     return { ok: false, error: 'invalid_state', message: 'No hay líneas pendientes de confirmar' };
   }
 
