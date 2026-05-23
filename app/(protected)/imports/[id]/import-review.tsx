@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Decimal from 'decimal.js';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -254,23 +254,13 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                   </p>
                 )}
               </div>
-              <Select
+              <CategoryCombobox
+                options={bulkCategoryOptions}
                 value={bulkCategoryId}
-                onValueChange={setBulkCategoryId}
+                onChange={setBulkCategoryId}
                 disabled={uniformKind === null || isPending}
-              >
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Elegí categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bulkCategoryOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.depth === 1 ? '↳ ' : ''}
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Buscar categoría…"
+              />
               <Button
                 type="button"
                 size="sm"
@@ -754,6 +744,95 @@ function computeTotalsByCurrency(lines: LineRow[]): CurrencyTotals[] {
     });
   }
   return out;
+}
+
+function CategoryCombobox({
+  options,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  options: CategoryNode[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selected = options.find((c) => c.id === value);
+
+  const filtered = useMemo(() => {
+    if (!search) return options;
+    const q = search.toLowerCase();
+    return options.filter((c) => c.name.toLowerCase().includes(q));
+  }, [options, search]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative w-64">
+      <button
+        type="button"
+        onClick={() => { if (!disabled) setOpen(!open); }}
+        disabled={disabled}
+        className={cn(
+          'flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm',
+          'border-input ring-offset-background',
+          disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+        )}
+      >
+        <span className={selected ? '' : 'text-muted-foreground'}>
+          {selected ? (selected.depth === 1 ? `↳ ${selected.name}` : selected.name) : (placeholder ?? 'Elegí categoría')}
+        </span>
+        <svg className="h-4 w-4 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+          <div className="p-1.5">
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar…"
+              className="h-8 w-full rounded border-0 bg-transparent px-2 text-sm outline-none ring-1 ring-input focus:ring-primary"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {filtered.length === 0 && (
+              <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin resultados</p>
+            )}
+            {filtered.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => { onChange(c.id); setOpen(false); setSearch(''); }}
+                className={cn(
+                  'flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                  c.id === value && 'bg-accent font-medium',
+                )}
+              >
+                {c.depth === 1 ? <span className="mr-1 text-muted-foreground">↳</span> : null}
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
