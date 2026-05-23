@@ -17,7 +17,7 @@ import { IMPORT_TYPES, IMPORT_TYPE_LABELS, type ImportType } from '@/lib/schemas
 import { createImport } from '@/app/actions/imports/create';
 
 type Institution = { id: string; name: string };
-type Account = { id: string; name: string; institutionId: string | null };
+type Account = { id: string; name: string; ownerTag: string | null; institutionId: string | null };
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_input: 'Revisá los campos del formulario.',
@@ -172,7 +172,7 @@ export function ImportUploadForm({
               <SelectContent>
                 {filteredAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.name}
+                    {a.name}{a.ownerTag ? ` (${a.ownerTag})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

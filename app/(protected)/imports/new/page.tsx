@@ -29,6 +29,7 @@ export default async function NewImportPage() {
       .select({
         id: accounts.id,
         name: accounts.name,
+        ownerTag: accounts.ownerTag,
         institutionId: accounts.institutionId,
       })
       .from(accounts)
