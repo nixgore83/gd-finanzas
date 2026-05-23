@@ -323,7 +323,14 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             </tr>
           </thead>
           <tbody>
-            {lines.map((l) => (
+            {[...lines].sort((a, b) => {
+              const aHasCat = a.proposedCategoryId ? 1 : 0;
+              const bHasCat = b.proposedCategoryId ? 1 : 0;
+              if (aHasCat !== bHasCat) return aHasCat - bHasCat;
+              const aDesc = (a.parsedData as ParsedTxLine).description ?? '';
+              const bDesc = (b.parsedData as ParsedTxLine).description ?? '';
+              return aDesc.localeCompare(bDesc, 'es');
+            }).map((l) => (
               <LineRowEditor
                 key={l.id}
                 line={l}
