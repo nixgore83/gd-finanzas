@@ -713,15 +713,26 @@ function LineRowEditor({
                 </>
               )}
               {line.status !== 'pending' && line.status !== 'rejected' && (
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                  onClick={() => onSetStatus(line.id, 'pending')}
-                  disabled={isPending}
-                >
-                  Volver
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => onSetStatus(line.id, 'rejected')}
+                    disabled={isPending}
+                  >
+                    ✕
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => onSetStatus(line.id, 'pending')}
+                    disabled={isPending}
+                  >
+                    Volver
+                  </Button>
+                </>
               )}
               <Button
                 size="sm"

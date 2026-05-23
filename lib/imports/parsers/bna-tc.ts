@@ -27,7 +27,7 @@ REGLAS ESTRICTAS:
 - Devolvé ÚNICAMENTE el objeto JSON. Sin markdown fences, sin comentarios, sin texto fuera del JSON.
 - NUNCA incluyas números completos de tarjeta (PAN), CBU, alias, claves, ni datos personales sensibles.
 - Cada línea representa UNA transacción individual.
-- IGNORÁ totales de cierre, subtotales, saldos anteriores, mínimos, intereses globales, IVA, impuestos sobre intereses, y cualquier fila que NO sea una transacción individual.
+- IGNORÁ totales de cierre, subtotales, saldos anteriores, mínimos, intereses globales, IVA, impuestos sobre intereses, pagos realizados ("SU PAGO EN PESOS", "SU PAGO EN DOLARES", "PAGO EN EFECTIVO", etc.), y cualquier fila que NO sea una transacción individual de consumo.
 - Cuotas: registrá UNA línea con el monto de la cuota del mes actual. Incluí la cuota en la descripción (ej: "ALGO C.03/06"). IMPORTANTE: la fecha de la cuota debe ser la FECHA DE CIERRE del resumen, NO la fecha original de compra.
 - Montos negativos o créditos → kind: "income", monto positivo.
 - Convertí formatos de monto argentinos: "45.000,00" → "45000.00".
