@@ -62,7 +62,7 @@ function extractJson(text: string): unknown {
  */
 export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>> {
   const client = getClient();
-  const maxTokens = input.maxTokens ?? 8000;
+  const maxTokens = input.maxTokens ?? 16000;
 
   async function callOnce(extraInstruction?: string): Promise<LlmRunResult<T>> {
     const content: Anthropic.Messages.ContentBlockParam[] = [];
@@ -117,6 +117,14 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
         message: innerMsg.slice(0, 200),
       });
       throw new LlmError(`Anthropic API call failed (${detail})`, 'api_failure', err);
+    }
+
+    if (response.stop_reason === 'max_tokens') {
+      console.warn('[llm] response truncated by max_tokens', {
+        model: input.modelId,
+        maxTokens,
+        outputTokens: response.usage.output_tokens,
+      });
     }
 
     const text = response.content
