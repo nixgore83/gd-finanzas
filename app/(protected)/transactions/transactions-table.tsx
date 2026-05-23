@@ -13,7 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label, Num } from '@/components/ui/typography';
+import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { SortableHeader } from '@/components/ui/sortable-header';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import type { CategoryNode } from '@/lib/categories/tree';
 import { bulkDeleteTransactions } from '@/app/actions/transactions/bulk-delete';
@@ -63,11 +65,22 @@ const TYPE_VAR: Record<TxRow['kind'], string> = {
 type Props = {
   rows: TxRow[];
   categories: CategoryNode[];
+  sort: string;
+  dir: 'asc' | 'desc';
 };
 
-export function TransactionsTable({ rows, categories }: Props) {
+export function TransactionsTable({ rows, categories, sort, dir }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+
+  function handleSort(field: string, newDir: 'asc' | 'desc') {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set('sort', field);
+    sp.set('dir', newDir);
+    sp.delete('page'); // reset to page 1
+    router.push(`/transactions?${sp.toString()}`);
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
 
@@ -234,24 +247,27 @@ export function TransactionsTable({ rows, categories }: Props) {
                   className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
                 />
               </th>
-              {['Tipo', 'Cuenta', 'Categoría'].map((h) => (
+              {([['Tipo', 'kind'], ['Cuenta', 'account'], ['Categoría', 'category']] as const).map(([label, field]) => (
                 <th
-                  key={h}
+                  key={field}
                   className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
                 >
-                  {h}
+                  <SortableHeader label={label} field={field} currentSort={sort} currentDir={dir} onSort={handleSort} />
                 </th>
               ))}
-              {['Monto', 'USD'].map((h) => (
+              {([['Monto', 'amount']] as const).map(([label, field]) => (
                 <th
-                  key={h}
+                  key={field}
                   className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
                 >
-                  {h}
+                  <SortableHeader label={label} field={field} currentSort={sort} currentDir={dir} onSort={handleSort} />
                 </th>
               ))}
+              <th className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                USD
+              </th>
               <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Concepto
+                <SortableHeader label="Concepto" field="description" currentSort={sort} currentDir={dir} onSort={handleSort} />
               </th>
               <th className="px-3 py-2.5" />
             </tr>

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { SortableHeader } from '@/components/ui/sortable-header';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
@@ -57,6 +58,9 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number } | null>(null);
+  const [sortField, setSortField] = useState<string>('category');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const handleSort = (field: string, dir: 'asc' | 'desc') => { setSortField(field); setSortDir(dir); };
   const defaultAccount = (importAccountId
     ? accounts.find((a) => a.id === importAccountId)
     : null) ?? (importInstitutionId
@@ -305,24 +309,39 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                   />
                 </th>
               )}
-              <th className="px-2 py-2 font-medium">Fecha</th>
-              <th className="px-2 py-2 font-medium">Descripción</th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Fecha" field="date" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Descripción" field="description" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
               <th className="px-2 py-2 font-medium">Tipo</th>
-              <th className="px-2 py-2 text-right font-medium">Monto</th>
+              <th className="px-2 py-2 text-right font-medium"><SortableHeader label="Monto" field="amount" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
               <th className="px-2 py-2 font-medium">Mon.</th>
-              <th className="px-2 py-2 font-medium">Categoría</th>
-              <th className="px-2 py-2 font-medium">Estado</th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Categoría" field="category" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Estado" field="status" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
               {!readOnly && <th className="px-2 py-2 font-medium">Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {[...lines].sort((a, b) => {
-              const aHasCat = a.proposedCategoryId ? 1 : 0;
-              const bHasCat = b.proposedCategoryId ? 1 : 0;
-              if (aHasCat !== bHasCat) return aHasCat - bHasCat;
-              const aDesc = (a.parsedData as ParsedTxLine).description ?? '';
-              const bDesc = (b.parsedData as ParsedTxLine).description ?? '';
-              return aDesc.localeCompare(bDesc, 'es');
+              const aP = a.parsedData as ParsedTxLine;
+              const bP = b.parsedData as ParsedTxLine;
+              const catMap = new Map(tree.map((c) => [c.id, c.name]));
+              let cmp = 0;
+              switch (sortField) {
+                case 'date': cmp = (aP.date ?? '').localeCompare(bP.date ?? ''); break;
+                case 'description': cmp = (aP.description ?? '').localeCompare(bP.description ?? '', 'es'); break;
+                case 'amount': cmp = parseFloat(aP.amountOriginal ?? '0') - parseFloat(bP.amountOriginal ?? '0'); break;
+                case 'status': cmp = (a.status ?? '').localeCompare(b.status ?? ''); break;
+                case 'category': {
+                  const aCat = a.proposedCategoryId ? (catMap.get(a.proposedCategoryId) ?? '') : '';
+                  const bCat = b.proposedCategoryId ? (catMap.get(b.proposedCategoryId) ?? '') : '';
+                  // Sin categoría siempre arriba
+                  if (!aCat && bCat) return -1;
+                  if (aCat && !bCat) return 1;
+                  cmp = aCat.localeCompare(bCat, 'es');
+                  break;
+                }
+                default: cmp = 0;
+              }
+              return sortDir === 'desc' ? -cmp : cmp;
             }).map((l) => (
               <LineRowEditor
                 key={l.id}

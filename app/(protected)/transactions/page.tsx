@@ -50,6 +50,8 @@ function parseFilters(sp: Record<string, string | string[] | undefined>) {
   const to = z.string().regex(ISO_DATE_RE).safeParse(get('to'));
   const q = z.string().trim().min(1).max(200).safeParse(get('q'));
   const page = z.coerce.number().int().positive().safeParse(get('page'));
+  const sort = z.enum(['date', 'description', 'amount', 'account', 'category', 'kind']).safeParse(get('sort'));
+  const dir = z.enum(['asc', 'desc']).safeParse(get('dir'));
 
   return {
     kind: kind.success ? kind.data : undefined,
@@ -60,6 +62,8 @@ function parseFilters(sp: Record<string, string | string[] | undefined>) {
     to: to.success ? to.data : undefined,
     q: q.success ? q.data : undefined,
     page: page.success ? page.data : 1,
+    sort: sort.success ? sort.data : 'date',
+    dir: dir.success ? dir.data : 'desc',
   };
 }
 
@@ -74,6 +78,8 @@ function buildHref(base: string, filters: Filters, pageOverride: number): string
   if (filters.from) sp.set('from', filters.from);
   if (filters.to) sp.set('to', filters.to);
   if (filters.q) sp.set('q', filters.q);
+  if (filters.sort && filters.sort !== 'date') sp.set('sort', filters.sort);
+  if (filters.dir && filters.dir !== 'desc') sp.set('dir', filters.dir);
   if (pageOverride > 1) sp.set('page', String(pageOverride));
   const qs = sp.toString();
   return qs.length > 0 ? `${base}?${qs}` : base;
@@ -166,7 +172,20 @@ export default async function TransactionsPage({
     .leftJoin(accounts, eq(accounts.id, transactions.accountId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .where(whereClause)
-    .orderBy(desc(transactions.date), desc(transactions.createdAt))
+    .orderBy(
+      (() => {
+        const d = filters.dir === 'asc' ? asc : desc;
+        switch (filters.sort) {
+          case 'description': return d(transactions.description);
+          case 'amount': return d(transactions.amountOriginal);
+          case 'account': return d(accounts.name);
+          case 'category': return d(categories.name);
+          case 'kind': return d(transactions.kind);
+          default: return d(transactions.date);
+        }
+      })(),
+      desc(transactions.createdAt),
+    )
     .limit(PAGE_LIMIT)
     .offset(offset);
 
@@ -444,7 +463,7 @@ export default async function TransactionsPage({
                   categoryName: row.categoryName,
                   tags: tagsByTx.get(row.id) ?? [],
                 }));
-                return <TransactionsTable rows={tableRows} categories={categoryOptions} />;
+                return <TransactionsTable rows={tableRows} categories={categoryOptions} sort={filters.sort ?? 'date'} dir={filters.dir ?? 'desc'} />;
               })()}
 
               {/* Pagination */}
