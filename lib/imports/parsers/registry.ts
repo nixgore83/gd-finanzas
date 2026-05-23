@@ -3,6 +3,7 @@ import { galiciaTcParser } from './galicia-tc';
 import { icbcMastercardTcParser } from './icbc-mastercard-tc';
 import { icbcTcParser } from './icbc-tc';
 import { icbcBancoParser } from './icbc-banco';
+import { bnaTcParser } from './bna-tc';
 import { hsbcUsTcParser } from './hsbc-us-tc';
 import { hsbcUsBancoParser } from './hsbc-us-banco';
 import type { Parser } from './types';
@@ -13,6 +14,7 @@ const PARSERS: Parser[] = [
   icbcMastercardTcParser, // before generic icbc-tc — accountMatch narrows it
   icbcTcParser,
   icbcBancoParser,
+  bnaTcParser,
   hsbcUsTcParser,
   hsbcUsBancoParser,
 ];
