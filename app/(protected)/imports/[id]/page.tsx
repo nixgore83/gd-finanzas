@@ -83,7 +83,12 @@ export default async function ImportDetailPage({
 
   const tree = await loadCategoryTree(session.householdId);
   const accountRows = await db
-    .select({ id: accounts.id, name: accounts.name, currency: accounts.currencyDefault })
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      currency: accounts.currencyDefault,
+      institutionId: accounts.institutionId,
+    })
     .from(accounts)
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));
@@ -154,7 +159,7 @@ export default async function ImportDetailPage({
         </div>
       )}
 
-      {(row.status === 'uploaded' || row.status === 'error') && hasParser && (
+      {(row.status === 'uploaded' || row.status === 'error' || row.status === 'parsed' || row.status === 'reviewing') && hasParser && (
         <div className="rounded-md border bg-card p-4">
           <p className="text-sm">
             Parser disponible: <span className="font-medium">{row.institutionName}</span>{' '}
@@ -197,6 +202,7 @@ export default async function ImportDetailPage({
           }))}
           tree={tree}
           accounts={accountRows}
+          importInstitutionId={row.institutionId}
         />
       )}
     </div>

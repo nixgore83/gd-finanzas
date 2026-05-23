@@ -34,7 +34,8 @@ type Props = {
   status: string;
   lines: LineRow[];
   tree: CategoryNode[];
-  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD' }>;
+  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null }>;
+  importInstitutionId: string | null;
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -51,10 +52,13 @@ const STATUS_LABEL: Record<string, string> = {
   edited: 'Editada',
 };
 
-export function ImportReview({ importId, status, lines, tree, accounts }: Props) {
+export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? '');
+  const defaultAccount = (importInstitutionId
+    ? accounts.find((a) => a.institutionId === importInstitutionId)
+    : null) ?? accounts[0];
+  const [accountId, setAccountId] = useState<string>(defaultAccount?.id ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
 
