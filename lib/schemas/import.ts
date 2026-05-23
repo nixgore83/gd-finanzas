@@ -15,13 +15,16 @@ const ALLOWED_EXTS = ['pdf', 'csv'] as const;
 export const importCreateMetaSchema = z.object({
   type: z.enum(IMPORT_TYPES),
   institutionId: z.string().uuid(),
+  accountId: z.string().uuid().optional(),
   force: z.boolean().optional(),
 });
 
 export function parseImportCreateMeta(formData: FormData) {
+  const accountIdVal = formData.get('accountId');
   const raw = {
     type: formData.get('type'),
     institutionId: formData.get('institutionId'),
+    accountId: accountIdVal && accountIdVal !== '' ? accountIdVal : undefined,
     force: formData.get('force') === '1',
   };
   return importCreateMetaSchema.safeParse(raw);

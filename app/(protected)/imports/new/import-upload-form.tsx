@@ -17,6 +17,7 @@ import { IMPORT_TYPES, IMPORT_TYPE_LABELS, type ImportType } from '@/lib/schemas
 import { createImport } from '@/app/actions/imports/create';
 
 type Institution = { id: string; name: string };
+type Account = { id: string; name: string; institutionId: string | null };
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_input: 'Revisá los campos del formulario.',
@@ -31,13 +32,22 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 type DuplicateInfo = { importId: string; confirmedAt: string | null };
 
-export function ImportUploadForm({ institutions }: { institutions: Institution[] }) {
+export function ImportUploadForm({
+  institutions,
+  accounts,
+}: {
+  institutions: Institution[];
+  accounts: Account[];
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [type, setType] = useState<ImportType>('tc');
   const [institutionId, setInstitutionId] = useState<string>(institutions[0]?.id ?? '');
+  const [accountId, setAccountId] = useState<string>('');
   const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
+
+  const filteredAccounts = accounts.filter((a) => a.institutionId === institutionId);
 
   function submit(force: boolean) {
     const form = formRef.current;
@@ -45,6 +55,7 @@ export function ImportUploadForm({ institutions }: { institutions: Institution[]
     const formData = new FormData(form);
     formData.set('type', type);
     formData.set('institutionId', institutionId);
+    if (accountId) formData.set('accountId', accountId);
     if (force) formData.set('force', '1');
 
     startTransition(async () => {
@@ -73,7 +84,7 @@ export function ImportUploadForm({ institutions }: { institutions: Institution[]
     >
       <div className="space-y-1.5">
         <Label htmlFor="institutionId">Institución</Label>
-        <Select value={institutionId} onValueChange={setInstitutionId}>
+        <Select value={institutionId} onValueChange={(v) => { setInstitutionId(v); setAccountId(''); }}>
           <SelectTrigger id="institutionId">
             <SelectValue placeholder="Elegí una institución" />
           </SelectTrigger>
@@ -102,6 +113,27 @@ export function ImportUploadForm({ institutions }: { institutions: Institution[]
           </SelectContent>
         </Select>
       </div>
+
+      {filteredAccounts.length > 0 && (
+        <div className="space-y-1.5">
+          <Label htmlFor="accountId">Cuenta (opcional — mejora la selección del parser)</Label>
+          <Select
+            value={accountId}
+            onValueChange={setAccountId}
+          >
+            <SelectTrigger id="accountId">
+              <SelectValue placeholder="Seleccionar cuenta" />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="file">Archivo (PDF o CSV, hasta 20 MB)</Label>

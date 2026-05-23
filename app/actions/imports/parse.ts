@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { imports, importLines, institutions } from '@/db/schema';
+import { accounts, imports, importLines, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { downloadImportFile } from '@/lib/imports/storage';
 import { resolveParser } from '@/lib/imports/parsers/registry';
@@ -48,9 +48,12 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
       fileUrl: imports.fileUrl,
       institutionId: imports.institutionId,
       institutionName: institutions.name,
+      accountId: imports.accountId,
+      accountName: accounts.name,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
+    .leftJoin(accounts, eq(accounts.id, imports.accountId))
     .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)))
     .limit(1);
 
@@ -64,7 +67,7 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     return { ok: false, error: 'no_parser', message: 'institución no encontrada' };
   }
 
-  const parser = resolveParser(row.institutionName, row.type);
+  const parser = resolveParser(row.institutionName, row.type, row.accountName ?? undefined);
   if (!parser) {
     return {
       ok: false,

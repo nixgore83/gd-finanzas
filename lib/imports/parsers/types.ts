@@ -112,6 +112,8 @@ export type Parser = {
   id: string;
   institutionMatch: (institutionName: string) => boolean;
   importTypeMatch: (type: ImportType) => boolean;
+  /** Optional — disambiguates when multiple parsers match the same institution+type */
+  accountMatch?: (accountName: string) => boolean;
   systemPrompt: string;
   userPrompt: string;
   schema: typeof parserOutputSchema;

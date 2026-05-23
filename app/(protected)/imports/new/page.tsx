@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { institutions } from '@/db/schema';
+import { accounts, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { ImportUploadForm } from './import-upload-form';
 
@@ -10,19 +10,31 @@ export const metadata = {
 };
 
 export default async function NewImportPage() {
+  let session;
   try {
-    await requireHouseholdSession();
+    session = await requireHouseholdSession();
   } catch (err) {
     if (err instanceof SessionError) redirect('/login');
     throw err;
   }
 
   const db = getDb();
-  const instRows = await db
-    .select({ id: institutions.id, name: institutions.name })
-    .from(institutions)
-    .where(eq(institutions.archived, false))
-    .orderBy(asc(institutions.name));
+  const [instRows, accountRows] = await Promise.all([
+    db
+      .select({ id: institutions.id, name: institutions.name })
+      .from(institutions)
+      .where(eq(institutions.archived, false))
+      .orderBy(asc(institutions.name)),
+    db
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        institutionId: accounts.institutionId,
+      })
+      .from(accounts)
+      .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
+      .orderBy(asc(accounts.name)),
+  ]);
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -33,7 +45,7 @@ export default async function NewImportPage() {
           parsearlo con LLM y revisar las transacciones antes de confirmar.
         </p>
       </div>
-      <ImportUploadForm institutions={instRows} />
+      <ImportUploadForm institutions={instRows} accounts={accountRows} />
     </div>
   );
 }

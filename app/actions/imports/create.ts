@@ -117,6 +117,7 @@ export async function createImport(formData: FormData): Promise<CreateImportResu
         fileHash,
         type: parsedMeta.data.type,
         institutionId: parsedMeta.data.institutionId,
+        accountId: parsedMeta.data.accountId ?? null,
         parserModel: 'pending',
         status: 'uploaded',
         createdBy: session.userId,

@@ -36,6 +36,7 @@ type Props = {
   tree: CategoryNode[];
   accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null }>;
   importInstitutionId: string | null;
+  importAccountId: string | null;
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -52,11 +53,13 @@ const STATUS_LABEL: Record<string, string> = {
   edited: 'Editada',
 };
 
-export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId }: Props) {
+export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number } | null>(null);
-  const defaultAccount = (importInstitutionId
+  const defaultAccount = (importAccountId
+    ? accounts.find((a) => a.id === importAccountId)
+    : null) ?? (importInstitutionId
     ? accounts.find((a) => a.institutionId === importInstitutionId)
     : null) ?? accounts[0];
   const [accountId, setAccountId] = useState<string>(defaultAccount?.id ?? '');

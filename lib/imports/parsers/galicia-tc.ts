@@ -36,7 +36,7 @@ REGLAS ESTRICTAS:
 - Cada línea representa UNA transacción individual de consumo o pago.
 - IGNORÁ totales de cierre, subtotales, saldos anteriores, mínimos, intereses globales y cualquier fila que NO sea una transacción individual.
 - IGNORÁ resúmenes en cuotas que ya estén consolidados en el "total a pagar" del mes.
-- Cuotas: si una compra es en N cuotas, registrá UNA sola línea con el monto total de la cuota del mes (lo que efectivamente se carga este resumen).
+- Cuotas: si una compra es en N cuotas, registrá UNA sola línea con el monto total de la cuota del mes. IMPORTANTE: la fecha de la cuota debe ser la FECHA DE CIERRE del resumen, NO la fecha original de compra.
 - Galicia separa habitualmente consumos por moneda en secciones distintas — respetá esa separación al setear currencyOriginal.`;
 
 const USER_PROMPT = `Extraé todas las transacciones del PDF de Galicia que sigue. Devolvé el JSON con el array "lines".`;

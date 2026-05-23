@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { households } from './households';
 import { institutions } from './institutions';
+import { accounts } from './accounts';
 import { authUsers } from './auth';
 import { categories } from './categories';
 import { transactions } from './transactions';
@@ -26,6 +27,9 @@ export const imports = pgTable(
     type: importTypeEnum('type').notNull(),
     institutionId: uuid('institution_id').references(() => institutions.id, {
       onDelete: 'restrict',
+    }),
+    accountId: uuid('account_id').references(() => accounts.id, {
+      onDelete: 'set null',
     }),
     parserModel: text('parser_model').notNull(),
     status: importStatusEnum('status').notNull().default('uploaded'),

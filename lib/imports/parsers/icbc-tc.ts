@@ -14,7 +14,7 @@ REGLAS ESTRICTAS:
 - NUNCA incluyas números completos de tarjeta (PAN), CBU, alias, claves, ni datos personales sensibles.
 - Extraé CADA línea individual del detalle — incluyendo las que están en páginas subsiguientes.
 - IGNORÁ: "SALDO ANTERIOR", "SU PAGO", "TRANSFERENC FINANC", totales, subtotales, resúmenes consolidados, intereses de financiación, IVA, pago mínimo, saldo actual.
-- Cuotas: registrá UNA línea con el monto de la cuota del mes actual (lo que efectivamente se carga este resumen). Incluí la cuota en la descripción (ej: "MERPAGO*ALGO C.03/06").
+- Cuotas: registrá UNA línea con el monto de la cuota del mes actual. Incluí la cuota en la descripción (ej: "MERPAGO*ALGO C.03/06"). IMPORTANTE: la fecha de la cuota debe ser la FECHA DEL RESUMEN (la del mes actual que aparece en "Estado de cuenta al" o "Cierre"), NO la fecha original de compra.
 - Montos negativos en la columna PESOS son devoluciones → kind: "income", monto positivo.
 - Fechas en formato YYYY-MM-DD (convertí "28-Feb-26" → "2026-02-28").
 - Montos como string numérico con punto decimal, siempre positivos.

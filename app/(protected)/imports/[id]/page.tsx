@@ -53,6 +53,7 @@ export default async function ImportDetailPage({
       type: imports.type,
       status: imports.status,
       institutionId: imports.institutionId,
+      accountId: imports.accountId,
       institutionName: institutions.name,
       parserModel: imports.parserModel,
       fileUrl: imports.fileUrl,
@@ -203,6 +204,7 @@ export default async function ImportDetailPage({
           tree={tree}
           accounts={accountRows}
           importInstitutionId={row.institutionId}
+          importAccountId={row.accountId}
         />
       )}
     </div>

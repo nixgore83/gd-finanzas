@@ -12,8 +12,20 @@ describe('resolveParser', () => {
     expect(resolveParser('Galicia', 'banco')).toBeNull();
   });
 
-  it('ICBC TC y banco encontrados', () => {
-    expect(resolveParser('ICBC', 'tc')?.id).toBe('icbc-tc-v1');
+  it('ICBC TC sin cuenta → parser genérico (Visa)', () => {
+    expect(resolveParser('ICBC', 'tc')?.id).toBe('icbc-tc-v2');
+  });
+
+  it('ICBC TC con cuenta Mastercard → parser Mastercard', () => {
+    expect(resolveParser('ICBC', 'tc', 'ICBC Master')?.id).toBe('icbc-mastercard-tc-v1');
+    expect(resolveParser('ICBC', 'tc', 'ICBC Mastercard')?.id).toBe('icbc-mastercard-tc-v1');
+  });
+
+  it('ICBC TC con cuenta Visa → parser genérico', () => {
+    expect(resolveParser('ICBC', 'tc', 'ICBC Visa')?.id).toBe('icbc-tc-v2');
+  });
+
+  it('ICBC banco encontrado', () => {
     expect(resolveParser('ICBC', 'banco')?.id).toBe('icbc-banco-v1');
   });
 
@@ -32,7 +44,8 @@ describe('listParsers', () => {
   it('listado incluye los parsers actuales', () => {
     const ids = listParsers().map((p) => p.id);
     expect(ids).toContain('galicia-tc-v1');
-    expect(ids).toContain('icbc-tc-v1');
+    expect(ids).toContain('icbc-mastercard-tc-v1');
+    expect(ids).toContain('icbc-tc-v2');
     expect(ids).toContain('icbc-banco-v1');
     expect(ids).toContain('hsbc-us-tc-v1');
     expect(ids).toContain('hsbc-us-banco-v1');
