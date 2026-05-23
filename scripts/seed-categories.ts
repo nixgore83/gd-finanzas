@@ -78,7 +78,7 @@ const EXPENSE: Cat[] = [
     name: 'Personales',
     color: '#64748b',
     icon: 'Shirt',
-    children: ['Regalos', 'Varios'],
+    children: ['Regalos', 'Suscripciones streaming', 'Suscripciones IA', 'Varios'],
   },
   {
     name: 'Impuestos',
