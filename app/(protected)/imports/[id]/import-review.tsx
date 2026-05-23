@@ -55,6 +55,7 @@ const STATUS_LABEL: Record<string, string> = {
 export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [confirmDone, setConfirmDone] = useState<{ count: number } | null>(null);
   const defaultAccount = (importInstitutionId
     ? accounts.find((a) => a.institutionId === importInstitutionId)
     : null) ?? accounts[0];
@@ -186,8 +187,8 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           );
           router.refresh();
         } else {
-          toast.success(`Import confirmado · ${res.createdCount} transacciones creadas`);
-          router.push('/transactions');
+          setConfirmDone({ count: res.createdCount });
+          router.refresh();
         }
       } else {
         toast.error(res.message ?? `Error: ${res.error}`);
@@ -407,6 +408,22 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           >
             Confirmar import ({summary.accepted + summary.edited})
           </Button>
+        </div>
+      )}
+
+      {confirmDone && (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <p className="font-medium">
+            Import confirmado — {confirmDone.count} transacciones creadas
+          </p>
+          <div className="mt-3 flex gap-3">
+            <Button variant="outline" size="sm" onClick={() => router.push('/transactions')}>
+              Ver transacciones
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => router.push('/imports/new')}>
+              Importar otro archivo
+            </Button>
+          </div>
         </div>
       )}
     </section>
