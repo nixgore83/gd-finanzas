@@ -402,7 +402,30 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       )}
 
       {!readOnly && (
-        <div className="flex flex-wrap items-end justify-between gap-3 rounded-md border bg-card p-4">
+        <div className="space-y-3 rounded-md border bg-card p-4">
+          {summary.pending > 0 && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => doBulk('accepted')}
+                disabled={isPending}
+              >
+                Aceptar todas las pending ({summary.pending})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => doBulk('rejected')}
+                disabled={isPending}
+              >
+                Rechazar todas las pending
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="accountId">
               Cuenta destino (común a todas las líneas)
@@ -427,6 +450,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           >
             Confirmar import ({summary.accepted + summary.edited})
           </Button>
+          </div>
         </div>
       )}
 
