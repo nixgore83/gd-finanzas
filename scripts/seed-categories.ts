@@ -92,6 +92,7 @@ const EXPENSE: Cat[] = [
     icon: 'TrendingUp',
     children: ['Rabbit Hole', 'Tijeritas'],
   },
+  { name: 'Seguros', color: '#0ea5e9', icon: 'Shield' },
   { name: 'Otros gastos', color: '#71717a', icon: 'MinusCircle' },
 ];
 
