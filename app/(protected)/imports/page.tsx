@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { imports, institutions } from '@/db/schema';
+import { accounts, imports, importLines, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { Button } from '@/components/ui/button';
@@ -70,14 +70,46 @@ export default async function ImportsListPage() {
       status: imports.status,
       institutionId: imports.institutionId,
       institutionName: institutions.name,
+      accountName: accounts.name,
+      accountOwner: accounts.ownerTag,
       createdAt: imports.createdAt,
       transactionCount: imports.transactionCount,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
+    .leftJoin(accounts, eq(accounts.id, imports.accountId))
     .where(eq(imports.householdId, session.householdId))
     .orderBy(desc(imports.createdAt))
     .limit(50);
+
+  // Derive period (month range) from import_lines dates
+  const periodByImport = new Map<string, string>();
+  if (rows.length > 0) {
+    const periods = await db
+      .select({
+        importId: importLines.importId,
+        minDate: sql<string>`min(${importLines.parsedData}->>'date')`,
+        maxDate: sql<string>`max(${importLines.parsedData}->>'date')`,
+      })
+      .from(importLines)
+      .where(sql`${importLines.importId} in ${rows.map((r) => r.id)}`)
+      .groupBy(importLines.importId);
+
+    for (const p of periods) {
+      if (!p.minDate) continue;
+      const minMonth = p.minDate.slice(0, 7); // YYYY-MM
+      const maxMonth = p.maxDate?.slice(0, 7) ?? minMonth;
+      const fmt = (ym: string) => {
+        const [y, m] = ym.split('-');
+        const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        return `${months[parseInt(m!, 10) - 1]} ${y}`;
+      };
+      periodByImport.set(
+        p.importId,
+        minMonth === maxMonth ? fmt(minMonth) : `${fmt(minMonth)} – ${fmt(maxMonth)}`,
+      );
+    }
+  }
 
   const totalLines = rows.reduce((s, r) => s + (r.transactionCount ?? 0), 0);
   const pendingReview = rows.filter((r) => r.status === 'parsed' || r.status === 'reviewing').length;
@@ -131,7 +163,7 @@ export default async function ImportsListPage() {
           <table className="w-full">
             <thead>
               <tr className="border-y border-border">
-                {['Fecha', 'Archivo', 'Institución', 'Tipo', 'Estado'].map((h) => (
+                {['Fecha', 'Cuenta', 'Período', 'Estado'].map((h) => (
                   <th
                     key={h}
                     className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
@@ -165,20 +197,19 @@ export default async function ImportsListPage() {
                     <td className="px-3 py-3">
                       <Link
                         href={`/imports/${r.id}`}
-                        className="font-mono text-sm text-foreground transition-colors hover:text-primary"
+                        className="text-sm font-medium text-foreground transition-colors hover:text-primary"
                       >
-                        {r.id.slice(0, 8)}…
+                        {r.accountName ?? r.institutionName ?? '—'}
+                        {r.accountOwner ? ` (${r.accountOwner})` : ''}
                       </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="font-display text-base text-foreground">
-                        {r.institutionName ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Label className="normal-case tracking-[0.1em]">
-                        {IMPORT_TYPE_LABELS[r.type]}
+                      <Label className="mt-0.5 block normal-case tracking-[0.05em]">
+                        {r.institutionName} · {IMPORT_TYPE_LABELS[r.type]}
                       </Label>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-sm text-foreground">
+                        {periodByImport.get(r.id) ?? '—'}
+                      </span>
                     </td>
                     <td className="px-3 py-3">
                       <span
