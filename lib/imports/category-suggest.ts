@@ -1,6 +1,6 @@
 import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { transactions } from '@/db/schema';
+import { importLines, imports, transactions } from '@/db/schema';
 
 /**
  * Normaliza una descripción de resumen bancario para matching:
@@ -16,10 +16,112 @@ export function normalizeDescription(raw: string): string {
 }
 
 /**
- * Sugiere `category_id` para una descripción dada. Primero intenta match
- * exacto (case-insensitive), luego match normalizado (sin sufijos de cuota
- * ni montos entre paréntesis). Si hay múltiples categorías históricas,
- * devuelve la más frecuente. Si no hay match, null.
+ * Busca categoría en una tabla dada, primero exacto y luego normalizado.
+ * Devuelve categoryId o null.
+ */
+async function searchInTable(
+  table: 'transactions' | 'import_lines',
+  householdId: string,
+  trimmed: string,
+  normalized: string,
+): Promise<string | null> {
+  const db = getDb();
+
+  if (table === 'transactions') {
+    // Exact match
+    const exact = await db
+      .select({
+        categoryId: transactions.categoryId,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          isNotNull(transactions.categoryId),
+          sql`lower(${transactions.description}) = lower(${trimmed})`,
+        ),
+      )
+      .groupBy(transactions.categoryId)
+      .orderBy(desc(sql`count(*)`))
+      .limit(1);
+    if (exact[0]) return exact[0].categoryId;
+
+    // Normalized match
+    if (normalized !== trimmed && normalized) {
+      const fuzzy = await db
+        .select({
+          categoryId: transactions.categoryId,
+          cnt: sql<number>`count(*)::int`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.householdId, householdId),
+            isNotNull(transactions.categoryId),
+            sql`lower(regexp_replace(regexp_replace(${transactions.description}, '\s+C\.\d+/\d+', '', 'gi'), '\s+\([\d.,]+\)', '', 'g')) = lower(${normalized})`,
+          ),
+        )
+        .groupBy(transactions.categoryId)
+        .orderBy(desc(sql`count(*)`))
+        .limit(1);
+      if (fuzzy[0]) return fuzzy[0].categoryId;
+    }
+  } else {
+    // import_lines: busca en parsed_data->>'description', filtrado por
+    // household via JOIN imports. Solo líneas con categoría asignada.
+    const exact = await db
+      .select({
+        categoryId: importLines.proposedCategoryId,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(importLines)
+      .innerJoin(imports, eq(imports.id, importLines.importId))
+      .where(
+        and(
+          eq(imports.householdId, householdId),
+          isNotNull(importLines.proposedCategoryId),
+          sql`lower(${importLines.parsedData}->>'description') = lower(${trimmed})`,
+        ),
+      )
+      .groupBy(importLines.proposedCategoryId)
+      .orderBy(desc(sql`count(*)`))
+      .limit(1);
+    if (exact[0]) return exact[0].categoryId;
+
+    // Normalized match
+    if (normalized !== trimmed && normalized) {
+      const fuzzy = await db
+        .select({
+          categoryId: importLines.proposedCategoryId,
+          cnt: sql<number>`count(*)::int`,
+        })
+        .from(importLines)
+        .innerJoin(imports, eq(imports.id, importLines.importId))
+        .where(
+          and(
+            eq(imports.householdId, householdId),
+            isNotNull(importLines.proposedCategoryId),
+            sql`lower(regexp_replace(regexp_replace(${importLines.parsedData}->>'description', '\s+C\.\d+/\d+', '', 'gi'), '\s+\([\d.,]+\)', '', 'g')) = lower(${normalized})`,
+          ),
+        )
+        .groupBy(importLines.proposedCategoryId)
+        .orderBy(desc(sql`count(*)`))
+        .limit(1);
+      if (fuzzy[0]) return fuzzy[0].categoryId;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Sugiere `category_id` para una descripción dada. Busca en:
+ * 1) Transacciones confirmadas (exacto, luego normalizado)
+ * 2) Import lines previas con categoría asignada (exacto, luego normalizado)
+ *
+ * En ambos casos, si hay múltiples categorías históricas devuelve la más
+ * frecuente. Si no hay match, null.
  */
 export async function suggestCategoryForDescription(
   householdId: string,
@@ -27,48 +129,12 @@ export async function suggestCategoryForDescription(
 ): Promise<string | null> {
   const trimmed = description.trim();
   if (!trimmed) return null;
-  const db = getDb();
-
-  // 1) Match exacto
-  const exact = await db
-    .select({
-      categoryId: transactions.categoryId,
-      cnt: sql<number>`count(*)::int`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.householdId, householdId),
-        isNotNull(transactions.categoryId),
-        sql`lower(${transactions.description}) = lower(${trimmed})`,
-      ),
-    )
-    .groupBy(transactions.categoryId)
-    .orderBy(desc(sql`count(*)`))
-    .limit(1);
-
-  if (exact[0]) return exact[0].categoryId;
-
-  // 2) Match normalizado — quita cuotas y montos entre paréntesis
   const normalized = normalizeDescription(trimmed);
-  if (normalized === trimmed || !normalized) return null;
 
-  const fuzzy = await db
-    .select({
-      categoryId: transactions.categoryId,
-      cnt: sql<number>`count(*)::int`,
-    })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.householdId, householdId),
-        isNotNull(transactions.categoryId),
-        sql`lower(regexp_replace(regexp_replace(${transactions.description}, '\s+C\.\d+/\d+', '', 'gi'), '\s+\([\d.,]+\)', '', 'g')) = lower(${normalized})`,
-      ),
-    )
-    .groupBy(transactions.categoryId)
-    .orderBy(desc(sql`count(*)`))
-    .limit(1);
+  // Transactions first (higher confidence — user confirmed these)
+  const fromTx = await searchInTable('transactions', householdId, trimmed, normalized);
+  if (fromTx) return fromTx;
 
-  return fuzzy[0]?.categoryId ?? null;
+  // Fallback: import_lines (user assigned category but tx may not exist yet)
+  return searchInTable('import_lines', householdId, trimmed, normalized);
 }
