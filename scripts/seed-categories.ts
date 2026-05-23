@@ -2,9 +2,9 @@ import postgres from 'postgres';
 import { loadEnv } from './_env';
 
 /**
- * Seed de la taxonomía real de categorías (cerrada con Pau, 2026-05-18 —
- * doc en Notion `Categorización`). Idempotente: si una categoría ya existe
- * por (household_id, name, kind) la skipea.
+ * Seed de la taxonomía real de categorías (cerrada con Nico, 2026-05-22).
+ * Idempotente: si una categoría ya existe por (household_id, name, kind)
+ * la skipea.
  *
  * Migración: si existen las placeholder "Ingresos varios" / "Gastos varios"
  * (sembradas por `db:seed:categories-placeholder` durante Hito 3.A), reapunta
@@ -31,7 +31,7 @@ const INCOME: Cat[] = [
     name: 'Inversiones',
     color: '#059669',
     icon: 'TrendingUp',
-    children: ['Dividendos', 'Intereses', 'Ganancia capital'],
+    children: ['Alquiler', 'Dividendos', 'Intereses', 'Ganancia capital'],
   },
   { name: 'Otros ingresos', color: '#047857', icon: 'PlusCircle' },
 ];
@@ -47,7 +47,7 @@ const EXPENSE: Cat[] = [
     name: 'Alimentación',
     color: '#f97316',
     icon: 'UtensilsCrossed',
-    children: ['Supermercado', 'Restaurantes', 'Delivery'],
+    children: ['Supermercado', 'Restaurantes'],
   },
   {
     name: 'Transporte',
@@ -79,7 +79,7 @@ const EXPENSE: Cat[] = [
     name: 'Impuestos',
     color: '#f59e0b',
     icon: 'Landmark',
-    children: ['Monotributo', 'Bienes Personales', 'Ganancias'],
+    children: ['Monotributo', 'Bienes Personales', 'Ganancias', 'Autónomos'],
   },
   {
     name: 'Inversiones',
