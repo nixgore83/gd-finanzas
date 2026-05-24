@@ -29,7 +29,15 @@ STRICT RULES:
 - Each line = ONE individual transaction (purchase, payment, fee).
 - IGNORE totals, subtotals, previous balance, minimum payment, interest summaries, payments made ("PAYMENT THANK YOU", etc.).
 - Installments: use the STATEMENT CLOSING DATE, not the original purchase date.
-- Extract transactions from ALL pages of the PDF.`;
+- Extract transactions from ALL pages of the PDF.
+
+STATEMENT SUBTOTALS:
+In addition to lines, extract the statement subtotals and include them as a "summary" field in the root JSON:
+{ "lines": [...], "summary": { "totalExpense": "1234.56", "totalIncome": "100.00", "currency": "USD" } }
+- "totalExpense": total purchases/charges for the period (the subtotal printed by the bank, NOT your own sum).
+- "totalIncome": total payments/credits/refunds.
+- "currency": "USD".
+- If subtotals are not clearly printed, omit the "summary" field.`;
 
 const USER_PROMPT = `Extract ALL transactions from the HSBC US credit card PDF. Return JSON with "lines".`;
 

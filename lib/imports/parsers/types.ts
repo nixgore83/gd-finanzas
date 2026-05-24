@@ -10,6 +10,10 @@ const parsedTxLineStrictSchema = z.object({
   merchant: z.string().max(200).optional(),
   notes: z.string().max(500).optional(),
   suggestedCategory: z.string().max(200).optional(),
+  /** True if this line looks like a transfer between own accounts */
+  isTransfer: z.boolean().optional().default(false),
+  /** UUID of the counterpart account — set by user in review UI */
+  transferAccountId: z.string().uuid().optional(),
 });
 
 /**
@@ -46,6 +50,15 @@ export const parsedTxLineSchema = z.preprocess((val) => {
   }
   if (out.kind == null) {
     out.kind = out.tipo ?? out.type;
+  }
+
+  // isTransfer aliases
+  if (out.isTransfer == null) {
+    out.isTransfer = out.is_transfer ?? out.transfer ?? out.esTransferencia;
+  }
+  // Coerce string "true"/"false" to boolean
+  if (typeof out.isTransfer === 'string') {
+    out.isTransfer = out.isTransfer.toLowerCase() === 'true';
   }
 
   // Number → string
@@ -102,11 +115,47 @@ export const parsedTxLineSchema = z.preprocess((val) => {
 
 export type ParsedTxLine = z.infer<typeof parsedTxLineStrictSchema>;
 
+const summarySchema = z.preprocess((val) => {
+  if (!val || typeof val !== 'object') return val;
+  const obj = val as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...obj };
+  // Alias handling
+  if (out.totalExpense == null) {
+    out.totalExpense = out.total_expense ?? out.totalGastos ?? out.total_gastos ?? out.totalCharges;
+  }
+  if (out.totalIncome == null) {
+    out.totalIncome = out.total_income ?? out.totalPagos ?? out.total_pagos ?? out.totalPayments ?? out.totalCredits;
+  }
+  if (out.currency == null) {
+    out.currency = out.moneda ?? out.currencyOriginal;
+  }
+  // Number → string
+  if (typeof out.totalExpense === 'number') out.totalExpense = String(out.totalExpense);
+  if (typeof out.totalIncome === 'number') out.totalIncome = String(out.totalIncome);
+  // Uppercase currency
+  if (typeof out.currency === 'string') out.currency = out.currency.toUpperCase();
+  return out;
+}, z.object({
+  totalExpense: z.string().optional(),
+  totalIncome: z.string().optional(),
+  currency: z.enum(['ARS', 'USD']).optional(),
+}));
+
 export const parserOutputSchema = z.object({
   lines: z.array(parsedTxLineSchema),
+  summary: summarySchema.optional(),
 });
 
-export type ParserOutput = { lines: ParsedTxLine[] };
+export type ImportSummary = {
+  totalExpense?: string;
+  totalIncome?: string;
+  currency?: string;
+};
+
+export type ParserOutput = {
+  lines: ParsedTxLine[];
+  summary?: ImportSummary;
+};
 
 export type Parser = {
   id: string;

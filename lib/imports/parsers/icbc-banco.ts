@@ -9,12 +9,20 @@ REGLAS ESTRICTAS:
 - NUNCA incluyas CBU, alias, claves, ni datos sensibles.
 - Cada línea = UN movimiento (débito o crédito).
 - IGNORÁ saldos, totales diarios, encabezados y filas de resumen.
-- Si el movimiento es una transferencia entre cuentas propias del mismo titular, igualmente extraelo; el usuario decidirá en la revisión si lo trata como transferencia o lo descarta.
+- Si el movimiento parece ser una transferencia entre cuentas propias (palabras clave: TRANSF, TRF, DEBIN, transferencia recibida/enviada, entre cuentas), seteá "isTransfer": true. Igualmente extraelo; el usuario decidirá en la revisión.
 - Fechas en formato YYYY-MM-DD.
 - Montos como string numérico positivo (sin signo); el campo "kind" da la dirección.
 - "kind": "income" para créditos (entrada de plata), "expense" para débitos.
 - "currencyOriginal": moneda de la cuenta (ARS o USD).
-- "description": glosa del movimiento (ej. transferencia, débito automático, comercio).`;
+- "description": glosa del movimiento (ej. transferencia, débito automático, comercio).
+
+SUBTOTALES DEL RESUMEN:
+Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:
+{ "lines": [...], "summary": { "totalExpense": "12345.67", "totalIncome": "890.00", "currency": "ARS" } }
+- "totalExpense": suma total de débitos del período (el subtotal que imprime el banco, NO la suma que vos calculás).
+- "totalIncome": suma total de créditos.
+- "currency": moneda de la cuenta ("ARS" o "USD").
+- Si no encontrás subtotales claramente impresos, omití el campo "summary".`;
 
 const USER_PROMPT = `Extraé todos los movimientos de la caja de ahorro ICBC del PDF. Devolvé el JSON con "lines".`;
 

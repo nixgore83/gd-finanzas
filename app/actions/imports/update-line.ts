@@ -47,7 +47,8 @@ export async function updateImportLine(input: {
     .limit(1);
   if (!imp) return { ok: false, error: 'not_found' };
 
-  if (parsed.data.proposedCategoryId) {
+  // Transfers don't need a category; skip validation for them
+  if (parsed.data.proposedCategoryId && !parsed.data.parsed.isTransfer) {
     const [cat] = await db
       .select({ id: categories.id, kind: categories.kind })
       .from(categories)
@@ -62,6 +63,11 @@ export async function updateImportLine(input: {
     if (cat.kind !== parsed.data.parsed.kind) {
       return { ok: false, error: 'category_mismatch' };
     }
+  }
+
+  // If marked as transfer, clear category
+  if (parsed.data.parsed.isTransfer) {
+    parsed.data.proposedCategoryId = null;
   }
 
   try {

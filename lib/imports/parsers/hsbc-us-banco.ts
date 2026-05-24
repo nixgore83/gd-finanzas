@@ -11,8 +11,17 @@ STRICT RULES:
 - Dates in YYYY-MM-DD format (convert from US MM/DD/YYYY if needed).
 - Amounts: positive string with dot decimal separator; the "kind" field carries direction.
 - "kind": "income" for credits (deposits, refunds, interest), "expense" for debits (withdrawals, fees, transfers out).
+- If the movement looks like a transfer between own accounts (keywords: TRANSFER, TRF, WIRE, between accounts), set "isTransfer": true.
 - "currencyOriginal": "USD".
-- "description": glosa del movimiento (merchant, source, or memo line). Si la fuente es CSV, usar la columna Description / Memo.`;
+- "description": glosa del movimiento (merchant, source, or memo line). Si la fuente es CSV, usar la columna Description / Memo.
+
+STATEMENT SUBTOTALS:
+In addition to lines, extract the statement subtotals and include them as a "summary" field in the root JSON:
+{ "lines": [...], "summary": { "totalExpense": "1234.56", "totalIncome": "100.00", "currency": "USD" } }
+- "totalExpense": total withdrawals/debits for the period (the subtotal printed by the bank, NOT your own sum).
+- "totalIncome": total deposits/credits.
+- "currency": "USD".
+- If subtotals are not clearly printed, omit the "summary" field.`;
 
 const USER_PROMPT = `Extract all transactions from the HSBC US account statement that follows. Return JSON with "lines".`;
 

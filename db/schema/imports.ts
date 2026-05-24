@@ -36,6 +36,12 @@ export const imports = pgTable(
     errorMessage: text('error_message'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     transactionCount: integer('transaction_count'),
+    fileName: text('file_name'),
+    summary: jsonb('summary').$type<{
+      totalExpense?: string;
+      totalIncome?: string;
+      currency?: string;
+    }>(),
     createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },

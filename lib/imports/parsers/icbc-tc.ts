@@ -21,7 +21,15 @@ REGLAS ESTRICTAS:
 - "kind": "expense" para consumos, "income" para devoluciones / créditos.
 - "currencyOriginal": "ARS" para montos en la columna PESOS, "USD" para la columna DOLARES.
 - "description": detalle del comercio tal como aparece en el resumen.
-- Es MUY IMPORTANTE que no te saltees transacciones. Si el detalle continúa en otra página, seguí extrayendo.`;
+- Es MUY IMPORTANTE que no te saltees transacciones. Si el detalle continúa en otra página, seguí extrayendo.
+
+SUBTOTALES DEL RESUMEN:
+Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:
+{ "lines": [...], "summary": { "totalExpense": "12345.67", "totalIncome": "890.00", "currency": "ARS" } }
+- "totalExpense": suma total de consumos/cargos del período (el subtotal que imprime el banco, NO la suma que vos calculás).
+- "totalIncome": suma total de pagos/créditos/devoluciones.
+- "currency": moneda principal del resumen ("ARS" o "USD").
+- Si no encontrás subtotales claramente impresos, omití el campo "summary".`;
 
 const USER_PROMPT = `Extraé TODAS las transacciones del resumen de TC ICBC que sigue. Incluí las de TODAS las páginas. Devolvé el JSON con el array "lines".`;
 

@@ -22,7 +22,15 @@ REGLAS ESTRICTAS:
 - "description": detalle del comercio tal como aparece en el resumen.
 
 IMPORTANTE: Este formato suele tener muchas transacciones (40-80+). Leé TODAS las páginas del PDF de principio a fin. NO pares antes de llegar al final del detalle.
-Antes de armar el JSON, contá mentalmente cuántas filas de transacción ves en total. Si tu JSON tiene significativamente menos líneas que las que contaste, volvé a leer el PDF.`;
+Antes de armar el JSON, contá mentalmente cuántas filas de transacción ves en total. Si tu JSON tiene significativamente menos líneas que las que contaste, volvé a leer el PDF.
+
+SUBTOTALES DEL RESUMEN:
+Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:
+{ "lines": [...], "summary": { "totalExpense": "12345.67", "totalIncome": "890.00", "currency": "ARS" } }
+- "totalExpense": suma total de consumos/cargos del período (el subtotal que imprime el banco, NO la suma que vos calculás).
+- "totalIncome": suma total de pagos/créditos/devoluciones.
+- "currency": moneda principal del resumen ("ARS" o "USD").
+- Si no encontrás subtotales claramente impresos, omití el campo "summary".`;
 
 const USER_PROMPT = `Extraé TODAS las transacciones del resumen de TC ICBC Mastercard que sigue. Incluí las de TODAS las páginas del detalle. Devolvé el JSON con el array "lines".`;
 

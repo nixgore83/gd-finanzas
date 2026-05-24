@@ -30,6 +30,12 @@ type LineRow = {
   transactionId: string | null;
 };
 
+type ImportSummary = {
+  totalExpense?: string;
+  totalIncome?: string;
+  currency?: string;
+} | null;
+
 type Props = {
   importId: string;
   status: string;
@@ -38,6 +44,8 @@ type Props = {
   accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
+  pdfUrl: string | null;
+  summary: ImportSummary;
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -54,7 +62,7 @@ const STATUS_LABEL: Record<string, string> = {
   edited: 'Editada',
 };
 
-export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId }: Props) {
+export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number } | null>(null);
@@ -70,7 +78,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
 
-  const summary = useMemo(() => {
+  const lineSummary = useMemo(() => {
     const c = { pending: 0, accepted: 0, rejected: 0, edited: 0 };
     for (const l of lines) c[l.status] += 1;
     return c;
@@ -181,7 +189,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('Elegí una cuenta destino');
       return;
     }
-    if (summary.accepted + summary.edited === 0) {
+    if (lineSummary.accepted + lineSummary.edited === 0) {
       toast.error('No hay líneas aceptadas para confirmar');
       return;
     }
@@ -213,10 +221,10 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           Líneas extraídas · {lines.length}
         </h2>
         <div className="flex flex-wrap gap-2 text-xs">
-          <Badge label="Pending" count={summary.pending} tone="slate" />
-          <Badge label="Aceptadas" count={summary.accepted} tone="emerald" />
-          <Badge label="Editadas" count={summary.edited} tone="blue" />
-          <Badge label="Rechazadas" count={summary.rejected} tone="rose" />
+          <Badge label="Pending" count={lineSummary.pending} tone="slate" />
+          <Badge label="Aceptadas" count={lineSummary.accepted} tone="emerald" />
+          <Badge label="Editadas" count={lineSummary.edited} tone="blue" />
+          <Badge label="Rechazadas" count={lineSummary.rejected} tone="rose" />
         </div>
       </div>
 
@@ -228,7 +236,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
               size="sm"
               variant="outline"
               onClick={() => doBulk('accepted')}
-              disabled={isPending || summary.pending === 0}
+              disabled={isPending || lineSummary.pending === 0}
             >
               Aceptar todas las pending
             </Button>
@@ -237,7 +245,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
               size="sm"
               variant="outline"
               onClick={() => doBulk('rejected')}
-              disabled={isPending || summary.pending === 0}
+              disabled={isPending || lineSummary.pending === 0}
             >
               Rechazar todas las pending
             </Button>
@@ -348,6 +356,8 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 line={l}
                 importId={importId}
                 tree={tree}
+                accounts={accounts}
+                currentAccountId={accountId}
                 readOnly={readOnly}
                 isPending={isPending}
                 onSetStatus={doSetStatus}
@@ -371,10 +381,21 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
 
       {totals.length > 0 && (
         <div className="rounded-md border bg-muted/20 p-3">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">
-            Totales extraídos (excluye rechazadas) — verificá contra los subtotales del
-            resumen.
-          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground">
+              Totales extraídos (excluye rechazadas)
+            </p>
+            {pdfUrl && (
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Abrir PDF para verificar ↗
+              </a>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
             {totals.map((t) => (
               <div
@@ -398,12 +419,21 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
               </div>
             ))}
           </div>
+
+          {/* Summary validation: compare extracted lines vs PDF subtotals */}
+          {summary && (summary.totalExpense || summary.totalIncome) ? (
+            <SummaryValidation totals={totals} summary={summary} />
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Subtotales del resumen no disponibles — re-parseá para extraerlos o verificá manualmente.
+            </p>
+          )}
         </div>
       )}
 
       {!readOnly && (
         <div className="space-y-3 rounded-md border bg-card p-4">
-          {summary.pending > 0 && (
+          {lineSummary.pending > 0 && (
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -412,7 +442,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 onClick={() => doBulk('accepted')}
                 disabled={isPending}
               >
-                Aceptar todas las pending ({summary.pending})
+                Aceptar todas las pending ({lineSummary.pending})
               </Button>
               <Button
                 type="button"
@@ -446,9 +476,9 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           <Button
             type="button"
             onClick={doConfirm}
-            disabled={isPending || summary.accepted + summary.edited === 0}
+            disabled={isPending || lineSummary.accepted + lineSummary.edited === 0}
           >
-            Confirmar import ({summary.accepted + summary.edited})
+            Confirmar import ({lineSummary.accepted + lineSummary.edited})
           </Button>
           </div>
         </div>
@@ -477,6 +507,8 @@ function LineRowEditor({
   line,
   importId,
   tree,
+  accounts,
+  currentAccountId,
   readOnly,
   isPending,
   onSetStatus,
@@ -486,6 +518,8 @@ function LineRowEditor({
   line: LineRow;
   importId: string;
   tree: CategoryNode[];
+  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null }>;
+  currentAccountId: string;
   readOnly: boolean;
   isPending: boolean;
   onSetStatus: (id: string, status: 'accepted' | 'rejected' | 'pending') => void;
@@ -574,24 +608,31 @@ function LineRowEditor({
         )}
       </td>
       <td className="px-2 py-1.5">
-        {editing ? (
-          <Select
-            value={draft.kind}
-            onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
-          >
-            <SelectTrigger className="h-8 w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="expense">Gasto</SelectItem>
-              <SelectItem value="income">Ingreso</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : line.parsedData.kind === 'expense' ? (
-          'Gasto'
-        ) : (
-          'Ingreso'
-        )}
+        <div className="flex flex-wrap items-center gap-1">
+          {editing ? (
+            <Select
+              value={draft.kind}
+              onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
+            >
+              <SelectTrigger className="h-8 w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expense">Gasto</SelectItem>
+                <SelectItem value="income">Ingreso</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : line.parsedData.kind === 'expense' ? (
+            'Gasto'
+          ) : (
+            'Ingreso'
+          )}
+          {(line.parsedData.isTransfer || draft.isTransfer) && (
+            <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+              Transfer
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-2 py-1.5 text-right tabular-nums">
         {editing ? (
@@ -625,7 +666,37 @@ function LineRowEditor({
         )}
       </td>
       <td className="px-2 py-1.5">
-        {editing ? (
+        {draft.isTransfer ? (
+          // Transfer: show counterpart account select instead of category
+          editing ? (
+            <Select
+              value={draft.transferAccountId ?? ''}
+              onValueChange={(v) => setDraft({ ...draft, transferAccountId: v || undefined })}
+            >
+              <SelectTrigger className="h-8 w-56">
+                <SelectValue placeholder="Cuenta contraparte…" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts
+                  .filter((a) => a.id !== currentAccountId)
+                  .map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name} · {a.currency}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            (() => {
+              const counterpart = accounts.find((a) => a.id === line.parsedData.transferAccountId);
+              return counterpart ? (
+                <span className="text-amber-800">{counterpart.name}</span>
+              ) : (
+                <span className="text-muted-foreground">Sin contraparte</span>
+              );
+            })()
+          )
+        ) : editing ? (
           <Select
             value={categoryId ?? ''}
             onValueChange={(v) => setCategoryId(v || null)}
@@ -671,10 +742,21 @@ function LineRowEditor({
           {line.transactionId ? (
             <span className="text-xs text-muted-foreground">linkeada</span>
           ) : editing ? (
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               <Button size="sm" type="button" onClick={save} disabled={isPending}>
                 Guardar
               </Button>
+              {draft.isTransfer && (
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setDraft({ ...draft, isTransfer: false, transferAccountId: undefined })}
+                  className="text-amber-700 text-xs"
+                >
+                  No transfer
+                </Button>
+              )}
               <Button
                 size="sm"
                 type="button"
@@ -743,6 +825,22 @@ function LineRowEditor({
               >
                 Editar
               </Button>
+              {!line.parsedData.isTransfer && (
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setDraft({ ...line.parsedData, isTransfer: true });
+                    setCategoryId(null);
+                    setEditing(true);
+                  }}
+                  disabled={isPending}
+                  className="text-amber-700"
+                >
+                  ⇄ Transfer
+                </Button>
+              )}
             </div>
           )}
         </td>
@@ -895,6 +993,77 @@ function CategoryCombobox({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SummaryValidation({
+  totals,
+  summary,
+}: {
+  totals: CurrencyTotals[];
+  summary: NonNullable<ImportSummary>;
+}) {
+  const summaryCcy = summary.currency ?? 'ARS';
+  const matchingTotal = totals.find((t) => t.currency === summaryCcy);
+
+  const extractedExpense = matchingTotal ? Number.parseFloat(matchingTotal.expense) : 0;
+  const extractedIncome = matchingTotal ? Number.parseFloat(matchingTotal.income) : 0;
+  const pdfExpense = summary.totalExpense ? Number.parseFloat(summary.totalExpense) : null;
+  const pdfIncome = summary.totalIncome ? Number.parseFloat(summary.totalIncome) : null;
+
+  const expenseDelta = pdfExpense !== null ? extractedExpense - pdfExpense : null;
+  const incomeDelta = pdfIncome !== null ? extractedIncome - pdfIncome : null;
+
+  const expenseOk = expenseDelta !== null && pdfExpense !== null
+    ? Math.abs(expenseDelta) < Math.max(pdfExpense * 0.01, 1)
+    : null;
+  const incomeOk = incomeDelta !== null && pdfIncome !== null
+    ? Math.abs(incomeDelta) < Math.max(pdfIncome * 0.01, 1)
+    : null;
+
+  const allOk = (expenseOk === null || expenseOk) && (incomeOk === null || incomeOk);
+
+  return (
+    <div className={cn(
+      'mt-3 rounded border p-3 text-sm',
+      allOk
+        ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'
+        : 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200',
+    )}>
+      <p className="mb-2 font-medium">
+        {allOk ? '✓ Totales coinciden con el resumen' : '✕ Diferencia detectada vs resumen'}
+      </p>
+      <div className="grid grid-cols-1 gap-1 text-xs md:grid-cols-2">
+        {pdfExpense !== null && (
+          <div className="flex items-center gap-2">
+            <span className={expenseOk ? '' : 'font-semibold'}>
+              Gastos: extraído {formatAmount(String(extractedExpense), summaryCcy as 'ARS' | 'USD')}
+              {' · resumen dice '}
+              {formatAmount(String(pdfExpense), summaryCcy as 'ARS' | 'USD')}
+              {expenseDelta !== null && Math.abs(expenseDelta) >= 0.01 && (
+                <span className={expenseOk ? '' : 'font-bold'}>
+                  {' · Δ '}{expenseDelta > 0 ? '+' : ''}{formatAmount(String(expenseDelta), summaryCcy as 'ARS' | 'USD')}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+        {pdfIncome !== null && (
+          <div className="flex items-center gap-2">
+            <span className={incomeOk ? '' : 'font-semibold'}>
+              Ingresos: extraído {formatAmount(String(extractedIncome), summaryCcy as 'ARS' | 'USD')}
+              {' · resumen dice '}
+              {formatAmount(String(pdfIncome), summaryCcy as 'ARS' | 'USD')}
+              {incomeDelta !== null && Math.abs(incomeDelta) >= 0.01 && (
+                <span className={incomeOk ? '' : 'font-bold'}>
+                  {' · Δ '}{incomeDelta > 0 ? '+' : ''}{formatAmount(String(incomeDelta), summaryCcy as 'ARS' | 'USD')}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

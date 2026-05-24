@@ -59,3 +59,13 @@ export const importLineStatusEnum = pgEnum('import_line_status', [
   'rejected',
   'edited',
 ]);
+
+export const assetTypeEnum = pgEnum('asset_type', [
+  'stock',
+  'etf',
+  'bond',
+  'cedear',
+  'fci',
+  'crypto',
+  'other',
+]);

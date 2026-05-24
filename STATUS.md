@@ -3,12 +3,64 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-23 por Claude
+**Última actualización:** 2026-05-24 por Claude
 
 ---
 
 ## Hito en curso
-**Carga de data real + mejoras de importación en progreso. Próximo: Patrimonio (V2).**
+**Patrimonio V2 implementado. Transfers en imports bancarios en progreso.**
+
+### Sesión 2026-05-24 — Patrimonio V2
+
+**Patrimonio implementado:**
+- [x] Schema DB: enum `asset_type`, tablas `net_worth_snapshots`, `account_balances`, `holdings`
+- [x] Migración 0006 aplicada + RLS policies (0003_patrimonio_rls.sql)
+- [x] Yahoo Finance helper (`yahoo-finance2`) para precios de mercado (US stocks, CEDEARs, bonos AR)
+- [x] Zod schemas para balances, holdings, snapshot form
+- [x] 3 data loaders (load-snapshots, load-snapshot-detail, net-worth-series)
+- [x] 4 server actions (create/update/delete snapshot + fetch-prices)
+- [x] `/patrimonio` — página principal con KPIs (net worth, target, progreso, distancia), barra de progreso vs USD 2.45M, chart de evolución, tabla de snapshots
+- [x] `/patrimonio/nuevo` — formulario con saldos agrupados por tipo de cuenta + holdings con ticker/precio/cantidad + botón "Actualizar precios" (Yahoo Finance) + net worth en vivo
+- [x] `/patrimonio/[id]` — detalle read-only + modo edición (`?edit=true`) + botón eliminar
+- [x] Pre-fill desde snapshot anterior al crear uno nuevo
+- [x] Reporte D: nueva sección "Patrimonio acumulado" con net worth vs target + barra de progreso
+- [x] Sidebar nav: nueva sección "Patrimonio"
+- [x] Typecheck + lint + 255 tests verdes
+
+**Transfers en imports bancarios:**
+- [x] Campo `isTransfer` + `transferAccountId` en `parsedTxLineSchema` (con alias handling)
+- [x] Auto-detección post-parse (`lib/imports/detect-transfers.ts`) con patrones TRANSF/TRF/DEBIN/etc.
+- [x] Integración en `parse.ts`: detectTransfers se ejecuta para imports tipo "banco"
+- [x] Prompts de parsers banco actualizados (ICBC + HSBC US) con instrucción `isTransfer`
+- [x] `update-line.ts`: soporta isTransfer (limpia categoría, skip validación de kind/categoría)
+- [x] `confirm.ts`: branch de transfers usa `buildTransferFields()` → crea par de txns con `transfer_pair_id`
+- [x] UI: badge "Transfer" en líneas detectadas, botón "⇄ Transfer" para marcar manual, select de cuenta contraparte, botón "No transfer" para desmarcar
+- [x] Typecheck + lint + 255 tests verdes
+
+**Validación de imports — subtotales + link al PDF:**
+- [x] Columnas `summary` (JSONB) y `fileName` (text) en tabla imports + migración 0007
+- [x] `generateSignedUrl()` en `lib/imports/storage.ts` para URLs firmadas de Supabase Storage
+- [x] `parserOutputSchema` ampliado con campo `summary` opcional (totalExpense, totalIncome, currency) + alias handling
+- [x] Los 7 parsers (5 TC + 2 banco) actualizados con instrucción de extraer subtotales del resumen
+- [x] `parse.ts` guarda `summary` del LLM en el import record
+- [x] `create.ts` guarda `fileName` (nombre original del archivo subido)
+- [x] Botón "Ver PDF ↗" en header de import detail (abre signed URL en nueva pestaña)
+- [x] Nombre de archivo visible en header de import detail
+- [x] Bloque de validación de totales: compara suma de líneas extraídas vs subtotales del PDF
+- [x] Semáforo verde/rojo con delta cuando hay diferencia significativa (>1%)
+- [x] Link "Abrir PDF para verificar ↗" en bloque de totales extraídos
+- [x] Parser ICBC Mastercard: ya funciona bien (78, 60, 40 líneas en últimos imports; el issue de 8 líneas era un caso aislado)
+- [x] Typecheck + lint + 255 tests verdes
+
+**Pendiente próxima sesión:**
+- [ ] Sorting en /budget y /forecasts
+- [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
+
+**Roadmap a definir:**
+- [ ] **Alertas de información no cargada** — listar qué información falta por cargar (ej: resumen de marzo de ICBC Visa). Análisis pendiente: definir lógica de detección (¿por cuenta × mes? ¿por institución?), UI de alertas, y nivel de automatización.
+- [ ] **Import desde mail reenviado** — recibir PDFs de resúmenes bancarios reenviados por email y procesarlos automáticamente. Análisis pendiente: setup de inbox (Supabase? servicio externo?), parsing del mail para extraer adjunto, asociación automática de institución/cuenta.
+
+---
 
 ### Sesión 2026-05-22/23 — Operacional + mejoras de imports
 

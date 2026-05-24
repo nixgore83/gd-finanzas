@@ -7,6 +7,7 @@ import { imports, importLines, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
+import { buildTransferFields } from '@/app/actions/transactions/_build-transfer';
 
 export type ConfirmImportResult =
   | {
@@ -129,6 +130,93 @@ export async function confirmImport(input: {
           lineErrors.push({ lineId: line.id, reason: 'parsed_data inválida' });
           continue;
         }
+
+        // ===== TRANSFER BRANCH =====
+        if (parsed.data.isTransfer) {
+          const transferAccountId = parsed.data.transferAccountId;
+          if (!transferAccountId) {
+            lineErrors.push({ lineId: line.id, reason: 'transfer sin cuenta contraparte' });
+            continue;
+          }
+
+          // Determine from/to based on kind (from the perspective of the import account)
+          const isOutgoing = parsed.data.kind === 'expense';
+          const accountFromId = isOutgoing ? input.accountId : transferAccountId;
+          const accountToId = isOutgoing ? transferAccountId : input.accountId;
+
+          const transferResult = await buildTransferFields(
+            {
+              date: parsed.data.date,
+              accountFromId,
+              accountToId,
+              amountFrom: parsed.data.amountOriginal,
+              amountTo: parsed.data.amountOriginal,
+              description: parsed.data.description,
+              notes: parsed.data.notes ?? null,
+              fxRateOverride: null,
+              tagIds: [],
+            },
+            session.householdId,
+          );
+
+          if (!transferResult.ok) {
+            lineErrors.push({
+              lineId: line.id,
+              reason: Object.values(transferResult.fields).join('; '),
+            });
+            continue;
+          }
+
+          // Insert both legs
+          const [fromRow] = await tx
+            .insert(transactions)
+            .values({
+              ...transferResult.fromLeg,
+              householdId: session.householdId,
+              source: 'import',
+              importBatchId: input.importId,
+              transactionSubtype: 'standard',
+              deducibleGanancias: false,
+              meta: null,
+              createdBy: session.userId,
+            })
+            .returning({ id: transactions.id });
+
+          const [toRow] = await tx
+            .insert(transactions)
+            .values({
+              ...transferResult.toLeg,
+              householdId: session.householdId,
+              source: 'import',
+              importBatchId: input.importId,
+              transactionSubtype: 'standard',
+              deducibleGanancias: false,
+              meta: null,
+              createdBy: session.userId,
+            })
+            .returning({ id: transactions.id });
+
+          if (!fromRow || !toRow) {
+            lineErrors.push({ lineId: line.id, reason: 'insert transfer sin row' });
+            continue;
+          }
+
+          // Link the import line to the "main" leg (the one matching the import account)
+          const mainTxId = isOutgoing ? fromRow.id : toRow.id;
+          await tx
+            .update(importLines)
+            .set({ transactionId: mainTxId })
+            .where(
+              and(
+                eq(importLines.id, line.id),
+                eq(importLines.importId, input.importId),
+              ),
+            );
+          createdCount += 1;
+          continue;
+        }
+
+        // ===== REGULAR INCOME/EXPENSE BRANCH =====
         if (!line.proposedCategoryId) {
           lineErrors.push({ lineId: line.id, reason: 'sin categoría asignada' });
           continue;

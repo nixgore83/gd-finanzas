@@ -13,3 +13,4 @@ export * from './budgets';
 export * from './fx-rates';
 export * from './imports';
 export * from './financial-goals';
+export * from './patrimonio';

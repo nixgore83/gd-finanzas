@@ -32,7 +32,15 @@ REGLAS ESTRICTAS:
 - Montos negativos o créditos → kind: "income", monto positivo.
 - Convertí formatos de monto argentinos: "45.000,00" → "45000.00".
 - Si hay secciones separadas por moneda (pesos / dólares), respetá la moneda de cada sección.
-- Extraé las transacciones de TODAS las páginas del PDF.`;
+- Extraé las transacciones de TODAS las páginas del PDF.
+
+SUBTOTALES DEL RESUMEN:
+Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:
+{ "lines": [...], "summary": { "totalExpense": "12345.67", "totalIncome": "890.00", "currency": "ARS" } }
+- "totalExpense": suma total de consumos/cargos del período (el subtotal que imprime el banco, NO la suma que vos calculás).
+- "totalIncome": suma total de pagos/créditos/devoluciones.
+- "currency": moneda principal del resumen ("ARS" o "USD").
+- Si no encontrás subtotales claramente impresos, omití el campo "summary".`;
 
 const USER_PROMPT = `Extraé TODAS las transacciones del resumen de TC BNA Visa que sigue. Devolvé el JSON con el array "lines".`;
 

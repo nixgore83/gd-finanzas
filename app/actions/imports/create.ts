@@ -115,6 +115,7 @@ export async function createImport(formData: FormData): Promise<CreateImportResu
         householdId: session.householdId,
         fileUrl: '',
         fileHash,
+        fileName: file.name,
         type: parsedMeta.data.type,
         institutionId: parsedMeta.data.institutionId,
         accountId: parsedMeta.data.accountId ?? null,

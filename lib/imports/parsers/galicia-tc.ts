@@ -37,7 +37,22 @@ REGLAS ESTRICTAS:
 - IGNORÁ totales de cierre, subtotales, saldos anteriores, mínimos, intereses globales, pagos realizados ("SU PAGO", "PAGO EN EFECTIVO", etc.), y cualquier fila que NO sea una transacción individual de consumo.
 - IGNORÁ resúmenes en cuotas que ya estén consolidados en el "total a pagar" del mes.
 - Cuotas: si una compra es en N cuotas, registrá UNA sola línea con el monto total de la cuota del mes. IMPORTANTE: la fecha de la cuota debe ser la FECHA DE CIERRE del resumen, NO la fecha original de compra.
-- Galicia separa habitualmente consumos por moneda en secciones distintas — respetá esa separación al setear currencyOriginal.`;
+- Galicia separa habitualmente consumos por moneda en secciones distintas — respetá esa separación al setear currencyOriginal.
+
+SUBTOTALES DEL RESUMEN:
+Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:
+{
+  "lines": [...],
+  "summary": {
+    "totalExpense": "12345.67",
+    "totalIncome": "890.00",
+    "currency": "ARS"
+  }
+}
+- "totalExpense": suma total de consumos/cargos del período (el subtotal que imprime el banco, NO la suma que vos calculás).
+- "totalIncome": suma total de pagos/créditos/devoluciones.
+- "currency": moneda principal del resumen ("ARS" o "USD"). Si hay dos secciones de moneda, usá la del monto mayor.
+- Si no encontrás subtotales claramente impresos, omití el campo "summary".`;
 
 const USER_PROMPT = `Extraé todas las transacciones del PDF de Galicia que sigue. Devolvé el JSON con el array "lines".`;
 

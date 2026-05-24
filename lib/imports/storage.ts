@@ -40,6 +40,19 @@ export async function downloadImportFile(path: string): Promise<Uint8Array> {
   return new Uint8Array(buf);
 }
 
+/**
+ * Generates a time-limited signed URL for viewing/downloading an import file.
+ * Returns null if URL generation fails.
+ */
+export async function generateSignedUrl(path: string, expiresIn = 3600): Promise<string | null> {
+  const client = adminClient();
+  const { data, error } = await client.storage
+    .from(BUCKET_NAME)
+    .createSignedUrl(path, expiresIn);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
 export function buildImportPath(householdId: string, importId: string, ext: string): string {
   const safeExt = ext.replace(/[^a-z0-9]/gi, '').toLowerCase();
   return `${householdId}/${importId}.${safeExt}`;

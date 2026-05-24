@@ -98,7 +98,7 @@ export default async function YearEconomyPage({
   const sp = await searchParams;
   const year = parseYear(sp);
   const today = todayIso();
-  const { report, targetSavingsMonthlyUsd } = await loadYearEconomyData(
+  const { report, targetSavingsMonthlyUsd, patrimonio } = await loadYearEconomyData(
     session.householdId,
     year,
     today,
@@ -314,6 +314,82 @@ export default async function YearEconomyPage({
         </div>
         <Hair className="mt-3 mb-4" />
         <MonthlyChart monthly={report.monthly} />
+      </section>
+
+      {/* ============ PATRIMONIO ACUMULADO ============ */}
+      <section className="relative overflow-hidden border border-border bg-card/40 px-7 py-7">
+        <div className="relative">
+          <div className="flex items-baseline justify-between">
+            <Display size="md">Patrimonio acumulado</Display>
+            <Link
+              href="/patrimonio"
+              className="link font-display text-sm italic text-muted-foreground"
+            >
+              Ver detalle →
+            </Link>
+          </div>
+          <Hair className="mt-3 mb-5" />
+
+          {patrimonio.latestNetWorthUsd ? (
+            <>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div>
+                  <Label>Net worth actual</Label>
+                  <Display size="lg" className="mt-3 block tabular-nums text-primary">
+                    {formatUsd(patrimonio.latestNetWorthUsd)}
+                  </Display>
+                </div>
+                <div className="border-l border-border pl-6">
+                  <Label>Target total</Label>
+                  <Display size="lg" className="mt-3 block tabular-nums text-[color:var(--attn)]">
+                    {formatUsd(patrimonio.targetTotalUsd)}
+                  </Display>
+                </div>
+                <div className="border-l border-border pl-6">
+                  <Label>Progreso</Label>
+                  <Display
+                    size="lg"
+                    className="mt-3 block tabular-nums"
+                    style={{
+                      color:
+                        patrimonio.progressPct !== null && patrimonio.progressPct >= 100
+                          ? 'var(--good)'
+                          : 'var(--primary)',
+                    }}
+                  >
+                    {patrimonio.progressPct !== null ? `${patrimonio.progressPct.toFixed(1)}%` : '—'}
+                  </Display>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="mt-5">
+                <div className="h-2 w-full bg-muted/60">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${Math.min(100, patrimonio.progressPct ?? 0)}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  <span>USD 0</span>
+                  <span>{formatUsd(patrimonio.targetTotalUsd)}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <Body>
+              Sin snapshots de patrimonio todavía.{' '}
+              <Link href="/patrimonio/nuevo" className="link text-primary">
+                Cargá el primero →
+              </Link>
+            </Body>
+          )}
+
+          <Body className="mt-4 text-xs">
+            Disclaimer: el target compara patrimonio registrado en snapshots manuales vs meta total.
+            No incluye rendimientos proyectados.
+          </Body>
+        </div>
       </section>
 
       {/* ============ CATEGORY TABLES ============ */}

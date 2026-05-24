@@ -1,7 +1,7 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lte, sql, sum } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql, sum } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { getDb } from '@/lib/db/client';
-import { budgets, financialGoals, forecasts, recurrences, transactions } from '@/db/schema';
+import { budgets, financialGoals, forecasts, netWorthSnapshots, recurrences, transactions } from '@/db/schema';
 import { loadCategoryTree, type CategoryNode } from '@/lib/categories/tree';
 import { getFxRate } from '@/lib/fx/get-fx-rate';
 import type { ResolvedFxRate } from '@/lib/fx/resolve';
@@ -17,10 +17,23 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
+export type PatrimonioSnapshot = {
+  date: string;
+  totalUsd: string;
+};
+
+export type PatrimonioData = {
+  latestNetWorthUsd: string | null;
+  targetTotalUsd: string;
+  progressPct: number | null;
+  snapshots: PatrimonioSnapshot[];
+};
+
 export type LoadYearEconomyResult = {
   report: YearEconomyReport;
   tree: CategoryNode[];
   targetSavingsMonthlyUsd: string;
+  patrimonio: PatrimonioData;
 };
 
 export async function loadYearEconomyData(
@@ -183,7 +196,47 @@ export async function loadYearEconomyData(
     targetSavingsMonthlyUsd,
   });
 
-  return { report, tree, targetSavingsMonthlyUsd };
+  // 5) Patrimonio data for IF trajectory section
+  const [goalsRow] = await db
+    .select({
+      numeroRetiroUsd: financialGoals.numeroRetiroUsd,
+      numeroEducacionUsd: financialGoals.numeroEducacionUsd,
+      bufferUsd: financialGoals.bufferUsd,
+    })
+    .from(financialGoals)
+    .where(eq(financialGoals.householdId, householdId))
+    .limit(1);
+
+  const targetTotalUsd = goalsRow
+    ? new Decimal(goalsRow.numeroRetiroUsd)
+        .plus(goalsRow.numeroEducacionUsd)
+        .plus(goalsRow.bufferUsd)
+    : new Decimal(FINANCIAL_GOALS_DEFAULTS.numeroRetiroUsd)
+        .plus(FINANCIAL_GOALS_DEFAULTS.numeroEducacionUsd)
+        .plus(FINANCIAL_GOALS_DEFAULTS.bufferUsd);
+
+  const snapshotRows = await db
+    .select({
+      date: netWorthSnapshots.date,
+      totalUsd: netWorthSnapshots.totalUsd,
+    })
+    .from(netWorthSnapshots)
+    .where(eq(netWorthSnapshots.householdId, householdId))
+    .orderBy(desc(netWorthSnapshots.date));
+
+  const latestNetWorthUsd = snapshotRows[0]?.totalUsd ?? null;
+  const progressPct = latestNetWorthUsd
+    ? new Decimal(latestNetWorthUsd).div(targetTotalUsd).times(100).toNumber()
+    : null;
+
+  const patrimonio: PatrimonioData = {
+    latestNetWorthUsd,
+    targetTotalUsd: targetTotalUsd.toFixed(2),
+    progressPct,
+    snapshots: snapshotRows.slice().reverse(),
+  };
+
+  return { report, tree, targetSavingsMonthlyUsd, patrimonio };
 }
 
 export function formatYearMonth(year: number, month: number): { from: string; to: string } {

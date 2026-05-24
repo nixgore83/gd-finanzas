@@ -7,6 +7,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { resolveParser } from '@/lib/imports/parsers/registry';
+import { generateSignedUrl } from '@/lib/imports/storage';
 import { ParseButton } from './parse-button';
 import { ImportReview } from './import-review';
 
@@ -58,6 +59,8 @@ export default async function ImportDetailPage({
       parserModel: imports.parserModel,
       fileUrl: imports.fileUrl,
       fileHash: imports.fileHash,
+      fileName: imports.fileName,
+      summary: imports.summary,
       errorMessage: imports.errorMessage,
       transactionCount: imports.transactionCount,
       confirmedAt: imports.confirmedAt,
@@ -99,13 +102,33 @@ export default async function ImportDetailPage({
 
   const showReview = ['parsed', 'reviewing', 'confirmed'].includes(row.status);
 
+  // Generate signed URL for PDF viewing (1 hour expiry)
+  const pdfUrl = row.fileUrl ? await generateSignedUrl(row.fileUrl) : null;
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Import</h1>
-        <Link href="/imports" className="text-sm text-muted-foreground hover:underline">
-          ← Imports
-        </Link>
+        <div>
+          <h1 className="text-2xl font-semibold">Import</h1>
+          {row.fileName && (
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{row.fileName}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {pdfUrl && (
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Ver PDF ↗
+            </a>
+          )}
+          <Link href="/imports" className="text-sm text-muted-foreground hover:underline">
+            ← Imports
+          </Link>
+        </div>
       </div>
 
       <dl className="grid grid-cols-2 gap-3 rounded-md border bg-card p-4 text-sm md:grid-cols-3">
@@ -205,6 +228,8 @@ export default async function ImportDetailPage({
           accounts={accountRows}
           importInstitutionId={row.institutionId}
           importAccountId={row.accountId}
+          pdfUrl={pdfUrl}
+          summary={row.summary ?? null}
         />
       )}
     </div>

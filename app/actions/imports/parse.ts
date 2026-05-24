@@ -12,6 +12,7 @@ import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
+import { detectTransfers } from '@/lib/imports/detect-transfers';
 import { getServerEnv } from '@/lib/env';
 
 export type ParseImportResult =
@@ -172,9 +173,12 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     .where(and(eq(importLines.importId, importId), isNotNull(importLines.transactionId)));
   const confirmedDescs = new Set(confirmedRows.map((r) => r.desc?.toLowerCase()));
 
-  const lines = allLines.filter(
+  const filteredLines = allLines.filter(
     (line) => !confirmedDescs.has(line.description.toLowerCase()),
   );
+
+  // Auto-detect transfers for banco imports (post-parse pass)
+  const lines = row.type === 'banco' ? detectTransfers(filteredLines) : filteredLines;
 
   // Dedup cross-import: buscar transacciones existentes con misma cuenta,
   // fecha, descripción y monto que ya estén en la DB (de otro import u otra carga).
@@ -248,12 +252,16 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
   const dupCount = lineRows.filter((l) => l.status === 'rejected').length;
   const pendingCount = lineRows.filter((l) => l.status === 'pending').length;
 
+  // Extract summary from parser output (subtotals from the PDF)
+  const summary = (result.data as { summary?: { totalExpense?: string; totalIncome?: string; currency?: string } }).summary ?? null;
+
   await db
     .update(imports)
     .set({
       status: 'parsed',
       parserModel: result.model,
       transactionCount: confirmedDescs.size + lineRows.length,
+      summary,
       errorMessage: dupCount > 0
         ? `${dupCount} líneas duplicadas rechazadas automáticamente (ya existen como transacciones). ${pendingCount} pendientes de revisión.`
         : null,
