@@ -52,8 +52,11 @@
 - [x] Parser ICBC Mastercard: ya funciona bien (78, 60, 40 líneas en últimos imports; el issue de 8 líneas era un caso aislado)
 - [x] Typecheck + lint + 255 tests verdes
 
+**Sorting en /budget y /forecasts:**
+- [x] Budget grid: headers sortables por nombre de categoría y total anual (client-side, respeta jerarquía padre/hijo)
+- [x] Forecasts: sort por fecha/nombre/monto dentro de cada mes (server-side via URL params)
+
 **Pendiente próxima sesión:**
-- [ ] Sorting en /budget y /forecasts
 - [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
 
 **Roadmap a definir:**

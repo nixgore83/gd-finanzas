@@ -49,7 +49,19 @@ function shortDate(iso: string): string {
   return `${d} ${months[mi] ?? ''}`;
 }
 
-export default async function ForecastsPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function parseSort(sp: Record<string, string | string[] | undefined>): { field: string; dir: 'asc' | 'desc' } {
+  const field = typeof sp.sort === 'string' ? sp.sort : 'date';
+  const dir = typeof sp.dir === 'string' && sp.dir === 'desc' ? 'desc' : 'asc';
+  return { field, dir };
+}
+
+export default async function ForecastsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -80,6 +92,9 @@ export default async function ForecastsPage() {
     )
     .orderBy(asc(forecasts.expectedDate));
 
+  const sp = await searchParams;
+  const { field: sortField, dir: sortDir } = parseSort(sp);
+
   // Agrupar por mes
   const byMonth = new Map<string, typeof rows>();
   for (const r of rows) {
@@ -87,6 +102,21 @@ export default async function ForecastsPage() {
     const arr = byMonth.get(key) ?? [];
     arr.push(r);
     byMonth.set(key, arr);
+  }
+
+  // Sort within each month
+  for (const [, items] of byMonth) {
+    items.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'amount') {
+        cmp = Number.parseFloat(a.expectedAmount) - Number.parseFloat(b.expectedAmount);
+      } else if (sortField === 'name') {
+        cmp = (a.recurrenceName ?? '').localeCompare(b.recurrenceName ?? '', 'es');
+      } else {
+        cmp = a.expectedDate.localeCompare(b.expectedDate);
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
   }
 
   return (
@@ -113,6 +143,36 @@ export default async function ForecastsPage() {
           <Link href="/recurrences">Ir a recurrencias</Link>
         </Button>
       </header>
+
+      {rows.length > 0 && (
+        <div className="flex items-center gap-2 font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span>Ordenar por:</span>
+          {[
+            { field: 'date', label: 'Fecha' },
+            { field: 'name', label: 'Nombre' },
+            { field: 'amount', label: 'Monto' },
+          ].map((s) => {
+            const isActive = sortField === s.field;
+            const nextDir = isActive && sortDir === 'asc' ? 'desc' : 'asc';
+            const href = `/forecasts?sort=${s.field}&dir=${isActive ? nextDir : 'asc'}`;
+            return (
+              <Link
+                key={s.field}
+                href={href}
+                className={cn(
+                  'inline-flex items-center gap-0.5 rounded px-2 py-1 transition-colors hover:text-foreground',
+                  isActive && 'bg-primary/10 text-foreground',
+                )}
+              >
+                {s.label}
+                {isActive && (
+                  <span className="text-xs">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       <Hair thick />
 
