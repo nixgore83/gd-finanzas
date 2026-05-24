@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, institutions } from '@/db/schema';
+import { accounts, imports, importLines, institutions, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { downloadImportFile } from '@/lib/imports/storage';
 import { resolveParser } from '@/lib/imports/parsers/registry';
@@ -176,6 +176,34 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     (line) => !confirmedDescs.has(line.description.toLowerCase()),
   );
 
+  // Dedup cross-import: buscar transacciones existentes con misma cuenta,
+  // fecha, descripción y monto que ya estén en la DB (de otro import u otra carga).
+  const accountId = row.accountId;
+  const existingTxKeys = new Set<string>();
+  if (accountId && lines.length > 0) {
+    const dates = lines.map((l) => l.date).filter(Boolean);
+    const minDate = dates.reduce((a, b) => (a < b ? a : b));
+    const maxDate = dates.reduce((a, b) => (a > b ? a : b));
+    const existingTxs = await db
+      .select({
+        date: transactions.date,
+        description: transactions.description,
+        amount: transactions.amountOriginal,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, session.householdId),
+          eq(transactions.accountId, accountId),
+          sql`${transactions.date} >= ${minDate}`,
+          sql`${transactions.date} <= ${maxDate}`,
+        ),
+      );
+    for (const tx of existingTxs) {
+      existingTxKeys.add(`${tx.date}|${tx.description?.toLowerCase()}|${tx.amount}`);
+    }
+  }
+
   // Mapa nombre→id para resolver sugerencias del LLM (case-insensitive).
   const catByName = new Map(
     tree.map((c) => [c.name.toLowerCase(), c.id]),
@@ -197,12 +225,18 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
         proposedCategoryId = catByName.get(line.suggestedCategory.toLowerCase()) ?? null;
       }
 
+      // Auto-reject if this line already exists as a transaction (cross-import dedup)
+      const lineKey = `${line.date}|${line.description.toLowerCase()}|${line.amountOriginal}`;
+      const isDuplicate = existingTxKeys.has(lineKey);
+
       return {
         importId,
         rawData: line,
-        parsedData: line,
+        parsedData: isDuplicate
+          ? { ...line, notes: `[DUPLICADA] Ya existe como transacción en esta cuenta` }
+          : line,
         proposedCategoryId,
-        status: 'pending' as const,
+        status: isDuplicate ? ('rejected' as const) : ('pending' as const),
       };
     }),
   );
@@ -211,13 +245,18 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     await db.insert(importLines).values(lineRows);
   }
 
+  const dupCount = lineRows.filter((l) => l.status === 'rejected').length;
+  const pendingCount = lineRows.filter((l) => l.status === 'pending').length;
+
   await db
     .update(imports)
     .set({
       status: 'parsed',
       parserModel: result.model,
       transactionCount: confirmedDescs.size + lineRows.length,
-      errorMessage: null,
+      errorMessage: dupCount > 0
+        ? `${dupCount} líneas duplicadas rechazadas automáticamente (ya existen como transacciones). ${pendingCount} pendientes de revisión.`
+        : null,
     })
     .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
 
