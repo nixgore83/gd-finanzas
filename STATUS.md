@@ -3,12 +3,60 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-20 por Claude
+**Última actualización:** 2026-05-23 por Claude
 
 ---
 
 ## Hito en curso
-**🎉 V1.1 funcional + Hito UI completo — Hitos 0-10 + UI cerrados.** Pendiente operacional: setup del service account Drive + wipe smoke + cargar info real.
+**Carga de data real + mejoras de importación en progreso. Próximo: Patrimonio (V2).**
+
+### Sesión 2026-05-22/23 — Operacional + mejoras de imports
+
+**Data real cargada:**
+- [x] Taxonomía de categorías cerrada con Nico (Alquiler income, Autónomos, sin Delivery, Personales con children Regalos/Suscripciones streaming/Suscripciones IA/Varios, Seguros, Gastos bancarios, Impresión 3D, Mario)
+- [x] 19 cuentas reales seedeadas (Nico + Pau + Hogar)
+- [x] Budget 2026 cargado desde Excel (188 entradas, 18 categorías × 12 meses)
+- [x] 7 recurrencias fijas (sueldos, alquiler, expensas, colegios, Nahir)
+- [x] FX backfill desde 2026-01-01 (93 cotizaciones) + parciales 2024-2025 para cuotas
+- [x] Múltiples resúmenes de TC importados (ICBC Visa, Galicia Amex/Visa/Master, BNA Visa, HSBC US)
+
+**Mejoras de imports implementadas:**
+- [x] Redirect post-confirm con opciones (ver txns / importar otro)
+- [x] Sugerencia de categoría normalizada (quita cuotas C.XX/XX y montos entre paréntesis)
+- [x] Sugerencia desde import_lines históricas (no solo transactions)
+- [x] Fix regex Postgres con String.raw para matching normalizado
+- [x] LLM sugiere categorías durante parsing (prompt enriquecido con árbol de categorías)
+- [x] Combobox con búsqueda para asignación bulk de categorías
+- [x] max_tokens subido de 8k a 16k + detección de truncamiento
+- [x] Re-parse de imports ya parseados/reviewing (limpia lines sin tx)
+- [x] Script `imports:reparse` para re-parseo masivo con --dry-run/--id/--model
+- [x] Account-aware parser resolution (accountMatch en Parser, accountId en imports)
+- [x] Parser ICBC Mastercard TC separado del Visa
+- [x] Parser BNA Visa TC
+- [x] Upload multi-archivo (misma institución/tipo/cuenta)
+- [x] Auto-unlock de PDFs protegidos (pdf_password en institutions, @pdfsmaller/pdf-decrypt)
+- [x] Cross-import content dedup (auto-rechaza líneas ya existentes como transacciones)
+- [x] Filas clickeables para selección en import review
+- [x] Botón rechazar directo en líneas editadas/aceptadas
+- [x] Aceptar/rechazar pending duplicado al pie con el confirm
+- [x] Cierre de import cuando todas las líneas están confirmadas o rechazadas
+- [x] Fix cuotas: fecha de cierre del resumen, no fecha original de compra (todos los parsers TC)
+- [x] Parser HSBC US TC v2 con formato JSON explícito + alias de campos
+- [x] Parsers ignoran filas de pago ("SU PAGO", etc.)
+
+**Mejoras UI:**
+- [x] Headers sortables en /transactions (server-side via URL params) y /imports/[id] review (client-side)
+- [x] Account default por institución en confirm + por accountId si viene del upload
+- [x] Owner tag en dropdown de cuentas (distingue Nico/Pau)
+- [x] Lista de imports muestra cuenta + período en vez de hash de archivo
+- [x] Sin-categoría primero en import review
+
+**Pendiente próxima sesión:**
+- [ ] **Patrimonio V2** — valuación de inversiones, saldos de cuentas, trayectoria a IF completa
+- [ ] Transfers en imports bancarios (depende de patrimonio)
+- [ ] Parser ICBC Mastercard — sigue extrayendo solo 8 líneas (problema de lectura del PDF, no del prompt)
+- [ ] Sorting en /budget y /forecasts
+- [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
 
 ---
 
