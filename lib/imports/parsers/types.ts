@@ -42,7 +42,7 @@ export const parsedTxLineSchema = z.preprocess((val) => {
       out.descripcion ?? out.descripción ?? out.detalle ?? out.concepto ?? out.concept;
   }
   if (out.date == null) {
-    out.date = out.fecha ?? out.transaction_date;
+    out.date = out.fecha ?? out.transaction_date ?? out.posting_date ?? out.trans_date;
   }
   if (out.kind == null) {
     out.kind = out.tipo ?? out.type;

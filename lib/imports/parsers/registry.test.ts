@@ -30,9 +30,9 @@ describe('resolveParser', () => {
   });
 
   it('HSBC US TC y banco encontrados (match con espacio y guión)', () => {
-    expect(resolveParser('HSBC US', 'tc')?.id).toBe('hsbc-us-tc-v1');
+    expect(resolveParser('HSBC US', 'tc')?.id).toBe('hsbc-us-tc-v2');
     expect(resolveParser('HSBC US', 'banco')?.id).toBe('hsbc-us-banco-v1');
-    expect(resolveParser('hsbc-us', 'tc')?.id).toBe('hsbc-us-tc-v1');
+    expect(resolveParser('hsbc-us', 'tc')?.id).toBe('hsbc-us-tc-v2');
   });
 
   it('Institución desconocida → null', () => {
@@ -47,7 +47,7 @@ describe('listParsers', () => {
     expect(ids).toContain('icbc-mastercard-tc-v1');
     expect(ids).toContain('icbc-tc-v2');
     expect(ids).toContain('icbc-banco-v1');
-    expect(ids).toContain('hsbc-us-tc-v1');
+    expect(ids).toContain('hsbc-us-tc-v2');
     expect(ids).toContain('hsbc-us-banco-v1');
   });
 });
