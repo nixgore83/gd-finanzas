@@ -177,7 +177,7 @@ export async function confirmImport(input: {
               importBatchId: input.importId,
               transactionSubtype: 'standard',
               deducibleGanancias: false,
-              meta: null,
+              meta: {},
               createdBy: session.userId,
             })
             .returning({ id: transactions.id });
@@ -191,7 +191,7 @@ export async function confirmImport(input: {
               importBatchId: input.importId,
               transactionSubtype: 'standard',
               deducibleGanancias: false,
-              meta: null,
+              meta: {},
               createdBy: session.userId,
             })
             .returning({ id: transactions.id });
@@ -334,8 +334,9 @@ export async function confirmImport(input: {
       }
     });
   } catch (err) {
-    console.error('[imports] confirm failed', { code: (err as { code?: string }).code });
-    return { ok: false, error: 'unknown' };
+    const e = err as { code?: string; message?: string };
+    console.error('[imports] confirm failed', { code: e.code, message: e.message });
+    return { ok: false, error: 'unknown', message: e.message };
   }
 
   revalidatePath(`/imports/${input.importId}`);
