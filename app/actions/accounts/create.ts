@@ -31,6 +31,12 @@ export async function createAccount(formData: FormData): Promise<CreateAccountRe
 
   const db = getDb();
   try {
+    const pdfPasswordRaw = formData.get('pdfPassword');
+    const pdfPassword =
+      typeof pdfPasswordRaw === 'string' && pdfPasswordRaw.length > 0
+        ? pdfPasswordRaw
+        : null;
+
     const [inserted] = await db
       .insert(accounts)
       .values({
@@ -41,6 +47,7 @@ export async function createAccount(formData: FormData): Promise<CreateAccountRe
         institutionId: parsed.data.institutionId,
         ownerTag: parsed.data.ownerTag,
         expectsMonthlyImport: parsed.data.expectsMonthlyImport,
+        pdfPassword,
       })
       .returning({ id: accounts.id });
 

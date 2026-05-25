@@ -39,6 +39,7 @@ export async function parseImportInternal(
       institutionId: imports.institutionId,
       institutionName: institutions.name,
       pdfPassword: institutions.pdfPassword,
+      accountPdfPassword: accounts.pdfPassword,
       accountId: imports.accountId,
       accountName: accounts.name,
     })
@@ -92,10 +93,11 @@ export async function parseImportInternal(
 
   // Unlock protected PDF
   const isPdf = !row.fileUrl.toLowerCase().endsWith('.csv');
-  if (isPdf && row.pdfPassword) {
+  const pdfPassword = row.accountPdfPassword ?? row.pdfPassword;
+  if (isPdf && pdfPassword) {
     try {
       const { decryptPDF } = await import('@pdfsmaller/pdf-decrypt');
-      const decrypted = await decryptPDF(bytes, row.pdfPassword);
+      const decrypted = await decryptPDF(bytes, pdfPassword);
       bytes = new Uint8Array(decrypted);
     } catch (err) {
       console.error('[imports] pdf unlock failed', { importId });

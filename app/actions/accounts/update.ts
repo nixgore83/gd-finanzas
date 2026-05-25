@@ -44,6 +44,12 @@ export async function updateAccount(formData: FormData): Promise<UpdateAccountRe
 
   const db = getDb();
   try {
+    const pdfPasswordRaw = formData.get('pdfPassword');
+    const pdfPassword =
+      typeof pdfPasswordRaw === 'string' && pdfPasswordRaw.length > 0
+        ? pdfPasswordRaw
+        : null;
+
     const result = await db
       .update(accounts)
       .set({
@@ -53,6 +59,7 @@ export async function updateAccount(formData: FormData): Promise<UpdateAccountRe
         institutionId: parsed.data.institutionId,
         ownerTag: parsed.data.ownerTag,
         expectsMonthlyImport: parsed.data.expectsMonthlyImport,
+        pdfPassword,
       })
       .where(and(eq(accounts.id, id), eq(accounts.householdId, session.householdId)))
       .returning({ id: accounts.id });

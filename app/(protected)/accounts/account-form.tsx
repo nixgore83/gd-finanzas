@@ -38,7 +38,7 @@ type ActionResult =
 type Props = {
   institutions: Institution[];
   action: (formData: FormData) => Promise<ActionResult>;
-  initial?: Partial<AccountInput> & { id?: string };
+  initial?: Partial<AccountInput> & { id?: string; pdfPassword?: string | null };
   submitLabel: string;
   hiddenId?: string;
   title: string;
@@ -225,6 +225,21 @@ export function AccountForm({
             <Label htmlFor="expectsMonthlyImport" className="cursor-pointer text-sm font-normal">
               Espera import mensual (alertar si falta un mes)
             </Label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pdfPassword">Contraseña PDF</Label>
+            <Input
+              id="pdfPassword"
+              name="pdfPassword"
+              maxLength={100}
+              defaultValue={initial?.pdfPassword ?? ''}
+              disabled={isPending}
+              placeholder="Opcional — para PDFs protegidos"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si el banco protege los resúmenes con contraseña, ingresala acá.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
