@@ -62,6 +62,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     links: [
       { href: '/settings/metas', label: 'Metas' },
       { href: '/settings/categorias', label: 'Categorías' },
+      { href: '/settings/gmail', label: 'Gmail' },
       { href: '/settings/backups', label: 'Backups' },
     ],
   },

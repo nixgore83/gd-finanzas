@@ -19,7 +19,7 @@ export function ParseButton({ importId }: { importId: string }) {
             toast.success(`Parser OK · ${res.lineCount} líneas`);
             router.refresh();
           } else {
-            toast.error(res.message ?? `Error: ${res.error}`);
+            toast.error('message' in res && res.message ? res.message : `Error: ${res.error}`);
             router.refresh();
           }
         });

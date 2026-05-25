@@ -19,6 +19,7 @@ export const accounts = pgTable(
     ownerTag: text('owner_tag').notNull(),
     archived: boolean('archived').notNull().default(false),
     expectsMonthlyImport: boolean('expects_monthly_import').notNull().default(false),
+    gmailLabelId: text('gmail_label_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

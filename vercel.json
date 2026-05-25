@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/backup-drive",
       "schedule": "0 2 * * 1"
+    },
+    {
+      "path": "/api/cron/gmail-import",
+      "schedule": "0 */4 * * *"
     }
   ]
 }
