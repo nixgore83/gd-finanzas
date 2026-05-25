@@ -56,12 +56,24 @@
 - [x] Budget grid: headers sortables por nombre de categoría y total anual (client-side, respeta jerarquía padre/hijo)
 - [x] Forecasts: sort por fecha/nombre/monto dentro de cada mes (server-side via URL params)
 
+**Alertas de información no cargada:**
+- [x] Columna `expects_monthly_import` en accounts + migración 0008
+- [x] Checkbox en account form + badge "Import mensual" en lista de cuentas
+- [x] `lib/imports/detect-gaps.ts`: detecta meses sin import confirmado para cuentas con flag
+- [x] Bloque de alertas en `/imports` con meses faltantes + links directos a `/imports/new`
+
+**Import desde Gmail:**
+- [x] Gmail API client (`lib/gmail/client.ts`) — listMessages, getAttachments, moveToProcessed, findOrCreateLabel, listUserLabels
+- [x] OAuth script (`npm run oauth:google-token`) con scopes Drive + Gmail combinados
+- [x] Columna `gmail_label_id` en accounts (migración 0009) — mapeo label ↔ cuenta
+- [x] Refactor parse/create a funciones internas sin sesión (para cron)
+- [x] Cron `/api/cron/gmail-import` (diario 11:00 UTC / 8:00 AR) — pollea labels, descarga PDFs, auto-import + auto-parse, mueve a "gd-procesados"
+- [x] Settings UI `/settings/gmail` — cargar labels, mapear a cuentas, badge "Configurado"
+- [x] Sidebar nav: link "Gmail" en Settings
+
 **Pendiente próxima sesión:**
 - [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
-
-**Roadmap a definir:**
-- [ ] **Alertas de información no cargada** — listar qué información falta por cargar (ej: resumen de marzo de ICBC Visa). Análisis pendiente: definir lógica de detección (¿por cuenta × mes? ¿por institución?), UI de alertas, y nivel de automatización.
-- [ ] **Import desde mail reenviado** — recibir PDFs de resúmenes bancarios reenviados por email y procesarlos automáticamente. Análisis pendiente: setup de inbox (Supabase? servicio externo?), parsing del mail para extraer adjunto, asociación automática de institución/cuenta.
+- [ ] Activar Gmail import: correr `oauth:google-token`, crear labels en Gmail, configurar filtros, mapear en `/settings/gmail`
 
 ---
 
