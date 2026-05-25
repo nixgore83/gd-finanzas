@@ -30,6 +30,7 @@ const baseAccountSchema = z.object({
   currencyDefault: z.enum(CURRENCIES, { errorMap: () => ({ message: 'Moneda inválida' }) }),
   institutionId: z.string().uuid().nullable(),
   ownerTag: z.enum(OWNER_TAGS, { errorMap: () => ({ message: 'Owner inválido' }) }),
+  expectsMonthlyImport: z.coerce.boolean().default(false),
 });
 
 /**
@@ -69,5 +70,6 @@ export function parseAccountFormData(formData: FormData) {
     currencyDefault: formData.get('currencyDefault'),
     institutionId,
     ownerTag: formData.get('ownerTag'),
+    expectsMonthlyImport: formData.get('expectsMonthlyImport') === 'on',
   });
 }

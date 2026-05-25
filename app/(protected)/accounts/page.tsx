@@ -29,6 +29,7 @@ type AccountRow = {
   institutionName: string | null;
   ownerTag: string;
   archived: boolean;
+  expectsMonthlyImport: boolean;
 };
 
 /** Bullet color by account type — keeps the page scannable at a glance. */
@@ -61,6 +62,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
       institutionName: institutions.name,
       ownerTag: accounts.ownerTag,
       archived: accounts.archived,
+      expectsMonthlyImport: accounts.expectsMonthlyImport,
     })
     .from(accounts)
     .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
@@ -226,6 +228,11 @@ function BankSection({
                 className="block font-display text-lg text-foreground hover:text-primary"
               >
                 {row.name}
+                {row.expectsMonthlyImport && (
+                  <span className="ml-2 inline-block align-middle rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                    Import mensual
+                  </span>
+                )}
               </Link>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
                 <Label className="normal-case tracking-[0.14em] text-muted-foreground">

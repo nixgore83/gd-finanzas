@@ -213,6 +213,20 @@ export function AccountForm({
             {errors.ownerTag && <p className="text-sm text-destructive">{errors.ownerTag}</p>}
           </div>
 
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="expectsMonthlyImport"
+              name="expectsMonthlyImport"
+              defaultChecked={initial?.expectsMonthlyImport ?? false}
+              disabled={isPending}
+              className="size-4 rounded border-input"
+            />
+            <Label htmlFor="expectsMonthlyImport" className="cursor-pointer text-sm font-normal">
+              Espera import mensual (alertar si falta un mes)
+            </Label>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" asChild disabled={isPending}>
               <Link href="/accounts">Cancelar</Link>

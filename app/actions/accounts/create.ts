@@ -40,6 +40,7 @@ export async function createAccount(formData: FormData): Promise<CreateAccountRe
         currencyDefault: parsed.data.currencyDefault,
         institutionId: parsed.data.institutionId,
         ownerTag: parsed.data.ownerTag,
+        expectsMonthlyImport: parsed.data.expectsMonthlyImport,
       })
       .returning({ id: accounts.id });
 

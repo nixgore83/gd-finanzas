@@ -52,6 +52,7 @@ export async function updateAccount(formData: FormData): Promise<UpdateAccountRe
         currencyDefault: parsed.data.currencyDefault,
         institutionId: parsed.data.institutionId,
         ownerTag: parsed.data.ownerTag,
+        expectsMonthlyImport: parsed.data.expectsMonthlyImport,
       })
       .where(and(eq(accounts.id, id), eq(accounts.householdId, session.householdId)))
       .returning({ id: accounts.id });

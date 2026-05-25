@@ -1,0 +1,1 @@
+ALTER TABLE "accounts" ADD COLUMN "expects_monthly_import" boolean DEFAULT false NOT NULL;

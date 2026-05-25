@@ -55,6 +55,7 @@ export default async function EditAccountPage({ params }: { params: RouteParams 
           currencyDefault: account.currencyDefault,
           institutionId: account.institutionId,
           ownerTag: account.ownerTag as 'Nico' | 'Pau' | 'Hogar',
+          expectsMonthlyImport: account.expectsMonthlyImport,
         }}
         submitLabel="Guardar cambios"
         title="Editar cuenta"

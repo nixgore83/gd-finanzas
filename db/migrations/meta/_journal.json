@@ -57,6 +57,13 @@
       "when": 1779635427019,
       "tag": "0007_petite_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779710131852,
+      "tag": "0008_omniscient_jazinda",
+      "breakpoints": true
     }
   ]
 }

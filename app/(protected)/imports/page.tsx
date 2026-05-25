@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
+import { detectImportGaps } from '@/lib/imports/detect-gaps';
 import { Button } from '@/components/ui/button';
 import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
@@ -114,6 +115,9 @@ export default async function ImportsListPage() {
   const totalLines = rows.reduce((s, r) => s + (r.transactionCount ?? 0), 0);
   const pendingReview = rows.filter((r) => r.status === 'parsed' || r.status === 'reviewing').length;
 
+  // Detect missing monthly imports
+  const gaps = await detectImportGaps(session.householdId);
+
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
@@ -146,6 +150,38 @@ export default async function ImportsListPage() {
       </header>
 
       <Hair thick />
+
+      {gaps.length > 0 && (
+        <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            Resúmenes faltantes
+          </p>
+          <div className="space-y-1.5">
+            {gaps.map((gap) => (
+              <div key={gap.accountId} className="text-sm text-amber-800 dark:text-amber-300">
+                <span className="font-medium">{gap.accountName}</span>
+                {gap.institutionName && (
+                  <span className="text-amber-700 dark:text-amber-400"> · {gap.institutionName}</span>
+                )}
+                <span className="ml-1">
+                  — falta{gap.missingMonths.length > 1 ? 'n' : ''}{' '}
+                  {gap.missingMonths.map((m) => {
+                    const [y, mo] = m.split('-');
+                    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                    return `${months[Number(mo) - 1]} ${y}`;
+                  }).join(', ')}
+                </span>
+                <Link
+                  href={`/imports/new${gap.institutionId ? `?institutionId=${gap.institutionId}&accountId=${gap.accountId}` : ''}`}
+                  className="ml-2 text-amber-900 underline hover:text-amber-700 dark:text-amber-200"
+                >
+                  Importar →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="border border-dashed border-border p-12 text-center">
