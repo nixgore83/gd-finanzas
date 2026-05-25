@@ -3,12 +3,33 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-24 por Claude
+**Última actualización:** 2026-05-25 por Claude
 
 ---
 
 ## Hito en curso
-**Patrimonio V2 implementado. Transfers en imports bancarios en progreso.**
+**ICBC banco multi-cuenta implementado. Gmail routing para emails multi-adjunto.**
+
+### Sesión 2026-05-25 — ICBC Banco Parser + Multi-Attachment Gmail
+
+**ICBC banco — parser + routing multi-adjunto:**
+- [x] Migración 0010: `pdf_password` en tabla `accounts` (override de `institutions.pdf_password`)
+- [x] UI: campo "Contraseña PDF" en form de crear/editar cuenta
+- [x] `parse-internal.ts`: prioriza password de cuenta sobre institución
+- [x] Attachment router (`lib/gmail/attachment-router.ts`): decripta PDF, extrae texto con `pdf-parse`, identifica cuenta por patrones (CAJA DE AHORRO PESOS/DOLARES, CUENTA CORRIENTE), skipea CARATULA y SIN MOVIMIENTOS
+- [x] Gmail cron refactoreado: agrupa cuentas por label; labels compartidos usan content-based routing; labels únicos mantienen flujo original
+- [x] Parser `icbc-banco-v1` actualizado para 2 formatos: AV.TRANSF.MINORISTAS (transferencias, todas isTransfer=true) y EXT.DE.MOVIMIENTOS (extracto general)
+- [x] Nueva dependencia: `pdf-parse` (text extraction para routing)
+- [x] Typecheck + lint + 255 tests verdes
+
+**Pendiente próxima sesión:**
+- [ ] Crear cuentas faltantes: ICBC CA USD (bank_savings, USD), ICBC CC (bank_checking, ARS)
+- [ ] Setear `pdf_password` en cuentas ICBC banco (305551) y TC (si distinto)
+- [ ] Asignar mismo Gmail label a las 3 cuentas banco ICBC
+- [ ] Test end-to-end: subir los 4 PDFs y verificar routing + parsing
+- [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
+
+---
 
 ### Sesión 2026-05-24 — Patrimonio V2
 
