@@ -31,6 +31,7 @@ export default async function NewImportPage() {
         name: accounts.name,
         ownerTag: accounts.ownerTag,
         institutionId: accounts.institutionId,
+        type: accounts.type,
       })
       .from(accounts)
       .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))

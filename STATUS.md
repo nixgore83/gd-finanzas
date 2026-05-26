@@ -3,12 +3,36 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-25 por Claude
+**Última actualización:** 2026-05-26 por Claude
 
 ---
 
 ## Hito en curso
-**ICBC banco multi-cuenta implementado. Gmail routing para emails multi-adjunto.**
+**PRD V1.1 completo. Único pendiente funcional: import multi-archivo cross-institución.**
+
+### Sesión 2026-05-26 — Gap analysis PRD + Export general
+
+**Gap analysis PRD V1.1 vs codebase:**
+- [x] Revisión completa del PRD (Notion) contra codebase
+- [x] Resultado: 9/10 features del PRD implementadas, único gap = export general de transacciones
+
+**Export general de transacciones (cierre PRD V1.1):**
+- [x] `GET /api/exports/transactions` — CSV o JSON, respeta filtros (kind, account, category, tag, fechas, búsqueda)
+- [x] Columnas: fecha, tipo, subtipo, descripción, cuenta, categoría, tags, monto original/USD/ARS, FX rate+source, notas, origen, deducible
+- [x] CSV con BOM UTF-8 (Excel-friendly), JSON con pretty-print
+- [x] Botón "↓ CSV" en header de `/transactions` (visible solo con resultados, pasa filtros activos)
+- [x] Typecheck + lint + 258 tests verdes
+
+**Operacional (hecho por Nico):**
+- [x] Cuentas ICBC CA USD + CC creadas
+- [x] `pdf_password` configurado en cuentas ICBC banco
+- [x] Gmail labels asignados a las 3 cuentas ICBC banco
+
+**Pendiente próxima sesión:**
+- [ ] Test E2E Gmail import ICBC banco (subir 4 PDFs, verificar routing + parsing)
+- [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
+
+---
 
 ### Sesión 2026-05-25 — ICBC Banco Parser + Multi-Attachment Gmail
 
@@ -21,13 +45,6 @@
 - [x] Parser `icbc-banco-v1` actualizado para 2 formatos: AV.TRANSF.MINORISTAS (transferencias, todas isTransfer=true) y EXT.DE.MOVIMIENTOS (extracto general)
 - [x] Nueva dependencia: `pdf-parse` (text extraction para routing)
 - [x] Typecheck + lint + 255 tests verdes
-
-**Pendiente próxima sesión:**
-- [ ] Crear cuentas faltantes: ICBC CA USD (bank_savings, USD), ICBC CC (bank_checking, ARS)
-- [ ] Setear `pdf_password` en cuentas ICBC banco (305551) y TC (si distinto)
-- [ ] Asignar mismo Gmail label a las 3 cuentas banco ICBC
-- [ ] Test end-to-end: subir los 4 PDFs y verificar routing + parsing
-- [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
 
 ---
 

@@ -61,10 +61,24 @@ export async function routeAttachment(
   const match = identifyAccount(text);
   if (!match) return null;
 
-  // Find the matching account
-  const target = accounts.find(
-    (a) => a.type === match.type && a.currencyDefault === match.currency,
-  );
+  // Find the matching account.
+  // For TC (credit_card) there may be multiple accounts with same type+currency
+  // (e.g. ICBC Visa + ICBC Mastercard, both credit_card ARS). In that case
+  // we use the accountNamePattern to disambiguate via account name.
+  const target = match.accountNamePattern
+    ? accounts.find(
+        (a) =>
+          a.type === match.type &&
+          a.currencyDefault === match.currency &&
+          match.accountNamePattern!.test(a.name),
+      ) ??
+      // Fallback: if no name match, try type+currency only
+      accounts.find(
+        (a) => a.type === match.type && a.currencyDefault === match.currency,
+      )
+    : accounts.find(
+        (a) => a.type === match.type && a.currencyDefault === match.currency,
+      );
   if (!target) return null;
 
   return { account: target, decryptedBytes: bytes };
@@ -73,19 +87,34 @@ export async function routeAttachment(
 interface AccountMatch {
   type: AccountType;
   currency: Currency;
+  /** Optional pattern to match against account name (for disambiguation). */
+  accountNamePattern?: RegExp;
 }
 
-const PATTERNS: Array<{ regex: RegExp; type: AccountType; currency: Currency }> = [
+const PATTERNS: Array<{
+  regex: RegExp;
+  type: AccountType;
+  currency: Currency;
+  accountNamePattern?: RegExp;
+}> = [
+  // Bank statements
   { regex: /CAJA\s+DE\s+AHORRO.*PESOS/i, type: 'bank_savings', currency: 'ARS' },
   { regex: /CAJA\s+DE\s+AHORRO.*D[OÓ]LARES/i, type: 'bank_savings', currency: 'USD' },
   { regex: /CUENTA\s+CORRIENTE.*PESOS/i, type: 'bank_checking', currency: 'ARS' },
   { regex: /CUENTA\s+CORRIENTE.*D[OÓ]LARES/i, type: 'bank_checking', currency: 'USD' },
+  // Credit card statements — order matters: specific brands before generic
+  { regex: /MASTERCARD/i, type: 'credit_card', currency: 'ARS', accountNamePattern: /master/i },
+  { regex: /VISA/i, type: 'credit_card', currency: 'ARS', accountNamePattern: /visa/i },
 ];
 
 function identifyAccount(text: string): AccountMatch | null {
   for (const p of PATTERNS) {
     if (p.regex.test(text)) {
-      return { type: p.type, currency: p.currency };
+      return {
+        type: p.type,
+        currency: p.currency,
+        accountNamePattern: p.accountNamePattern,
+      };
     }
   }
   return null;

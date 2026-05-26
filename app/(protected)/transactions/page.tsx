@@ -85,6 +85,19 @@ function buildHref(base: string, filters: Filters, pageOverride: number): string
   return qs.length > 0 ? `${base}?${qs}` : base;
 }
 
+function buildExportHref(filters: Filters): string {
+  const sp = new URLSearchParams();
+  if (filters.kind) sp.set('kind', filters.kind);
+  if (filters.accountId) sp.set('accountId', filters.accountId);
+  if (filters.categoryId) sp.set('categoryId', filters.categoryId);
+  if (filters.tagId) sp.set('tagId', filters.tagId);
+  if (filters.from) sp.set('from', filters.from);
+  if (filters.to) sp.set('to', filters.to);
+  if (filters.q) sp.set('q', filters.q);
+  const qs = sp.toString();
+  return qs.length > 0 ? `/api/exports/transactions?${qs}` : '/api/exports/transactions';
+}
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function TransactionsPage({
@@ -289,6 +302,13 @@ export default async function TransactionsPage({
           )}
         </div>
         <div className="flex gap-2">
+          {total > 0 && (
+            <Button variant="ghost" size="sm" asChild>
+              <a href={buildExportHref(filters)} download>
+                ↓ CSV
+              </a>
+            </Button>
+          )}
           <Button variant="outline" asChild>
             <Link href="/transactions/new-transfer">↔ Transferencia</Link>
           </Button>
