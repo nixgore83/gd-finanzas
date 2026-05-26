@@ -358,14 +358,21 @@ function ByDayGroup({
             />
           </td>
           <td className="px-3 py-3">
-            <span
-              className="inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]"
-              style={{
-                background: `color-mix(in oklab, ${TYPE_VAR[row.kind]} 15%, transparent)`,
-                color: TYPE_VAR[row.kind],
-              }}
-            >
-              {ALL_KIND_LABELS[row.kind]}
+            <span className="flex items-center gap-1">
+              <span
+                className="inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]"
+                style={{
+                  background: `color-mix(in oklab, ${TYPE_VAR[row.kind]} 15%, transparent)`,
+                  color: TYPE_VAR[row.kind],
+                }}
+              >
+                {ALL_KIND_LABELS[row.kind]}
+              </span>
+              {row.kind === 'expense' && row.amountOriginal.startsWith('-') && (
+                <span className="inline-block rounded-sm border border-dashed border-emerald-400 bg-emerald-50 px-1.5 py-[2px] font-sans text-[9px] font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                  Devolución
+                </span>
+              )}
             </span>
           </td>
           <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
@@ -380,7 +387,7 @@ function ByDayGroup({
                 'text-sm',
                 row.kind === 'income' && 'text-[color:var(--good)]',
                 row.kind === 'transfer' && 'text-[color:var(--attn)]',
-                row.kind === 'expense' && 'text-foreground',
+                row.kind === 'expense' && 'text-[color:var(--bad)]',
               )}
             >
               {formatAmount(row.amountOriginal, row.currencyOriginal)}

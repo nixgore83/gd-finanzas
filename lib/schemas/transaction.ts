@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import Decimal from 'decimal.js';
-import { positiveMoneySchema } from './money';
+import { moneySchema } from './money';
 import { CURRENCIES } from './account';
 import { tagIdsSchema } from './tag';
 
@@ -10,7 +10,8 @@ import { tagIdsSchema } from './tag';
  * En Hito 3.A solo soportamos `income` y `expense`. Transferencias entran en
  * 3.C con su propia validación cross-cuenta.
  *
- * Convención: `amountOriginal` siempre positivo; el `kind` carga la dirección.
+ * Convención: `amountOriginal` positivo normalmente; negativo para devoluciones/reintegros.
+ * El `kind` sigue siendo la dirección principal (income/expense).
  */
 
 export const TRANSACTION_KINDS = ['income', 'expense'] as const;
@@ -71,7 +72,7 @@ export const transactionInputSchema = z.object({
   accountId: z.string().uuid({ message: 'Cuenta requerida' }),
   categoryId: z.string().uuid({ message: 'Categoría requerida' }),
   kind: z.enum(TRANSACTION_KINDS, { errorMap: () => ({ message: 'Tipo inválido' }) }),
-  amountOriginal: positiveMoneySchema,
+  amountOriginal: moneySchema,
   currencyOriginal: z.enum(CURRENCIES, { errorMap: () => ({ message: 'Moneda inválida' }) }),
   description: z
     .string()

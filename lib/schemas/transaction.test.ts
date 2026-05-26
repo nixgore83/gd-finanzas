@@ -41,8 +41,12 @@ describe('transactionInputSchema', () => {
     expect(() => transactionInputSchema.parse({ ...validBase, date: '2026-5-17' })).toThrow();
   });
 
-  it('rechaza monto negativo y cero string vacío', () => {
-    expect(() => transactionInputSchema.parse({ ...validBase, amountOriginal: '-10' })).toThrow();
+  it('acepta monto negativo (devoluciones/reintegros)', () => {
+    const out = transactionInputSchema.parse({ ...validBase, amountOriginal: '-10' });
+    expect(out.amountOriginal).toBe('-10.00');
+  });
+
+  it('rechaza string vacío como monto', () => {
     expect(() => transactionInputSchema.parse({ ...validBase, amountOriginal: '' })).toThrow();
   });
 

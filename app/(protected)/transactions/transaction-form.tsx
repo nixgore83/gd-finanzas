@@ -298,7 +298,6 @@ export function TransactionForm({
                 name="amountOriginal"
                 type="number"
                 step="0.01"
-                min="0"
                 required
                 defaultValue={initial?.amountOriginal ?? ''}
                 disabled={isPending}
