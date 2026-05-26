@@ -35,6 +35,16 @@ describe('resolveParser', () => {
     expect(resolveParser('hsbc-us', 'tc')?.id).toBe('hsbc-us-tc-v2');
   });
 
+  it('Mercado Pago TC encontrado', () => {
+    expect(resolveParser('Mercado Pago', 'tc')?.id).toBe('mercado-pago-tc-v1');
+    expect(resolveParser('mercado pago', 'tc')?.id).toBe('mercado-pago-tc-v1');
+    expect(resolveParser('MercadoPago', 'tc')?.id).toBe('mercado-pago-tc-v1');
+  });
+
+  it('Mercado Pago banco → todavía no implementado', () => {
+    expect(resolveParser('Mercado Pago', 'banco')).toBeNull();
+  });
+
   it('Institución desconocida → null', () => {
     expect(resolveParser('Patagonia', 'tc')).toBeNull();
   });
@@ -49,5 +59,6 @@ describe('listParsers', () => {
     expect(ids).toContain('icbc-banco-v1');
     expect(ids).toContain('hsbc-us-tc-v2');
     expect(ids).toContain('hsbc-us-banco-v1');
+    expect(ids).toContain('mercado-pago-tc-v1');
   });
 });

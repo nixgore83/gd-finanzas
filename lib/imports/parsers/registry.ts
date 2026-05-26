@@ -6,6 +6,7 @@ import { icbcBancoParser } from './icbc-banco';
 import { bnaTcParser } from './bna-tc';
 import { hsbcUsTcParser } from './hsbc-us-tc';
 import { hsbcUsBancoParser } from './hsbc-us-banco';
+import { mercadoPagoTcParser } from './mercado-pago-tc';
 import type { Parser } from './types';
 
 // Order matters: more specific parsers (with accountMatch) go before generic ones.
@@ -17,6 +18,7 @@ const PARSERS: Parser[] = [
   bnaTcParser,
   hsbcUsTcParser,
   hsbcUsBancoParser,
+  mercadoPagoTcParser,
 ];
 
 /**
