@@ -499,6 +499,9 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             <Button variant="outline" size="sm" onClick={() => router.push('/transactions')}>
               Ver transacciones
             </Button>
+            <Button variant="outline" size="sm" onClick={() => router.push('/imports')}>
+              Importados
+            </Button>
             <Button variant="outline" size="sm" onClick={() => router.push('/imports/new')}>
               Importar otro archivo
             </Button>
