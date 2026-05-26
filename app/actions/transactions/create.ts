@@ -6,9 +6,10 @@ import { transactions, transactionTags } from '@/db/schema';
 import { parseTransactionFormData } from '@/lib/schemas/transaction';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { buildTransactionFields, validateTagIds } from './_build';
+import { getAutoMatchEnabled, tryAutoMatch, type AutoMatchResult } from '@/lib/forecasts/auto-match';
 
 export type CreateTransactionResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; autoMatch?: AutoMatchResult }
   | {
       ok: false;
       error: 'invalid_input' | 'invalid_refs' | 'fx_unavailable' | 'session' | 'unknown';
@@ -40,8 +41,12 @@ export async function createTransaction(formData: FormData): Promise<CreateTrans
   const tagsCheck = await validateTagIds(parsed.data.tagIds, session.householdId);
   if (!tagsCheck.ok) return { ok: false, error: 'invalid_refs', fields: tagsCheck.fields };
 
+  const autoMatchEnabled = await getAutoMatchEnabled(session.householdId);
+
   const db = getDb();
   try {
+    let autoMatch: AutoMatchResult = { matched: false };
+
     const id = await db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(transactions)
@@ -61,11 +66,22 @@ export async function createTransaction(formData: FormData): Promise<CreateTrans
           .values(parsed.data.tagIds.map((tagId) => ({ transactionId: inserted.id, tagId })));
       }
 
+      if (autoMatchEnabled) {
+        try {
+          autoMatch = await tryAutoMatch(tx, inserted.id, session.householdId);
+        } catch (err) {
+          console.error('[transactions] auto-match failed (non-fatal)', err);
+        }
+      }
+
       return inserted.id;
     });
 
     revalidatePath('/transactions');
-    return { ok: true, id };
+    if (autoMatch.matched) {
+      revalidatePath('/forecasts');
+    }
+    return { ok: true, id, autoMatch };
   } catch (err) {
     console.error('[transactions] create failed', { code: (err as { code?: string }).code });
     return { ok: false, error: 'unknown' };

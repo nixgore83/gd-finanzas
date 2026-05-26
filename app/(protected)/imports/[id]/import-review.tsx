@@ -65,7 +65,7 @@ const STATUS_LABEL: Record<string, string> = {
 export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [confirmDone, setConfirmDone] = useState<{ count: number } | null>(null);
+  const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
   const [sortField, setSortField] = useState<string>('category');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const handleSort = (field: string, dir: 'asc' | 'desc') => { setSortField(field); setSortDir(dir); };
@@ -196,13 +196,16 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     startTransition(async () => {
       const res = await confirmImport({ importId, accountId });
       if (res.ok) {
+        const matchMsg = res.autoMatchCount > 0
+          ? ` · ${res.autoMatchCount} linkeadas con previsiones`
+          : '';
         if (res.rejectedCount > 0) {
           toast.warning(
-            `${res.createdCount} confirmadas · ${res.rejectedCount} con error (ver detalle abajo)`,
+            `${res.createdCount} confirmadas${matchMsg} · ${res.rejectedCount} con error (ver detalle abajo)`,
           );
           router.refresh();
         } else {
-          setConfirmDone({ count: res.createdCount });
+          setConfirmDone({ count: res.createdCount, autoMatchCount: res.autoMatchCount });
           router.refresh();
         }
       } else {
@@ -488,6 +491,9 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
         <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
           <p className="font-medium">
             Import confirmado — {confirmDone.count} transacciones creadas
+            {confirmDone.autoMatchCount > 0 && (
+              <> · {confirmDone.autoMatchCount} linkeadas con previsiones</>
+            )}
           </p>
           <div className="mt-3 flex gap-3">
             <Button variant="outline" size="sm" onClick={() => router.push('/transactions')}>

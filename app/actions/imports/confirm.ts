@@ -8,6 +8,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
 import { buildTransferFields } from '@/app/actions/transactions/_build-transfer';
+import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
 
 export type ConfirmImportResult =
   | {
@@ -15,6 +16,7 @@ export type ConfirmImportResult =
       createdCount: number;
       rejectedCount: number;
       remaining: number;
+      autoMatchCount: number;
       lineErrors: Array<{ lineId: string; reason: string }>;
     }
   | {
@@ -113,7 +115,7 @@ export async function confirmImport(input: {
 
       revalidatePath(`/imports/${input.importId}`);
       revalidatePath('/imports');
-      return { ok: true, createdCount: 0, rejectedCount: 0, remaining: 0, lineErrors: [] };
+      return { ok: true, createdCount: 0, rejectedCount: 0, remaining: 0, autoMatchCount: 0, lineErrors: [] };
     }
 
     return { ok: false, error: 'invalid_state', message: 'No hay líneas pendientes de confirmar' };
@@ -121,6 +123,8 @@ export async function confirmImport(input: {
 
   const lineErrors: Array<{ lineId: string; reason: string }> = [];
   let createdCount = 0;
+  let autoMatchCount = 0;
+  const autoMatchEnabled = await getAutoMatchEnabled(session.householdId);
 
   try {
     await db.transaction(async (tx) => {
@@ -275,6 +279,15 @@ export async function confirmImport(input: {
             ),
           );
         createdCount += 1;
+
+        if (autoMatchEnabled) {
+          try {
+            const match = await tryAutoMatch(tx, txRow.id, session.householdId);
+            if (match.matched) autoMatchCount += 1;
+          } catch (err) {
+            console.error('[imports] auto-match failed (non-fatal)', err);
+          }
+        }
       }
 
       // Después de procesar, contar cuántas líneas aceptadas siguen sin transaction_id.
@@ -342,12 +355,16 @@ export async function confirmImport(input: {
   revalidatePath(`/imports/${input.importId}`);
   revalidatePath('/imports');
   revalidatePath('/transactions');
+  if (autoMatchCount > 0) {
+    revalidatePath('/forecasts');
+  }
 
   return {
     ok: true,
     createdCount,
     rejectedCount: lineErrors.length,
     remaining: lineErrors.length,
+    autoMatchCount,
     lineErrors,
   };
 }

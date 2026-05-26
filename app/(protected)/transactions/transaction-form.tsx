@@ -40,7 +40,7 @@ type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD' 
 type CategoryOption = { id: string; name: string; kind: 'income' | 'expense'; depth: 0 | 1 };
 
 type ActionResult =
-  | { ok: true; id?: string }
+  | { ok: true; id?: string; autoMatch?: { matched: true; forecastId: string; recurrenceName: string } | { matched: false } }
   | { ok: false; error: string; fields?: Record<string, string> };
 
 type Initial = {
@@ -179,7 +179,12 @@ export function TransactionForm({
     startTransition(async () => {
       const result = await action(formData);
       if (result.ok) {
-        toast.success(hiddenId ? 'Transacción actualizada' : 'Transacción creada');
+        const autoMatch = 'autoMatch' in result ? result.autoMatch : undefined;
+        if (autoMatch?.matched) {
+          toast.success(`Transacción creada · linkeada con "${autoMatch.recurrenceName}"`);
+        } else {
+          toast.success(hiddenId ? 'Transacción actualizada' : 'Transacción creada');
+        }
         router.push('/transactions');
         router.refresh();
         return;
