@@ -10,7 +10,7 @@ export type CreateImportInternalResult =
 
 export interface CreateImportInternalInput {
   householdId: string;
-  userId: string;
+  userId: string | null;
   file: { name: string; bytes: Uint8Array; contentType: string };
   type: 'tc' | 'banco' | 'broker';
   institutionId: string;
@@ -61,7 +61,7 @@ export async function createImportInternal(
         accountId: input.accountId,
         parserModel: 'pending',
         status: 'uploaded',
-        createdBy: input.userId,
+        createdBy: input.userId || null,
       })
       .returning({ id: imports.id });
     if (!row) throw new Error('insert returned no row');

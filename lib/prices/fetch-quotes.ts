@@ -22,17 +22,29 @@ export async function fetchQuotes(tickers: string[]): Promise<Record<string, Quo
 
   const results: Record<string, QuoteResult> = {};
 
-  for (const ticker of tickers) {
+  const quotesPromises = tickers.map(async (ticker) => {
     try {
       const q = await yf.quote(ticker);
       if (q.symbol && q.regularMarketPrice != null && q.currency) {
-        results[q.symbol] = {
+        return {
+          symbol: q.symbol,
           price: q.regularMarketPrice,
           currency: q.currency,
         };
       }
     } catch {
       // Skip tickers that can't be resolved
+    }
+    return null;
+  });
+
+  const quotes = await Promise.all(quotesPromises);
+  for (const q of quotes) {
+    if (q) {
+      results[q.symbol] = {
+        price: q.price,
+        currency: q.currency,
+      };
     }
   }
 

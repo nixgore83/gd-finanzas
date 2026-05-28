@@ -192,7 +192,7 @@ export function buildYearEconomyReport(input: {
   const savingsYtd = netYtd.plus(investmentYtd);
   const savingsRateYtdPct = incomeYtd.isZero()
     ? null
-    : netYtd.div(incomeYtd).times(100).toNumber();
+    : savingsYtd.div(incomeYtd).times(100).toNumber();
 
   const targetMonthly = new Decimal(targetSavingsMonthlyUsd);
   const expectedAccum = targetMonthly.times(monthsElapsed);

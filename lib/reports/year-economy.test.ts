@@ -207,6 +207,7 @@ describe('buildYearEconomyReport', () => {
     expect(out.kpis.netYtdUsd).toBe('5000.00');
     expect(out.kpis.investmentYtdUsd).toBe('3000.00');
     expect(out.kpis.savingsYtdUsd).toBe('8000.00');
+    expect(out.kpis.savingsRateYtdPct).toBe(80); // (10000 - 2000)/10000 * 100 = 80% (inv-rh no reduce el ahorro)
   });
 
   it('año pasado completo: monthsElapsed=12, isProjected=false en todos', () => {
