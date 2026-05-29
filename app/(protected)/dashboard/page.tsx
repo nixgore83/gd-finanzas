@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadDashboardData } from '@/lib/reports/dashboard-data';
+import { loadPendingActions } from '@/lib/reports/pending-actions';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { SparklineKpiCard } from '@/components/dashboard/sparkline-kpi-card';
+import { PendingActionsSummary } from '@/components/dashboard/pending-actions-summary';
 import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 
@@ -78,7 +80,10 @@ export default async function DashboardPage() {
   const month = now.getMonth() + 1;
   const monthLabel = `${MONTH_LABELS[month - 1]} ${year}`;
 
-  const data = await loadDashboardData(session.householdId, year, month);
+  const [data, pending] = await Promise.all([
+    loadDashboardData(session.householdId, year, month),
+    loadPendingActions(session.householdId),
+  ]);
 
   const last = data.monthly[data.monthly.length - 1];
   const prev = data.monthly[data.monthly.length - 2];
@@ -103,6 +108,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
+      {/* ============ PENDING ACTIONS ============ */}
+      <PendingActionsSummary data={pending} />
+
       {/* ============ HERO ============ */}
       <section className="flex flex-wrap items-end justify-between gap-8 pt-2">
         <div className="min-w-0 flex-1">

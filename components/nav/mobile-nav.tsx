@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Sidebar } from './sidebar';
 
-export function MobileNav({ userDisplayName }: { userDisplayName: string | null }) {
+export function MobileNav({
+  userDisplayName,
+  badges,
+}: {
+  userDisplayName: string | null;
+  badges?: Record<string, number>;
+}) {
   const [open, setOpen] = useState(false);
 
   // Lock scroll while open
@@ -44,7 +50,11 @@ export function MobileNav({ userDisplayName }: { userDisplayName: string | null 
         }`}
       >
         <div className="relative h-full">
-          <Sidebar userDisplayName={userDisplayName} onNavigate={() => setOpen(false)} />
+          <Sidebar
+            userDisplayName={userDisplayName}
+            onNavigate={() => setOpen(false)}
+            badges={badges}
+          />
           <button
             type="button"
             onClick={() => setOpen(false)}

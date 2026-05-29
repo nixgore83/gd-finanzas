@@ -55,9 +55,11 @@ function findActiveSection(pathname: string): string | null {
 type Props = {
   userDisplayName: string | null;
   onNavigate?: () => void;
+  /** Conteos a mostrar como badge, indexados por href del link (ej. `/pendientes`). */
+  badges?: Record<string, number>;
 };
 
-export function Sidebar({ userDisplayName, onNavigate }: Props) {
+export function Sidebar({ userDisplayName, onNavigate, badges }: Props) {
   const pathname = usePathname();
   const stored = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -107,6 +109,7 @@ export function Sidebar({ userDisplayName, onNavigate }: Props) {
             onToggle={() => toggleSection(section.key)}
             pathname={pathname}
             onNavigate={onNavigate}
+            badges={badges}
           />
         ))}
       </nav>
@@ -154,12 +157,14 @@ function SectionBlock({
   onToggle,
   pathname,
   onNavigate,
+  badges,
 }: {
   section: SidebarSection;
   isOpen: boolean;
   onToggle: () => void;
   pathname: string;
   onNavigate?: () => void;
+  badges?: Record<string, number>;
 }) {
   const hasActive = section.links.some((l) => isActiveLink(pathname, l));
   return (
@@ -185,7 +190,12 @@ function SectionBlock({
         <ul className="mt-1 space-y-px">
           {section.links.map((link) => (
             <li key={link.href}>
-              <NavLink link={link} pathname={pathname} onNavigate={onNavigate} />
+              <NavLink
+                link={link}
+                pathname={pathname}
+                onNavigate={onNavigate}
+                badge={badges?.[link.href]}
+              />
             </li>
           ))}
         </ul>
@@ -198,10 +208,12 @@ function NavLink({
   link,
   pathname,
   onNavigate,
+  badge,
 }: {
   link: SidebarLink;
   pathname: string;
   onNavigate?: () => void;
+  badge?: number;
 }) {
   const active = isActiveLink(pathname, link);
   return (
@@ -217,7 +229,15 @@ function NavLink({
           : 'border-transparent text-foreground/85 hover:border-border hover:bg-accent hover:text-foreground',
       )}
     >
-      {link.label}
+      <span className="flex-1">{link.label}</span>
+      {badge != null && badge > 0 && (
+        <span
+          aria-label={`${badge} pendientes`}
+          className="ml-2 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[color:var(--attn)] px-1.5 py-[1px] font-sans text-[10px] font-semibold tabular-nums leading-none text-[color:var(--background)]"
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </Link>
   );
 }

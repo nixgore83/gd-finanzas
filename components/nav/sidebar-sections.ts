@@ -17,6 +17,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     title: 'Operar',
     links: [
       { href: '/dashboard', label: 'Dashboard' },
+      { href: '/pendientes', label: 'Pendientes', matchPrefix: '/pendientes' },
       { href: '/accounts', label: 'Cuentas', matchPrefix: '/accounts' },
       { href: '/transactions', label: 'Transacciones', matchPrefix: '/transactions' },
       { href: '/tags', label: 'Etiquetas', matchPrefix: '/tags' },

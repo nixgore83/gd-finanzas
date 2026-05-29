@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getMfaState } from '@/lib/auth/mfa';
 import { getDb } from '@/lib/db/client';
 import { householdMembers, profiles } from '@/db/schema';
+import { countPendingActions } from '@/lib/reports/pending-actions';
 import { Sidebar } from '@/components/nav/sidebar';
 import { MobileNav } from '@/components/nav/mobile-nav';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
@@ -57,18 +58,21 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   const displayName = profile?.displayName ?? user.email ?? null;
 
+  const pendingCount = await countPendingActions(membership.householdId);
+  const navBadges = { '/pendientes': pendingCount };
+
   return (
     <div className="flex min-h-dvh">
       {/* Desktop sidebar */}
       <div className="hidden md:flex md:shrink-0">
-        <Sidebar userDisplayName={displayName} />
+        <Sidebar userDisplayName={displayName} badges={navBadges} />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar: hamburguesa + brand + theme toggle */}
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
           <div className="flex items-center gap-3">
-            <MobileNav userDisplayName={displayName} />
+            <MobileNav userDisplayName={displayName} badges={navBadges} />
             <span className="text-sm font-semibold">gd-finanzas</span>
           </div>
           <ThemeToggle />
