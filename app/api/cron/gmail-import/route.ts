@@ -219,7 +219,7 @@ async function createAndParse(
 
   const createResult = await createImportInternal({
     householdId,
-    userId: userId ?? '',
+    userId: userId,
     file: { name: filename, bytes, contentType },
     type: importType,
     institutionId: acc.institutionId,

@@ -3,36 +3,30 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-26 por Claude
+**Última actualización:** 2026-05-28 por Claude
 
 ---
 
 ## Hito en curso
-**PRD V1.1 completo. Único pendiente funcional: import multi-archivo cross-institución.**
+**PRD V1.1 completo. V1.1 funcional en producción con optimizaciones aplicadas.**
 
-### Sesión 2026-05-26 — Gap analysis PRD + Export general
+### Sesión 2026-05-28 — Code Review y Optimizaciones
 
-**Gap analysis PRD V1.1 vs codebase:**
-- [x] Revisión completa del PRD (Notion) contra codebase
-- [x] Resultado: 9/10 features del PRD implementadas, único gap = export general de transacciones
-
-**Export general de transacciones (cierre PRD V1.1):**
-- [x] `GET /api/exports/transactions` — CSV o JSON, respeta filtros (kind, account, category, tag, fechas, búsqueda)
-- [x] Columnas: fecha, tipo, subtipo, descripción, cuenta, categoría, tags, monto original/USD/ARS, FX rate+source, notas, origen, deducible
-- [x] CSV con BOM UTF-8 (Excel-friendly), JSON con pretty-print
-- [x] Botón "↓ CSV" en header de `/transactions` (visible solo con resultados, pasa filtros activos)
-- [x] Typecheck + lint + 258 tests verdes
-
-**Operacional (hecho por Nico):**
-- [x] Cuentas ICBC CA USD + CC creadas
-- [x] `pdf_password` configurado en cuentas ICBC banco
-- [x] Gmail labels asignados a las 3 cuentas ICBC banco
+**Revisión y Refactorización del Codebase (Branch `optimizaciones`):**
+- [x] **Savings Rate (Reporte D):** Se corrigió la fórmula del ratio de ahorro acumulado `savingsRateYtdPct` para usar `savingsYtd` en vez de `netYtd`, permitiendo que los egresos en categorías `isInvestment` sumen correctamente como ahorro. Test de regresión agregado.
+- [x] **Cron de Gmail:** Se eliminó el riesgo de crash del driver Postgres (conversión errónea de UUID) al pasar un `userId` nulo válido en lugar de un string vacío `''` en `createImportInternal`.
+- [x] **Paralelización de Cotizaciones:** Se optimizó `fetchQuotes` para solicitar cotizaciones de Yahoo Finance concurrentemente usando `Promise.all`, evitando la latencia secuencial en el formulario de patrimonio.
+- [x] **Pool de Conexiones DB:** Se cacheó el cliente Drizzle en `globalThis` para evitar fugas de conexiones en desarrollo (Fast Refresh) y se redujo el tamaño del pool en entornos serverless (`max: 2`).
+- [x] **Pruning de Backups:** Se modificó la nomenclatura de backups (`gd-finanzas-backup-${householdId}-${date}.zip`) y el pruning de Google Drive para filtrar por `householdId` y evitar borrar copias de seguridad de otros inquilinos (defensa multi-tenancy).
+- [x] **Import multi-archivo cross-institución:** Verificado y marcado como completo. El formulario `import-upload-form.tsx` permite configurar y enviar independientemente la institución y cuenta de destino de cada archivo.
+- [x] Cambios confirmados: `typecheck && lint && test` limpios. Branch `optimizaciones` creada y pusheada a GitHub.
 
 **Pendiente próxima sesión:**
-- [ ] Test E2E Gmail import ICBC banco (subir 4 PDFs, verificar routing + parsing)
-- [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
+- [ ] Test E2E Gmail import ICBC banco (subir 4 PDFs reales en el correo de Nico, verificar routing + parsing en prod/dev)
 
 ---
+
+### Sesión 2026-05-26 — Gap analysis PRD + Export general
 
 ### Sesión 2026-05-25 — ICBC Banco Parser + Multi-Attachment Gmail
 

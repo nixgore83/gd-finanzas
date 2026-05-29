@@ -36,8 +36,8 @@ export async function runBackup(householdId: string): Promise<BackupRunResult> {
   const bytes = await buildBackupZip(snapshot);
 
   // Filename con sufijo numérico si hay colisión el mismo día.
-  const existing = await listBackups(folderId);
-  const base = `gd-finanzas-backup-${todayIso()}`;
+  const existing = await listBackups(folderId, householdId);
+  const base = `gd-finanzas-backup-${householdId}-${todayIso()}`;
   const taken = new Set(existing.map((f) => f.name.replace(/\.zip$/, '')));
   let candidate = base;
   let suffix = 1;
@@ -50,7 +50,7 @@ export async function runBackup(householdId: string): Promise<BackupRunResult> {
   const uploaded = await uploadBackup({ name: filename, bytes, folderId });
 
   // Prune: re-list para incluir el recién subido en orden por createdTime.
-  const after = await listBackups(folderId);
+  const after = await listBackups(folderId, householdId);
   const toDelete = pruneOldBackups(after, BACKUP_RETENTION);
   for (const f of toDelete) {
     await deleteFile(f.id);
