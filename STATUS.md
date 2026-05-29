@@ -3,12 +3,27 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-28 por Claude
+**Última actualización:** 2026-05-29 por Claude
 
 ---
 
 ## Hito en curso
-**PRD V1.1 completo. V1.1 funcional en producción con optimizaciones aplicadas.**
+**PRD V1.1 completo + en producción. Mejora UX: panel de acciones pendientes.**
+
+### Sesión 2026-05-29 — Acciones pendientes (dashboard + página `/pendientes`)
+
+**Merge + deploy de `optimizaciones`:**
+- [x] PR #5 (`optimizaciones → main`) mergeado y deployado a producción en Vercel. Incluyó el namespacing de `globalThis.__gdFinanzasDb` (fix de code review).
+
+**Feature: Acciones pendientes (branch `feat/pending-actions`):**
+- [x] Data layer `lib/reports/pending-actions.ts` — `loadPendingActions` + `classifyOverdue` (puro, testeado) + `countPendingActions`. Agrega: imports para revisar (`parsed`/`reviewing`), imports con error, previsiones vencidas (`missed` + `pending` vencida en gracia), resúmenes mensuales faltantes (reusa `detectImportGaps`), y presupuesto del mes sin definir.
+- [x] Página dedicada `/pendientes` con secciones agrupadas y links de acción a `/imports/[id]`, `/imports/new`, `/forecasts`, `/budget`.
+- [x] Bloque-resumen en el dashboard (`PendingActionsSummary`) arriba del HERO; estado "Todo al día" cuando no hay pendientes.
+- [x] Link "Pendientes" en sidebar (sección Operar) con badge de contador (alimentado por `countPendingActions` desde el layout protegido).
+- [x] Test nuevo de `classifyOverdue`. `typecheck && test (263) && lint && build` limpios.
+- [ ] Pendiente: verificación visual con datos reales en dev/prod; abrir PR + deploy.
+
+---
 
 ### Sesión 2026-05-28 — Code Review y Optimizaciones
 
