@@ -8,8 +8,23 @@
 El PRD V1.1 vive en Notion: https://www.notion.so/351933eb1d2681359971ebd831053fdc
 
 **Antes de planear cualquier módulo nuevo, leerlo.** Si hay conflicto entre este
-CLAUDE.md y el PRD, el PRD manda. Si encontrás algo en el PRD que parece estar mal,
-no lo "arregles" en silencio: avisalo.
+CLAUDE.md y el PRD, el PRD manda en lo que respecta a **reglas de negocio y scope**.
+Si encontrás algo en el PRD que parece ser una regla de negocio mal definida, no la
+"arregles" en silencio: avisalo y esperá decisión.
+
+**Mantener el PRD sincronizado con la realidad.** El PRD tiende a quedar viejo a medida
+que el código avanza. Cuando el Notion MCP esté disponible, mantenerlo al día es parte
+del trabajo:
+- Al cerrar un hito o feature no-trivial, reflejarlo en el PRD: bumpear el changelog
+  (fecha + "Claude") y marcar qué quedó implementado.
+- Cuando analices código del repo y detectes que el PRD divergió de la implementación
+  real en algo **fáctico** (versión de stack, región, scheduling de crons, qué módulos
+  existen, fuente de un dato), corregilo en el PRD y dejá nota en el changelog.
+- Distinción clave: divergencias **fácticas** (cómo está hecho) se corrigen directo;
+  cambios de **regla de negocio o scope** (qué debería hacer) se proponen y se confirman
+  antes de escribirlos.
+- Si el Notion MCP no está conectado (corrida headless/cron), anotá el pendiente de sync
+  en `STATUS.md` para hacerlo cuando vuelva a estar disponible.
 
 ---
 
@@ -126,7 +141,7 @@ Antes de decir "listo" en cualquier hito: `npm run typecheck && npm test && npm 
 1. Toda feature no-trivial entra primero por **Plan Mode**. Yo apruebo el plan antes de que escribas código.
 2. Tras implementar, correr typecheck + tests + lint.
 3. Si tocás schema de DB: generar migración Drizzle, aplicarla local, avisar.
-4. Cierre de cada hito: actualizar `STATUS.md` con qué quedó hecho, qué falta, decisiones tomadas, cosas a discutir conmigo o con Pau.
+4. Cierre de cada hito: actualizar `STATUS.md` con qué quedó hecho, qué falta, decisiones tomadas, cosas a discutir conmigo o con Pau. **Y sincronizar el PRD en Notion** (changelog + divergencias fácticas), según la sección "Spec autoritativa".
 5. Sesión nueva: leer este `CLAUDE.md`, leer `STATUS.md`, leer el PRD si la sesión toca módulo nuevo.
 6. Si dudás de una regla de negocio: releer PRD. Si el PRD no resuelve, **preguntar antes de improvisar**. Defaults razonables solo para decisiones internas de implementación, nunca para reglas de negocio.
 
