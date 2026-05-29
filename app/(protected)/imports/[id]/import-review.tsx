@@ -185,11 +185,12 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   }
 
   function doConfirm() {
-    if (!accountId) {
+    const hasToConfirm = lineSummary.accepted + lineSummary.edited > 0;
+    if (hasToConfirm && !accountId) {
       toast.error('Elegí una cuenta destino');
       return;
     }
-    if (lineSummary.accepted + lineSummary.edited === 0) {
+    if (!hasToConfirm && lineSummary.pending > 0) {
       toast.error('No hay líneas aceptadas para confirmar');
       return;
     }
@@ -479,9 +480,11 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           <Button
             type="button"
             onClick={doConfirm}
-            disabled={isPending || lineSummary.accepted + lineSummary.edited === 0}
+            disabled={isPending || (lineSummary.accepted + lineSummary.edited === 0 && lineSummary.pending > 0)}
           >
-            Confirmar import ({lineSummary.accepted + lineSummary.edited})
+            {lineSummary.accepted + lineSummary.edited === 0
+              ? 'Confirmar import'
+              : `Confirmar import (${lineSummary.accepted + lineSummary.edited})`}
           </Button>
           </div>
         </div>

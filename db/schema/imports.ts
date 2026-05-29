@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   timestamp,
+  date,
   integer,
   jsonb,
   index,
@@ -36,6 +37,10 @@ export const imports = pgTable(
     errorMessage: text('error_message'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     transactionCount: integer('transaction_count'),
+    // Período cubierto por el extracto (min/max de las fechas de las líneas
+    // parseadas), persistido para poder ordenar/filtrar en SQL.
+    periodStart: date('period_start'),
+    periodEnd: date('period_end'),
     fileName: text('file_name'),
     summary: jsonb('summary').$type<{
       totalExpense?: string;

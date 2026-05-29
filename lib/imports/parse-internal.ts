@@ -10,6 +10,7 @@ import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
+import { computeImportPeriod } from '@/lib/imports/period';
 import { getServerEnv } from '@/lib/env';
 
 export type ParseImportInternalResult =
@@ -257,6 +258,9 @@ export async function parseImportInternal(
           : null,
     })
     .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
+
+  // Persistir el período cubierto por el extracto (para ordenar/filtrar en la lista).
+  await computeImportPeriod(db, importId);
 
   revalidatePath(`/imports/${importId}`);
   revalidatePath('/imports');

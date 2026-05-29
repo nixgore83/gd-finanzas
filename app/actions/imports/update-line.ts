@@ -7,6 +7,7 @@ import { getDb } from '@/lib/db/client';
 import { categories, imports, importLines } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
+import { computeImportPeriod } from '@/lib/imports/period';
 
 const updateLineSchema = z.object({
   lineId: z.string().uuid(),
@@ -86,6 +87,9 @@ export async function updateImportLine(input: {
       )
       .returning({ id: importLines.id });
     if (updated.length === 0) return { ok: false, error: 'not_found' };
+
+    // La edición pudo cambiar la fecha de la línea → recomputar período del import.
+    await computeImportPeriod(db, parsed.data.importId);
 
     revalidatePath(`/imports/${parsed.data.importId}`);
     return { ok: true };
