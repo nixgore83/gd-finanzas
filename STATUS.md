@@ -8,7 +8,16 @@
 ---
 
 ## Hito en curso
-**PRD V1.1 completo + en producción. Mejora UX: panel de acciones pendientes.**
+**PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-05-29 (cont.) — Mejora de la pantalla `/imports` (branch `feat/imports-screen`)
+
+- [x] **Filtros + orden + paginación (P0):** reescritura de `/imports` con el patrón de `/transactions` (URL search params + Zod, WHERE dinámico, `SortableHeader`, paginación con contador, chips de filtros activos). Filtros: tipo, institución, cuenta, rango de período, búsqueda por nombre de archivo. Orden por fecha/cuenta/período/estado/txns.
+- [x] **Tabs por estado (P1):** segmentos Todos · Para revisar · Confirmados · Error con contadores. Reemplaza el `animate-pulse` global.
+- [x] **Acciones (P2):** reintentar parse en filas con error (reusa `parseImport`), borrar import + bulk delete (`app/actions/imports/delete.ts`, solo estados sin transacciones creadas).
+- [x] **Período como columnas (P3):** `imports.period_start` / `period_end` (migración `0012` + backfill SQL). Helper `lib/imports/period.ts` (`computeImportPeriod`), invocado al parsear (`parse-internal`) y al editar línea (`update-line`). La lista ordena/filtra por período en SQL.
+- [x] Helpers puros en `lib/imports/list-filters.ts` (`viewToStatuses`, `isDeletableStatus`) con tests. `typecheck && test (270) && lint && build` limpios.
+- [ ] **PENDIENTE (bloqueante para deploy):** aplicar migración `0012` con `npm run db:migrate` (requiere `DIRECT_URL`). Aditiva/backward-compatible → aplicar ANTES de deployar el código nuevo.
 
 ### Sesión 2026-05-29 — Acciones pendientes (dashboard + página `/pendientes`)
 
