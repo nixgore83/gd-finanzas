@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { TagMultiSelect, type TagOption } from './tag-multi-select';
 
-type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD' };
+type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD'; ownerTag: string };
 
 type ActionResult =
   | { ok: true; pairId?: string }
@@ -192,7 +192,7 @@ export function TransferForm({
                 <SelectContent>
                   {accounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.currencyDefault})
+                      {a.name} ({a.ownerTag}) ({a.currencyDefault})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -218,7 +218,7 @@ export function TransferForm({
                 <SelectContent>
                   {accounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.currencyDefault})
+                      {a.name} ({a.ownerTag}) ({a.currencyDefault})
                     </SelectItem>
                   ))}
                 </SelectContent>

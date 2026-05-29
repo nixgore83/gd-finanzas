@@ -124,7 +124,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
   // ===== Opciones de filtro =====
   const [accountOptions, institutionOptions] = await Promise.all([
     db
-      .select({ id: accounts.id, name: accounts.name })
+      .select({ id: accounts.id, name: accounts.name, ownerTag: accounts.ownerTag })
       .from(accounts)
       .where(eq(accounts.householdId, householdId))
       .orderBy(asc(accounts.name)),
@@ -229,11 +229,13 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
     });
   }
   if (filters.accountId) {
+    const acc = accountOptions.find((a) => a.id === filters.accountId);
     activeChips.push({
       label: 'Cuenta',
-      value: accountOptions.find((a) => a.id === filters.accountId)?.name ?? '—',
+      value: acc ? `${acc.name}${acc.ownerTag ? ` (${acc.ownerTag})` : ''}` : '—',
     });
   }
+
   if (filters.from) activeChips.push({ label: 'Desde', value: filters.from });
   if (filters.to) activeChips.push({ label: 'Hasta', value: filters.to });
   if (filters.q) activeChips.push({ label: 'Texto', value: filters.q });
@@ -431,6 +433,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                     {accountOptions.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}
+                        {a.ownerTag ? ` (${a.ownerTag})` : ''}
                       </option>
                     ))}
                   </select>

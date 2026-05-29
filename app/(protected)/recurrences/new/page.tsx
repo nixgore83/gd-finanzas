@@ -24,7 +24,12 @@ export default async function NewRecurrencePage() {
 
   const db = getDb();
   const accountRows = await db
-    .select({ id: accounts.id, name: accounts.name, currencyDefault: accounts.currencyDefault })
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      currencyDefault: accounts.currencyDefault,
+      ownerTag: accounts.ownerTag,
+    })
     .from(accounts)
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));

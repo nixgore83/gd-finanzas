@@ -5,7 +5,11 @@ import { parseImportInternal, type ParseImportInternalResult } from '@/lib/impor
 
 export type ParseImportResult = ParseImportInternalResult | { ok: false; error: 'session' };
 
-export async function parseImport(importId: string): Promise<ParseImportResult> {
+export async function parseImport(
+  importId: string,
+  customPassword?: string,
+  persistPassword?: boolean,
+): Promise<ParseImportResult> {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -14,5 +18,5 @@ export async function parseImport(importId: string): Promise<ParseImportResult> 
     throw err;
   }
 
-  return parseImportInternal(importId, session.householdId);
+  return parseImportInternal(importId, session.householdId, customPassword, persistPassword);
 }

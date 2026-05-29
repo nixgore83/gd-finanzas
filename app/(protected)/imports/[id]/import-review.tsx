@@ -41,7 +41,7 @@ type Props = {
   status: string;
   lines: LineRow[];
   tree: CategoryNode[];
-  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null }>;
+  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
   pdfUrl: string | null;
@@ -471,7 +471,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
               <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.name} · {a.currency}
+                    {a.name} ({a.ownerTag}) · {a.currency}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -530,7 +530,7 @@ function LineRowEditor({
   line: LineRow;
   importId: string;
   tree: CategoryNode[];
-  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null }>;
+  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
   currentAccountId: string;
   readOnly: boolean;
   isPending: boolean;
@@ -602,7 +602,7 @@ function LineRowEditor({
           <Input
             value={draft.date}
             onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-            className="h-8 w-32"
+            className="h-8 w-24"
           />
         ) : (
           line.parsedData.date
@@ -613,7 +613,7 @@ function LineRowEditor({
           <Input
             value={draft.description}
             onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            className="h-8"
+            className="h-8 w-full min-w-[120px]"
           />
         ) : (
           line.parsedData.description
@@ -626,7 +626,7 @@ function LineRowEditor({
               value={draft.kind}
               onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
             >
-              <SelectTrigger className="h-8 w-28">
+              <SelectTrigger className="h-8 w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -651,7 +651,7 @@ function LineRowEditor({
           <Input
             value={draft.amountOriginal}
             onChange={(e) => setDraft({ ...draft, amountOriginal: e.target.value })}
-            className="h-8 w-24 text-right"
+            className="h-8 w-20 text-right"
           />
         ) : (
           <span className={line.parsedData.kind === 'income' ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]'}>
@@ -667,7 +667,7 @@ function LineRowEditor({
               setDraft({ ...draft, currencyOriginal: v as 'ARS' | 'USD' })
             }
           >
-            <SelectTrigger className="h-8 w-20">
+            <SelectTrigger className="h-8 w-16">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -687,7 +687,7 @@ function LineRowEditor({
               value={draft.transferAccountId ?? ''}
               onValueChange={(v) => setDraft({ ...draft, transferAccountId: v || undefined })}
             >
-              <SelectTrigger className="h-8 w-56">
+              <SelectTrigger className="h-8 w-44">
                 <SelectValue placeholder="Cuenta contraparte…" />
               </SelectTrigger>
               <SelectContent>
@@ -695,7 +695,7 @@ function LineRowEditor({
                   .filter((a) => a.id !== currentAccountId)
                   .map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} · {a.currency}
+                      {a.name} ({a.ownerTag}) · {a.currency}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -704,7 +704,9 @@ function LineRowEditor({
             (() => {
               const counterpart = accounts.find((a) => a.id === line.parsedData.transferAccountId);
               return counterpart ? (
-                <span className="text-amber-800">{counterpart.name}</span>
+                <span className="text-amber-800">
+                  {counterpart.name} ({counterpart.ownerTag})
+                </span>
               ) : (
                 <span className="text-muted-foreground">Sin contraparte</span>
               );
@@ -715,7 +717,7 @@ function LineRowEditor({
             value={categoryId ?? ''}
             onValueChange={(v) => setCategoryId(v || null)}
           >
-            <SelectTrigger className="h-8 w-56">
+            <SelectTrigger className="h-8 w-44">
               <SelectValue placeholder="—" />
             </SelectTrigger>
             <SelectContent>
