@@ -120,7 +120,7 @@ export default async function TransactionsPage({
 
   // Cargar listas para los Selects de filtro.
   const accountOptions = await db
-    .select({ id: accounts.id, name: accounts.name })
+    .select({ id: accounts.id, name: accounts.name, ownerTag: accounts.ownerTag })
     .from(accounts)
     .where(eq(accounts.householdId, session.householdId))
     .orderBy(asc(accounts.name));
@@ -405,7 +405,7 @@ export default async function TransactionsPage({
                     <option value="">Todas</option>
                     {accountOptions.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name}
+                        {a.name}{a.ownerTag ? ` (${a.ownerTag})` : ''}
                       </option>
                     ))}
                   </select>

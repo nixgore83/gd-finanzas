@@ -65,9 +65,12 @@ export default async function ImportDetailPage({
       transactionCount: imports.transactionCount,
       confirmedAt: imports.confirmedAt,
       createdAt: imports.createdAt,
+      pdfPassword: institutions.pdfPassword,
+      accountPdfPassword: accounts.pdfPassword,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
+    .leftJoin(accounts, eq(accounts.id, imports.accountId))
     .where(and(eq(imports.id, id), eq(imports.householdId, session.householdId)))
     .limit(1);
 
@@ -92,6 +95,7 @@ export default async function ImportDetailPage({
       name: accounts.name,
       currency: accounts.currencyDefault,
       institutionId: accounts.institutionId,
+      ownerTag: accounts.ownerTag,
     })
     .from(accounts)
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
@@ -191,7 +195,11 @@ export default async function ImportDetailPage({
             archivo y vas a poder revisarlas antes de confirmar.
           </p>
           <div className="mt-3">
-            <ParseButton importId={row.id} />
+            <ParseButton
+              importId={row.id}
+              isPdf={!row.fileUrl?.toLowerCase().endsWith('.csv')}
+              hasStoredPassword={!!(row.accountPdfPassword || row.pdfPassword)}
+            />
           </div>
         </div>
       )}

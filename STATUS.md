@@ -10,6 +10,17 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-05-29 (cont.) — Password PDF manual + ownerTag en dropdowns (branch `feat/manual-pdf-password`, hecho con Antigravity)
+
+- [x] **Password de PDF manual al parsear:** `ParseButton` ahora permite ingresar la contraseña de desencriptación al reparsear (con placeholder según si hay una guardada) + checkbox "guardar para futuras importaciones". `parse`/`parse-internal` reciben `customPassword`/`persistPassword`; al desencriptar OK con password manual, se persiste en `accounts.pdf_password` (o `institutions.pdf_password` si el import no tiene cuenta).
+- [x] **ownerTag (Nico/Pau/Hogar) en todos los dropdowns de cuentas:** transactions (form + transfer + lista), recurrences (form + páginas), imports (review + lista). Queries de cuentas ampliadas con `ownerTag`.
+- [x] Revisado, validado (`typecheck && test 270 && lint && build`), retoque cosmético de indentación. Observaciones menores no bloqueantes: el persist corre dentro del `try` de decrypt; persistir en `institutions` escribe en tabla global (inocuo para 1 household).
+
+### Sesión 2026-05-29 (cont.) — Sync del PRD de Notion + convención (branch `docs/sync-prd-convention`)
+
+- [x] PRD de Notion estaba sin tocar desde 2026-05-05; corregido inline (patrimonio, MFA obligatoria, Gmail import, región us-west-2, Next 16 + Drizzle, FX promedio vendedor) + changelog v1.2. PR #8 mergeado.
+- [x] CLAUDE.md: convención de mantener el PRD sincronizado al cerrar cada hito.
+
 ### Sesión 2026-05-29 (cont.) — Mejora de la pantalla `/imports` (branch `feat/imports-screen`)
 
 - [x] **Filtros + orden + paginación (P0):** reescritura de `/imports` con el patrón de `/transactions` (URL search params + Zod, WHERE dinámico, `SortableHeader`, paginación con contador, chips de filtros activos). Filtros: tipo, institución, cuenta, rango de período, búsqueda por nombre de archivo. Orden por fecha/cuenta/período/estado/txns.

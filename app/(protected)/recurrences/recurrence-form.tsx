@@ -31,7 +31,7 @@ import {
   type RecurrenceKind,
 } from '@/lib/schemas/recurrence';
 
-type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD' };
+type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD'; ownerTag: string };
 type CategoryOption = { id: string; name: string; kind: 'income' | 'expense'; depth: 0 | 1 };
 
 type ActionResult =
@@ -230,7 +230,7 @@ export function RecurrenceForm({
               <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.name} ({a.currencyDefault})
+                    {a.name} ({a.ownerTag}) ({a.currencyDefault})
                   </SelectItem>
                 ))}
               </SelectContent>

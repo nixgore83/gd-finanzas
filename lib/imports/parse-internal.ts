@@ -28,6 +28,8 @@ export type ParseImportInternalResult =
 export async function parseImportInternal(
   importId: string,
   householdId: string,
+  customPassword?: string,
+  persistPassword?: boolean,
 ): Promise<ParseImportInternalResult> {
   const db = getDb();
 
@@ -94,12 +96,27 @@ export async function parseImportInternal(
 
   // Unlock protected PDF
   const isPdf = !row.fileUrl.toLowerCase().endsWith('.csv');
-  const pdfPassword = row.accountPdfPassword ?? row.pdfPassword;
+  const pdfPassword = customPassword || row.accountPdfPassword || row.pdfPassword;
   if (isPdf && pdfPassword) {
     try {
       const { decryptPDF } = await import('@pdfsmaller/pdf-decrypt');
       const decrypted = await decryptPDF(bytes, pdfPassword);
       bytes = new Uint8Array(decrypted);
+
+      // Si la desencriptación fue exitosa y vino un password manual, persistirlo
+      if (customPassword && persistPassword) {
+        if (row.accountId) {
+          await db
+            .update(accounts)
+            .set({ pdfPassword: customPassword })
+            .where(eq(accounts.id, row.accountId));
+        } else if (row.institutionId) {
+          await db
+            .update(institutions)
+            .set({ pdfPassword: customPassword })
+            .where(eq(institutions.id, row.institutionId));
+        }
+      }
     } catch (err) {
       console.error('[imports] pdf unlock failed', { importId });
       await db
@@ -107,7 +124,7 @@ export async function parseImportInternal(
         .set({
           status: 'error',
           errorMessage:
-            'No se pudo desbloquear el PDF. Verificá la contraseña en la institución.',
+            'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.',
         })
         .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
       return {
