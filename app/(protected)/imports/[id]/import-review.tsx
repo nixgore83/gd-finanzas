@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
 import Decimal from 'decimal.js';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -571,11 +571,22 @@ function LineRowEditor({
     });
   }
 
+  function cancelEdit() {
+    setEditing(false);
+    setDraft(line.parsedData);
+    setCategoryId(line.proposedCategoryId);
+  }
+
+  const colCount = readOnly ? 7 : 9;
+  const counterpart = accounts.find((a) => a.id === line.parsedData.transferAccountId);
+
   return (
+    <>
     <tr
       className={cn(
         'border-t align-top',
         isSelected && !readOnly && 'bg-blue-50/50',
+        editing && !readOnly && 'bg-blue-50/40',
         !readOnly && !editing && line.status !== 'rejected' && 'cursor-pointer',
       )}
       onClick={(e) => {
@@ -592,54 +603,21 @@ function LineRowEditor({
             aria-label="Seleccionar línea"
             checked={isSelected}
             onChange={onToggleSelect}
-            disabled={line.status === 'rejected'}
+            disabled={line.status === 'rejected' || editing}
             className="size-4 rounded border-input"
           />
         </td>
       )}
-      <td className="px-2 py-1.5 tabular-nums">
-        {editing ? (
-          <Input
-            value={draft.date}
-            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-            className="h-8 w-24"
-          />
-        ) : (
-          line.parsedData.date
-        )}
-      </td>
-      <td className="px-2 py-1.5">
-        {editing ? (
-          <Input
-            value={draft.description}
-            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            className="h-8 w-full min-w-[120px]"
-          />
-        ) : (
-          line.parsedData.description
-        )}
-      </td>
+      <td className="px-2 py-1.5 tabular-nums">{line.parsedData.date}</td>
+      <td className="px-2 py-1.5">{line.parsedData.description}</td>
       <td className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1">
-          {editing ? (
-            <Select
-              value={draft.kind}
-              onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
-            >
-              <SelectTrigger className="h-8 w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="expense">Gasto</SelectItem>
-                <SelectItem value="income">Ingreso</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : line.parsedData.kind === 'expense' ? (
+          {line.parsedData.kind === 'expense' ? (
             <span className="text-[color:var(--bad)]">Gasto</span>
           ) : (
             <span className="text-[color:var(--good)]">Ingreso</span>
           )}
-          {(line.parsedData.isTransfer || draft.isTransfer) && (
+          {line.parsedData.isTransfer && (
             <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
               Transfer
             </span>
@@ -647,88 +625,20 @@ function LineRowEditor({
         </div>
       </td>
       <td className="px-2 py-1.5 text-right tabular-nums">
-        {editing ? (
-          <Input
-            value={draft.amountOriginal}
-            onChange={(e) => setDraft({ ...draft, amountOriginal: e.target.value })}
-            className="h-8 w-20 text-right"
-          />
-        ) : (
-          <span className={line.parsedData.kind === 'income' ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]'}>
-            {line.parsedData.amountOriginal}
-          </span>
-        )}
+        <span className={line.parsedData.kind === 'income' ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]'}>
+          {line.parsedData.amountOriginal}
+        </span>
       </td>
+      <td className="px-2 py-1.5">{line.parsedData.currencyOriginal}</td>
       <td className="px-2 py-1.5">
-        {editing ? (
-          <Select
-            value={draft.currencyOriginal}
-            onValueChange={(v) =>
-              setDraft({ ...draft, currencyOriginal: v as 'ARS' | 'USD' })
-            }
-          >
-            <SelectTrigger className="h-8 w-16">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ARS">ARS</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          line.parsedData.currencyOriginal
-        )}
-      </td>
-      <td className="px-2 py-1.5">
-        {draft.isTransfer ? (
-          // Transfer: show counterpart account select instead of category
-          editing ? (
-            <Select
-              value={draft.transferAccountId ?? ''}
-              onValueChange={(v) => setDraft({ ...draft, transferAccountId: v || undefined })}
-            >
-              <SelectTrigger className="h-8 w-44">
-                <SelectValue placeholder="Cuenta contraparte…" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts
-                  .filter((a) => a.id !== currentAccountId)
-                  .map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.ownerTag}) · {a.currency}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+        {line.parsedData.isTransfer ? (
+          counterpart ? (
+            <span className="text-amber-800">
+              {counterpart.name} ({counterpart.ownerTag})
+            </span>
           ) : (
-            (() => {
-              const counterpart = accounts.find((a) => a.id === line.parsedData.transferAccountId);
-              return counterpart ? (
-                <span className="text-amber-800">
-                  {counterpart.name} ({counterpart.ownerTag})
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Sin contraparte</span>
-              );
-            })()
+            <span className="text-muted-foreground">Sin contraparte</span>
           )
-        ) : editing ? (
-          <Select
-            value={categoryId ?? ''}
-            onValueChange={(v) => setCategoryId(v || null)}
-          >
-            <SelectTrigger className="h-8 w-44">
-              <SelectValue placeholder="—" />
-            </SelectTrigger>
-            <SelectContent>
-              {categoriesForKind.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.depth === 1 ? '↳ ' : ''}
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         ) : (
           categoryName ?? <span className="text-muted-foreground">—</span>
         )}
@@ -758,34 +668,7 @@ function LineRowEditor({
           {line.transactionId ? (
             <span className="text-xs text-muted-foreground">linkeada</span>
           ) : editing ? (
-            <div className="flex flex-wrap gap-1">
-              <Button size="sm" type="button" onClick={save} disabled={isPending}>
-                Guardar
-              </Button>
-              {draft.isTransfer && (
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setDraft({ ...draft, isTransfer: false, transferAccountId: undefined })}
-                  className="text-amber-700 text-xs"
-                >
-                  No transfer
-                </Button>
-              )}
-              <Button
-                size="sm"
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setEditing(false);
-                  setDraft(line.parsedData);
-                  setCategoryId(line.proposedCategoryId);
-                }}
-              >
-                X
-              </Button>
-            </div>
+            <span className="text-xs font-medium text-blue-700">✎ editando ↓</span>
           ) : (
             <div className="flex flex-wrap gap-1">
               {line.status === 'pending' && (
@@ -862,6 +745,160 @@ function LineRowEditor({
         </td>
       )}
     </tr>
+    {editing && !readOnly && (
+      <tr className="border-t bg-blue-50/40">
+        <td colSpan={colCount} className="px-3 py-3">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-900">
+              Editando línea
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Fecha">
+                <Input
+                  value={draft.date}
+                  onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                  className="h-8 w-32"
+                />
+              </Field>
+              <Field label="Tipo">
+                <Select
+                  value={draft.kind}
+                  onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
+                >
+                  <SelectTrigger className="h-8 w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="expense">Gasto</SelectItem>
+                    <SelectItem value="income">Ingreso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Monto">
+                <Input
+                  value={draft.amountOriginal}
+                  onChange={(e) => setDraft({ ...draft, amountOriginal: e.target.value })}
+                  className="h-8 w-32 text-right"
+                />
+              </Field>
+              <Field label="Moneda">
+                <Select
+                  value={draft.currencyOriginal}
+                  onValueChange={(v) => setDraft({ ...draft, currencyOriginal: v as 'ARS' | 'USD' })}
+                >
+                  <SelectTrigger className="h-8 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Descripción" className="min-w-[240px] flex-1">
+                <Input
+                  value={draft.description}
+                  onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                  className="h-8 w-full"
+                />
+              </Field>
+              {draft.isTransfer ? (
+                <Field label="Cuenta contraparte">
+                  <Select
+                    value={draft.transferAccountId ?? ''}
+                    onValueChange={(v) => setDraft({ ...draft, transferAccountId: v || undefined })}
+                  >
+                    <SelectTrigger className="h-8 w-64">
+                      <SelectValue placeholder="Cuenta contraparte…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts
+                        .filter((a) => a.id !== currentAccountId)
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name} ({a.ownerTag}) · {a.currency}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : (
+                <Field label="Categoría">
+                  <Select
+                    value={categoryId ?? ''}
+                    onValueChange={(v) => setCategoryId(v || null)}
+                  >
+                    <SelectTrigger className="h-8 w-64">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoriesForKind.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.depth === 1 ? '↳ ' : ''}
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" type="button" onClick={save} disabled={isPending}>
+                Guardar
+              </Button>
+              <Button size="sm" type="button" variant="outline" onClick={cancelEdit} disabled={isPending}>
+                Cancelar
+              </Button>
+              {draft.isTransfer ? (
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setDraft({ ...draft, isTransfer: false, transferAccountId: undefined })}
+                  className="text-amber-700"
+                >
+                  No es transfer
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setDraft({ ...draft, isTransfer: true });
+                    setCategoryId(null);
+                  }}
+                  className="text-amber-700"
+                >
+                  ⇄ Marcar como transfer
+                </Button>
+              )}
+            </div>
+          </div>
+        </td>
+      </tr>
+    )}
+    </>
+  );
+}
+
+function Field({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('space-y-1', className)}>
+      <label className="block text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
+    </div>
   );
 }
 
