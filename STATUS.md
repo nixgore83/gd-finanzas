@@ -21,7 +21,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] **#14** — **Edición masiva de moneda** en revisión (`bulkSetCurrency`): el LLM a veces asume USD en cuenta ARS. Selector + "Aplicar moneda" en la barra de selección.
 - [x] **Contraparte de transferencias (decisión Nico):** se PERSISTEN identificadores de contraparte (name, accountRef, CUIL/CUIT, CBU, alias) en `import_lines.parsed_data.counterparty` y `transactions.meta.counterparty`. Cambios: `counterparty` en `parsedTxLineSchema` (+ aliases tolerantes), prompt ICBC banco invertido (extrae a `counterparty`, deja `description` limpia), mapeo en `confirm.ts`, display en revisión (`CounterpartyTag`), tests (274). **Excepción documentada en CLAUDE.md** (reemplaza "nunca almacenar CBU/CUIT"). Sin migración (todo jsonb). Otros parsers (TC/broker) quedan pendientes de sumar el mismo patrón.
 - **Debugging prod:** Hobby NO persiste runtime logs → se usaron logs de Supabase (MCP: storage/postgres/auth) + `execute_sql`.
-- [ ] **Pendiente sync PRD Notion:** reflejar la excepción de datos de contraparte + parseo async V1.2 en el changelog del PRD.
+- [x] **Sync PRD Notion:** §7 Seguridad actualizada (excepción de datos de contraparte) + changelog v1.3 (2026-06-08).
 
 ### Sesión 2026-05-29 (cont.) — Password PDF manual + ownerTag en dropdowns (branch `feat/manual-pdf-password`, hecho con Antigravity)
 
