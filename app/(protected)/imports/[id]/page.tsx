@@ -15,6 +15,11 @@ export const metadata = {
   title: 'Import · gd-finanzas',
 };
 
+// `parseImport` (llamada síncrona al LLM, 5-15s típicos pero un PDF grande puede
+// más) y `confirmImport` (crea N transacciones) corren en el contexto de esta
+// ruta. Le damos margen amplio para evitar 504 en el parseo (ver STATUS.md).
+export const maxDuration = 300;
+
 const STATUS_LABELS: Record<string, string> = {
   uploaded: 'Subido',
   parsing: 'Parseando…',
