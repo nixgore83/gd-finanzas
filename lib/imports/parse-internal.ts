@@ -118,20 +118,27 @@ export async function parseImportInternal(
         }
       }
     } catch (err) {
-      console.error('[imports] pdf unlock failed', { importId });
-      await db
-        .update(imports)
-        .set({
-          status: 'error',
-          errorMessage:
-            'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.',
-        })
-        .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
-      return {
-        ok: false,
-        error: 'unknown',
-        message: `PDF protegido: ${(err as Error).message?.slice(0, 100)}`,
-      };
+      // Un PDF sin encriptar + contraseña (guardada o manual) no es un error:
+      // no hay nada que desencriptar, seguimos con los bytes originales.
+      const errMsg = (err as Error).message ?? '';
+      const notEncrypted =
+        /not encrypted/i.test(errMsg) || /No \/Encrypt dictionary/i.test(errMsg);
+      if (!notEncrypted) {
+        console.error('[imports] pdf unlock failed', { importId });
+        await db
+          .update(imports)
+          .set({
+            status: 'error',
+            errorMessage:
+              'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.',
+          })
+          .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
+        return {
+          ok: false,
+          error: 'unknown',
+          message: `PDF protegido: ${errMsg.slice(0, 100)}`,
+        };
+      }
     }
   }
 
