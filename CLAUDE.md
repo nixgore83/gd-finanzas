@@ -148,6 +148,57 @@ Antes de decir "listo" en cualquier hito: `npm run typecheck && npm test && npm 
 
 ---
 
+## Trabajo en paralelo — varios agentes a la vez
+
+**Asumí siempre que puede haber otro(s) agente(s) trabajando en este repo al mismo tiempo,
+sobre el mismo working tree.** El estado del repo puede cambiar entre una tool call y la
+siguiente sin que vos lo hayas tocado. Estas precauciones son **NO NEGOCIABLES**:
+
+### Branch propio, siempre
+- **Nunca trabajes ni commitees directo en `main`.** Antes de escribir código, creá tu
+  propio branch: `git fetch origin && git switch -c <tipo>/<descripcion-corta> origin/main`.
+- **Un branch por agente.** No compartas branch con otro agente ni reutilices uno ajeno.
+- Idealmente, aislá el filesystem con un **git worktree** propio
+  (`git worktree add ../gd-<branch> <branch>`) para no ver ni pisar los archivos sin
+  commitear de otro agente. Si el harness ofrece `isolation: "worktree"`, usalo.
+
+### Git: solo operaciones acotadas a TUS archivos
+Estas operaciones tocan el working tree entero o el WIP ajeno y están **prohibidas** salvo
+que el usuario lo pida explícitamente:
+- ❌ `git stash` / `git stash pop` — se lleva los cambios sin commitear de los demás.
+  (Para chequear si un error es tuyo, no stashees: mirá `git diff -- <archivo>`.)
+- ❌ `git reset --hard`, `git checkout -- .`, `git clean`, `git restore .` sin path.
+- ❌ `git add -A` / `git add .` / `git commit -am` — stagea archivos que no tocaste,
+  incluido el WIP de otro agente. **Stageá siempre por path explícito:** `git add <archivo>`.
+- ❌ `git push --force`, rebase o amend de un branch que no sea exclusivamente tuyo.
+- ✅ Permitido: `git diff -- <archivo>`, `git add <archivo>`, `git commit` de tus paths,
+  `git switch`, `git worktree`, push de tu propio branch.
+
+### Typecheck / test / lint en árbol compartido
+- `npm run typecheck && npm test && npm run lint` corren sobre **todo** el working tree,
+  que puede incluir cambios a medio hacer de otro agente.
+- **Un error en un archivo que vos no tocaste probablemente es WIP ajeno: no lo "arregles",
+  avisalo.** Para distinguir lo tuyo, mirá `git diff` de tus paths antes de atribuirte un fallo.
+
+### Archivos compartidos
+- `CLAUDE.md`, `STATUS.md`, `package.json`, lockfiles, `db/schema/*` y `db/migrations/*` son
+  puntos calientes de conflicto. Editá **mínimo y por append** cuando se pueda, y **re-leé el
+  archivo justo antes de escribir** (puede haber cambiado bajo tus pies).
+- Migraciones Drizzle: revisá `db/migrations/` por trabajo no pusheado antes de generar una
+  nueva; dos migraciones en paralelo sobre el mismo schema se pisan.
+
+### Procesos y servicios
+- No mates ni reinicies dev servers, watchers ni procesos en background: otro agente puede
+  depender de ellos.
+- Migraciones/seeds contra la DB compartida: coordiná, no apliques cambios destructivos en
+  paralelo.
+
+### Cierre
+- Commiteá **solo tus archivos** (por path), pusheá **tu** branch y abrí PR.
+  **No mergees a `main` por tu cuenta** mientras pueda haber trabajo ajeno abierto.
+
+---
+
 ## Hitos del proyecto
 
 | # | Hito | Output |
