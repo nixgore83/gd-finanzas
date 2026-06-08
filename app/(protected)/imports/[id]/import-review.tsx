@@ -20,6 +20,7 @@ import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
+import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
 type LineRow = {
@@ -77,6 +78,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const [accountId, setAccountId] = useState<string>(defaultAccount?.id ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
+  const [bulkCurrency, setBulkCurrency] = useState<'ARS' | 'USD' | ''>('');
 
   const lineSummary = useMemo(() => {
     const c = { pending: 0, accepted: 0, rejected: 0, edited: 0 };
@@ -152,6 +154,32 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
         toast.success(`Categoría asignada a ${res.updated} líneas${skippedMsg}`);
         setSelectedIds(new Set());
         setBulkCategoryId('');
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  function doBulkCurrency() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    if (!bulkCurrency) {
+      toast.error('Elegí una moneda');
+      return;
+    }
+    startTransition(async () => {
+      const res = await bulkSetCurrency({
+        importId,
+        lineIds: [...selectedIds],
+        currency: bulkCurrency,
+      });
+      if (res.ok) {
+        toast.success(`Moneda ${bulkCurrency} asignada a ${res.updated} líneas`);
+        setSelectedIds(new Set());
+        setBulkCurrency('');
         router.refresh();
       } else {
         toast.error(`Error: ${res.error}`);
@@ -273,21 +301,48 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                   </p>
                 )}
               </div>
-              <CategoryCombobox
-                options={bulkCategoryOptions}
-                value={bulkCategoryId}
-                onChange={setBulkCategoryId}
-                disabled={uniformKind === null || isPending}
-                placeholder="Buscar categoría…"
-              />
-              <Button
-                type="button"
-                size="sm"
-                onClick={doBulkCategory}
-                disabled={isPending || !bulkCategoryId || uniformKind === null}
-              >
-                Aplicar a {selectedIds.size}
-              </Button>
+              <div className="flex flex-wrap items-end gap-2">
+                <CategoryCombobox
+                  options={bulkCategoryOptions}
+                  value={bulkCategoryId}
+                  onChange={setBulkCategoryId}
+                  disabled={uniformKind === null || isPending}
+                  placeholder="Buscar categoría…"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={doBulkCategory}
+                  disabled={isPending || !bulkCategoryId || uniformKind === null}
+                >
+                  Aplicar categoría
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-blue-900">Moneda</label>
+                  <Select
+                    value={bulkCurrency}
+                    onValueChange={(v) => setBulkCurrency(v as 'ARS' | 'USD')}
+                  >
+                    <SelectTrigger className="h-9 w-24 bg-background">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ARS">ARS</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={doBulkCurrency}
+                  disabled={isPending || !bulkCurrency}
+                >
+                  Aplicar moneda
+                </Button>
+              </div>
               <Button
                 type="button"
                 size="sm"
