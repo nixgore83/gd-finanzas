@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import type { CategoryNode } from '@/lib/categories/tree';
-import type { ParsedTxLine } from '@/lib/imports/parsers/types';
+import type { Counterparty, ParsedTxLine } from '@/lib/imports/parsers/types';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
@@ -664,7 +664,10 @@ function LineRowEditor({
         </td>
       )}
       <td className="px-2 py-1.5 tabular-nums">{line.parsedData.date}</td>
-      <td className="px-2 py-1.5">{line.parsedData.description}</td>
+      <td className="px-2 py-1.5">
+        {line.parsedData.description}
+        <CounterpartyTag counterparty={line.parsedData.counterparty} />
+      </td>
       <td className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1">
           {line.parsedData.kind === 'expense' ? (
@@ -937,6 +940,26 @@ function LineRowEditor({
       </tr>
     )}
     </>
+  );
+}
+
+function CounterpartyTag({ counterparty }: { counterparty?: Counterparty }) {
+  if (!counterparty) return null;
+  const { name, accountRef, cuil, cbu, alias } = counterparty;
+  const ids = [
+    accountRef && `cta ${accountRef}`,
+    cuil && `CUIL ${cuil}`,
+    cbu && `CBU ${cbu}`,
+    alias && `alias ${alias}`,
+  ].filter(Boolean);
+  if (!name && ids.length === 0) return null;
+  return (
+    <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+      {name && <span className="font-medium">{name}</span>}
+      {ids.length > 0 && (
+        <span className="block font-mono">{ids.join(' · ')}</span>
+      )}
+    </div>
   );
 }
 

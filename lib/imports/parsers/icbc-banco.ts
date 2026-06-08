@@ -9,19 +9,24 @@ FORMATO 1 — AVISO DE TRANSFERENCIAS MINORISTAS (AV.TRANSF.MINORISTAS)
 Tabla con columnas: FECHA | REFERENCIA | ORDENANTE / BENEFICIARIO | ORIGEN | DESTINO | DEBITOS | CREDITOS
 - Cada fila es UNA transferencia. La mayoría son transferencias entre cuentas propias o de/hacia terceros.
 - Seteá "isTransfer": true en TODAS las líneas de este formato (son todas transferencias).
-- "description": usá el nombre del ORDENANTE o BENEFICIARIO limpio (ej: "GORE NICOLAS MARIO", "DALMASSO PAULA CECIL", "CINQUE HERMANOS SOCI"). NO incluyas referencia, CBU, CUIT ni código de banco.
-- Si el concepto dice "ALQUILERES" u otro concepto específico, incluilo en la descripción (ej: "ALQUILERES - OSNAJANSKY MARTI").
+- "description": un concepto LIMPIO y corto. Si hay un concepto explícito (ej: "ALQUILERES"), usalo; si no, usá el nombre de la contraparte (ej: "Transf. de GORE NICOLAS"). NO metas CBU, CUIT, nro de cuenta ni referencia en la description.
+- "counterparty": extraé acá los identificadores de la contraparte (ordenante o beneficiario):
+  { "name": nombre tal cual (ej "GORE NICOLAS MARIO"), "accountRef": nro de cuenta de origen/destino si figura (ej "0926/01109094/30"), "cuil": CUIL/CUIT si figura, "cbu": CBU si figura, "alias": alias bancario si figura }.
+  Incluí solo los campos que realmente aparezcan; omití los que no.
 
 FORMATO 2 — EXTRACTO DE MOVIMIENTOS (EXT.DE.MOVIMIENTOS)
 Tabla con columnas: FECHA | CONCEPTO | F.VALOR | COMPROBANTE | ORIGEN | CANAL | DEBITOS | CREDITOS | SALDOS
 - Cada fila es un movimiento (transferencia, débito automático, impuesto, comisión, etc.).
-- "description": usá el CONCEPTO tal como aparece. NO incluyas comprobante, CBU, CUIT ni datos sensibles.
-- Solo seteá "isTransfer": true si el concepto indica transferencia (TRANSF, TRF, DEBIN).
+- "description": usá el CONCEPTO de forma LIMPIA. Si el concepto trae embebido un nro de cuenta/CUIL/comprobante (ej "TRASP.DE 0926/01109094/30"), dejá en description solo la parte legible ("Trasp. de") y mové el identificador a "counterparty".
+- "counterparty": si el movimiento es una transferencia/traspaso y se puede identificar la contraparte, extraé acá lo que figure:
+  { "name", "accountRef", "cuil", "cbu", "alias" }. Incluí solo los campos presentes; si no hay contraparte identificable, omití "counterparty".
+- Solo seteá "isTransfer": true si el concepto indica transferencia (TRANSF, TRF, TRASP, DEBIN).
 
 REGLAS GENERALES:
 - Devolvé ÚNICAMENTE un objeto JSON con la forma { "lines": [...] }.
 - NO incluyas markdown fences ni texto fuera del JSON.
-- NUNCA incluyas CBU, alias, CUIT, claves ni datos sensibles en ningún campo.
+- Los identificadores de la contraparte (CBU, CUIT, nro de cuenta, alias) van EN EL CAMPO "counterparty", NUNCA mezclados en "description". No inventes datos: si un campo no aparece en el PDF, omitilo.
+- NUNCA incluyas claves, contraseñas ni credenciales de acceso en ningún campo.
 - IGNORÁ saldos, totales, encabezados, carátulas, textos legales.
 - Si el PDF dice "SIN MOVIMIENTOS", devolvé { "lines": [] }.
 - Fechas en formato YYYY-MM-DD. Si solo dice "06-03" y el resumen es período 01/03/2026 al 31/03/2026, la fecha es 2026-03-06.

@@ -146,3 +146,75 @@ describe('parsedTxLineSchema preprocess (alias + coerce)', () => {
     if (out.success) expect(out.data.kind).toBe('income');
   });
 });
+
+describe('parsedTxLineSchema counterparty', () => {
+  it('acepta counterparty completo', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-01-23',
+      description: 'Transf. de',
+      amountOriginal: '8117.71',
+      currencyOriginal: 'ARS',
+      kind: 'income',
+      isTransfer: true,
+      counterparty: {
+        name: 'GORE NICOLAS MARIO',
+        accountRef: '0926/01109094/30',
+        cuil: '20-12345678-9',
+        cbu: '0150999900000012345678',
+        alias: 'mi.alias.bancario',
+      },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) {
+      expect(out.data.counterparty?.name).toBe('GORE NICOLAS MARIO');
+      expect(out.data.counterparty?.accountRef).toBe('0926/01109094/30');
+      expect(out.data.counterparty?.cuil).toBe('20-12345678-9');
+    }
+  });
+
+  it('normaliza aliases (cuit→cuil, account_number→accountRef, nombre→name) y trimea', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-01-23',
+      description: 'ALQUILERES',
+      amountOriginal: '300000.00',
+      currencyOriginal: 'ARS',
+      kind: 'income',
+      counterparty: {
+        nombre: '  OSNAJANSKY MARTI  ',
+        account_number: '0072/00012345/01',
+        cuit: '27-98765432-1',
+      },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) {
+      expect(out.data.counterparty?.name).toBe('OSNAJANSKY MARTI');
+      expect(out.data.counterparty?.accountRef).toBe('0072/00012345/01');
+      expect(out.data.counterparty?.cuil).toBe('27-98765432-1');
+    }
+  });
+
+  it('counterparty sin campos útiles → undefined', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-01-23',
+      description: 'X',
+      amountOriginal: '10.00',
+      currencyOriginal: 'ARS',
+      kind: 'expense',
+      counterparty: { name: '', accountRef: '   ' },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.counterparty).toBeUndefined();
+  });
+
+  it('línea sin counterparty sigue siendo válida', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-01-23',
+      description: 'NETFLIX',
+      amountOriginal: '12.99',
+      currencyOriginal: 'USD',
+      kind: 'expense',
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.counterparty).toBeUndefined();
+  });
+});

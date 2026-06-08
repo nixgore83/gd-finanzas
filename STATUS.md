@@ -3,12 +3,25 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-05-29 por Claude
+**Última actualización:** 2026-06-08 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-06-08 — Fixes de imports en producción + contraparte de transferencias
+
+Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature de contraparte.
+
+- [x] **#10** — PDF sin encriptar: `decryptPDF` tiraba "not encrypted" y mataba el parseo; ahora ese caso se ignora y se sigue con bytes originales (solo falla ante contraseña genuinamente incorrecta).
+- [x] **#11** — Editor de línea de import como **panel expandible** (colSpan full-width) en vez de inline por celda → elimina scroll horizontal y botones escondidos.
+- [x] **#12** — `maxDuration` explícito en rutas de imports (`/imports/new` 60s, `/imports/[id]` 300s). Resolvía 504 `FUNCTION_INVOCATION_TIMEOUT` al subir (default de Hobby bajo).
+- [x] **#13** — Estado `parsing` huérfano (parse síncrono que muere por timeout deja el import pegado): ahora muestra botón "Reintentar parseo". Fix de fondo (parseo async) sigue pendiente para V1.2.
+- [x] **#14** — **Edición masiva de moneda** en revisión (`bulkSetCurrency`): el LLM a veces asume USD en cuenta ARS. Selector + "Aplicar moneda" en la barra de selección.
+- [x] **Contraparte de transferencias (decisión Nico):** se PERSISTEN identificadores de contraparte (name, accountRef, CUIL/CUIT, CBU, alias) en `import_lines.parsed_data.counterparty` y `transactions.meta.counterparty`. Cambios: `counterparty` en `parsedTxLineSchema` (+ aliases tolerantes), prompt ICBC banco invertido (extrae a `counterparty`, deja `description` limpia), mapeo en `confirm.ts`, display en revisión (`CounterpartyTag`), tests (274). **Excepción documentada en CLAUDE.md** (reemplaza "nunca almacenar CBU/CUIT"). Sin migración (todo jsonb). Otros parsers (TC/broker) quedan pendientes de sumar el mismo patrón.
+- **Debugging prod:** Hobby NO persiste runtime logs → se usaron logs de Supabase (MCP: storage/postgres/auth) + `execute_sql`.
+- [ ] **Pendiente sync PRD Notion:** reflejar la excepción de datos de contraparte + parseo async V1.2 en el changelog del PRD.
 
 ### Sesión 2026-05-29 (cont.) — Password PDF manual + ownerTag en dropdowns (branch `feat/manual-pdf-password`, hecho con Antigravity)
 

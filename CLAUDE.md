@@ -54,8 +54,9 @@ del trabajo:
 - **RLS habilitado en TODAS las tablas** con datos del usuario, sin excepción.
 - **API keys** (Anthropic, Google Drive OAuth, Supabase service_role) solo en Vercel env vars. Jamás en cliente.
 - **MFA obligatorio** para los 2 usuarios reales en producción.
-- **Nunca almacenar:** CBU, alias, números de tarjeta completos, claves bancarias, credenciales.
-- Si el parser de imports detecta credenciales en un PDF → **enmascarar antes de persistir**.
+- **Nunca almacenar:** claves bancarias, contraseñas, números de tarjeta completos, credenciales de acceso.
+- **Excepción documentada (decisión Nico, 2026-06-08):** los **identificadores de contraparte** de transferencias/movimientos importados (nombre, nro de cuenta, CUIL/CUIT, CBU, alias) **SÍ se persisten** deliberadamente, en `import_lines.parsed_data.counterparty` y `transactions.meta.counterparty`, para alinear info y deducible Ganancias. Quedan bajo RLS+MFA, **nunca se loguean**, y van en campo estructurado (no en texto libre / `description`). El export contador decide aparte si los enmascara. Esto reemplaza la regla previa de "nunca almacenar CBU/alias/CUIT".
+- Si el parser de imports detecta **credenciales de acceso** (claves, PINs, tokens) en un PDF → **enmascarar antes de persistir**.
 - Export contador (`/exports`): no persiste más de 24h en Storage.
 - `.gitignore` debe bloquear cualquier archivo que parezca tener datos reales antes del primer commit.
 
