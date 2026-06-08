@@ -220,9 +220,24 @@ export default async function ImportDetailPage({
       )}
 
       {row.status === 'parsing' && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Parseando con LLM… esto puede tardar varios segundos. Refrescá la página en un
-          rato.
+        <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p>
+            Parseando con LLM… esto puede tardar hasta un par de minutos. Refrescá la
+            página en un rato.
+          </p>
+          {hasParser && (
+            <div className="space-y-2 border-t border-amber-200 pt-3">
+              <p className="text-xs">
+                ¿Quedó trabado? Si pasaron varios minutos y sigue acá, el parseo se cortó
+                (timeout). Reintentá:
+              </p>
+              <ParseButton
+                importId={row.id}
+                isPdf={!row.fileUrl?.toLowerCase().endsWith('.csv')}
+                hasStoredPassword={!!(row.accountPdfPassword || row.pdfPassword)}
+              />
+            </div>
+          )}
         </div>
       )}
 
