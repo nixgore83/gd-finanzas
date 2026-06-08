@@ -9,6 +9,11 @@ export const metadata = {
   title: 'Nuevo import · gd-finanzas',
 };
 
+// La acción `createImport` (sube a Storage + varios round-trips a DB) corre en
+// el contexto de esta ruta. El default puede quedar corto en el primer hit tras
+// un deploy (cold start) o con varios archivos; le damos margen explícito.
+export const maxDuration = 60;
+
 export default async function NewImportPage() {
   let session;
   try {
