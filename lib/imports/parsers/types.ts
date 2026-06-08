@@ -1,6 +1,24 @@
 import { z } from 'zod';
 import type { ImportType } from '@/lib/schemas/import';
 
+/**
+ * Identificadores de la contraparte de una transferencia/movimiento (ordenante o
+ * beneficiario). Decisión 2026-06-08 (Nico): se PERSISTEN deliberadamente para
+ * alinear info y deducible Ganancias — excepción documentada a la regla general
+ * de no almacenar datos sensibles (ver CLAUDE.md §seguridad). Viven en
+ * `import_lines.parsed_data.counterparty` y, al confirmar, en
+ * `transactions.meta.counterparty`. Protegidos por RLS+MFA, nunca logueados.
+ */
+const counterpartySchema = z.object({
+  name: z.string().max(200).optional(),
+  accountRef: z.string().max(100).optional(),
+  cuil: z.string().max(20).optional(),
+  cbu: z.string().max(40).optional(),
+  alias: z.string().max(100).optional(),
+});
+
+export type Counterparty = z.infer<typeof counterpartySchema>;
+
 const parsedTxLineStrictSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha en formato YYYY-MM-DD'),
   description: z.string().min(1).max(500),
@@ -14,6 +32,8 @@ const parsedTxLineStrictSchema = z.object({
   isTransfer: z.boolean().optional().default(false),
   /** UUID of the counterpart account — set by user in review UI */
   transferAccountId: z.string().uuid().optional(),
+  /** Identificadores de la contraparte (ordenante/beneficiario). Ver counterpartySchema. */
+  counterparty: counterpartySchema.optional(),
 });
 
 /**
@@ -108,6 +128,24 @@ export const parsedTxLineSchema = z.preprocess((val) => {
     ) {
       out.kind = 'income';
     }
+  }
+
+  // counterparty: normalizar nombres alternativos comunes y descartar vacíos.
+  if (out.counterparty && typeof out.counterparty === 'object') {
+    const cp = out.counterparty as Record<string, unknown>;
+    const norm: Record<string, unknown> = {
+      name: cp.name ?? cp.nombre ?? cp.ordenante ?? cp.beneficiario ?? cp.titular,
+      accountRef: cp.accountRef ?? cp.account_ref ?? cp.cuenta ?? cp.nroCuenta ?? cp.account_number ?? cp.accountNumber,
+      cuil: cp.cuil ?? cp.cuit ?? cp.cuilCuit ?? cp.cuil_cuit,
+      cbu: cp.cbu,
+      alias: cp.alias,
+    };
+    // Quitar campos undefined/vacíos; si no queda nada, omitir counterparty.
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(norm)) {
+      if (typeof v === 'string' && v.trim() !== '') cleaned[k] = v.trim();
+    }
+    out.counterparty = Object.keys(cleaned).length > 0 ? cleaned : undefined;
   }
 
   return out;

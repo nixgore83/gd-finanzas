@@ -110,6 +110,7 @@ export async function confirmImport(input: {
           confirmedAt: sql`now()`,
           transactionCount: linked.length,
           errorMessage: null,
+          ...(input.accountId ? { accountId: input.accountId } : {}),
         })
         .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
 
@@ -134,6 +135,13 @@ export async function confirmImport(input: {
           lineErrors.push({ lineId: line.id, reason: 'parsed_data inválida' });
           continue;
         }
+
+        // Identificadores de contraparte (ordenante/beneficiario) extraídos por
+        // el parser → se persisten en transactions.meta.counterparty. Decisión
+        // documentada en CLAUDE.md (excepción a la regla de no almacenar sensibles).
+        const cpMeta: Record<string, unknown> = parsed.data.counterparty
+          ? { counterparty: parsed.data.counterparty }
+          : {};
 
         // ===== TRANSFER BRANCH =====
         if (parsed.data.isTransfer) {
@@ -181,7 +189,7 @@ export async function confirmImport(input: {
               importBatchId: input.importId,
               transactionSubtype: 'standard',
               deducibleGanancias: false,
-              meta: {},
+              meta: cpMeta,
               createdBy: session.userId,
             })
             .returning({ id: transactions.id });
@@ -195,7 +203,7 @@ export async function confirmImport(input: {
               importBatchId: input.importId,
               transactionSubtype: 'standard',
               deducibleGanancias: false,
-              meta: {},
+              meta: cpMeta,
               createdBy: session.userId,
             })
             .returning({ id: transactions.id });
@@ -257,6 +265,7 @@ export async function confirmImport(input: {
           .insert(transactions)
           .values({
             ...built.fields,
+            meta: { ...built.fields.meta, ...cpMeta },
             householdId: session.householdId,
             source: 'import',
             importBatchId: input.importId,
@@ -322,6 +331,7 @@ export async function confirmImport(input: {
             confirmedAt: sql`now()`,
             transactionCount: linkedCount,
             errorMessage: null,
+            ...(input.accountId ? { accountId: input.accountId } : {}),
           })
           .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
       } else if (linkedCount > 0) {
@@ -332,6 +342,7 @@ export async function confirmImport(input: {
             status: 'reviewing',
             transactionCount: linkedCount,
             errorMessage: `${linkedCount} confirmadas, ${remaining.length} pendientes con error`,
+            ...(input.accountId ? { accountId: input.accountId } : {}),
           })
           .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
       } else {
@@ -342,6 +353,7 @@ export async function confirmImport(input: {
           .set({
             status: 'reviewing',
             errorMessage: `${remaining.length} líneas con error`,
+            ...(input.accountId ? { accountId: input.accountId } : {}),
           })
           .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
       }
