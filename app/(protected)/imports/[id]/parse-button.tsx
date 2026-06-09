@@ -57,10 +57,10 @@ export function ParseButton({
           startTransition(async () => {
             const res = await parseImport(importId, password || undefined, persistPassword);
             if (res.ok) {
-              toast.success(`Parser OK · ${res.lineCount} líneas`);
+              toast.success('Parseando en segundo plano… refrescá en un rato para ver las líneas');
               router.refresh();
             } else {
-              toast.error('message' in res && res.message ? res.message : `Error: ${res.error}`);
+              toast.error(`Error: ${res.error}`);
               router.refresh();
             }
           });

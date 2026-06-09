@@ -8,6 +8,7 @@ import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { resolveParser } from '@/lib/imports/parsers/registry';
 import { generateSignedUrl } from '@/lib/imports/storage';
+import { isParseStale } from '@/lib/imports/parse-stale';
 import { ParseButton } from './parse-button';
 import { ImportReview } from './import-review';
 
@@ -67,6 +68,7 @@ export default async function ImportDetailPage({
       fileName: imports.fileName,
       summary: imports.summary,
       statementAccountRef: imports.statementAccountRef,
+      parsingStartedAt: imports.parsingStartedAt,
       errorMessage: imports.errorMessage,
       transactionCount: imports.transactionCount,
       confirmedAt: imports.confirmedAt,
@@ -118,6 +120,9 @@ export default async function ImportDetailPage({
     row.institutionName !== null && resolveParser(row.institutionName, row.type) !== null;
 
   const showReview = ['parsed', 'reviewing', 'confirmed'].includes(row.status);
+
+  // El parseo corre async; si quedó en 'parsing' más del umbral, se cortó.
+  const parseStale = isParseStale(row.parsingStartedAt, new Date());
 
   // Generate signed URL for PDF viewing (1 hour expiry)
   const pdfUrl = row.fileUrl ? await generateSignedUrl(row.fileUrl) : null;
@@ -229,16 +234,23 @@ export default async function ImportDetailPage({
 
       {row.status === 'parsing' && (
         <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <p>
-            Parseando con LLM… esto puede tardar hasta un par de minutos. Refrescá la
-            página en un rato.
-          </p>
+          {parseStale ? (
+            <p className="font-medium">
+              El parseo se cortó (excedió el límite de tiempo). Reintentá abajo.
+            </p>
+          ) : (
+            <p>
+              Parseando con LLM en segundo plano… esto puede tardar hasta un par de
+              minutos. Refrescá la página en un rato.
+            </p>
+          )}
           {hasParser && (
             <div className="space-y-2 border-t border-amber-200 pt-3">
-              <p className="text-xs">
-                ¿Quedó trabado? Si pasaron varios minutos y sigue acá, el parseo se cortó
-                (timeout). Reintentá:
-              </p>
+              {!parseStale && (
+                <p className="text-xs">
+                  ¿Quedó trabado? Si pasaron varios minutos y sigue acá, reintentá:
+                </p>
+              )}
               <ParseButton
                 importId={row.id}
                 isPdf={!row.fileUrl?.toLowerCase().endsWith('.csv')}

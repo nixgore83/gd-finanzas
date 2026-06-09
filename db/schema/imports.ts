@@ -36,6 +36,10 @@ export const imports = pgTable(
     status: importStatusEnum('status').notNull().default('uploaded'),
     errorMessage: text('error_message'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    // Momento en que arrancó el parseo (status='parsing'). El parseo corre async
+    // (after()) acotado a la maxDuration de la función; este timestamp permite
+    // detectar parseos "cortados" (stale) que quedaron en 'parsing' sin cerrar.
+    parsingStartedAt: timestamp('parsing_started_at', { withTimezone: true }),
     transactionCount: integer('transaction_count'),
     // Período cubierto por el extracto (min/max de las fechas de las líneas
     // parseadas), persistido para poder ordenar/filtrar en SQL.
