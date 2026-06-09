@@ -116,9 +116,10 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
     .where(eq(imports.householdId, householdId))
     .groupBy(imports.status);
   const byStatus = new Map(statusCountRows.map((r) => [r.status, Number(r.c)]));
+  const reviewStatuses = viewToStatuses('review') ?? [];
   const tabCounts: Record<ImportView, number> = {
     all: statusCountRows.reduce((s, r) => s + Number(r.c), 0),
-    review: (byStatus.get('parsed') ?? 0) + (byStatus.get('reviewing') ?? 0),
+    review: reviewStatuses.reduce((s, st) => s + (byStatus.get(st) ?? 0), 0),
     confirmed: byStatus.get('confirmed') ?? 0,
     error: byStatus.get('error') ?? 0,
   };

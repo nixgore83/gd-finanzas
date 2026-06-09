@@ -10,8 +10,8 @@ describe('viewToStatuses', () => {
     expect(viewToStatuses('all')).toBeNull();
   });
 
-  it('review → parsed + reviewing', () => {
-    expect(viewToStatuses('review')).toEqual(['parsed', 'reviewing']);
+  it('review → todo lo no-confirmed/no-error', () => {
+    expect(viewToStatuses('review')).toEqual(['uploaded', 'parsing', 'parsed', 'reviewing']);
   });
 
   it('confirmed → confirmed', () => {
