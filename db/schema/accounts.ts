@@ -21,6 +21,11 @@ export const accounts = pgTable(
     expectsMonthlyImport: boolean('expects_monthly_import').notNull().default(false),
     gmailLabelId: text('gmail_label_id'),
     pdfPassword: text('pdf_password'),
+    // Nº de cuenta tal como aparece en el encabezado de los extractos (ej.
+    // "0926/01109094/30"). Se "aprende" al importar: cuando el parser extrae el
+    // nº del PDF y el usuario lo mapea a esta cuenta, se guarda acá para
+    // auto-sugerir la cuenta destino en imports futuros.
+    accountNumber: text('account_number'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

@@ -42,6 +42,9 @@ export const imports = pgTable(
     periodStart: date('period_start'),
     periodEnd: date('period_end'),
     fileName: text('file_name'),
+    // Nº de cuenta propia extraído del encabezado del extracto por el parser.
+    // Se usa para auto-sugerir la cuenta destino (match contra accounts.account_number).
+    statementAccountRef: text('statement_account_ref'),
     summary: jsonb('summary').$type<{
       totalExpense?: string;
       totalIncome?: string;

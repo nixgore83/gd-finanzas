@@ -179,9 +179,31 @@ const summarySchema = z.preprocess((val) => {
   currency: z.enum(['ARS', 'USD']).optional(),
 }));
 
+/**
+ * Cuenta PROPIA del extracto (la del encabezado del PDF, no la contraparte).
+ * Su `number` se usa para auto-sugerir la cuenta destino del import.
+ */
+const statementAccountSchema = z.preprocess((val) => {
+  if (!val || typeof val !== 'object') return val;
+  const obj = val as Record<string, unknown>;
+  const number = obj.number ?? obj.nroCuenta ?? obj.account_number ?? obj.accountNumber ?? obj.cuenta;
+  const holder = obj.holder ?? obj.titular ?? obj.nombre ?? obj.name;
+  const out: Record<string, unknown> = {};
+  if (typeof number === 'string' && number.trim() !== '') out.number = number.trim();
+  if (typeof holder === 'string' && holder.trim() !== '') out.holder = holder.trim();
+  return Object.keys(out).length > 0 ? out : undefined;
+}, z
+  .object({
+    number: z.string().max(100).optional(),
+    holder: z.string().max(200).optional(),
+  })
+  .optional());
+
 export const parserOutputSchema = z.object({
   lines: z.array(parsedTxLineSchema),
   summary: summarySchema.optional(),
+  /** Cuenta propia del extracto (encabezado). Ver statementAccountSchema. */
+  statementAccount: statementAccountSchema,
 });
 
 export type ImportSummary = {
@@ -193,6 +215,7 @@ export type ImportSummary = {
 export type ParserOutput = {
   lines: ParsedTxLine[];
   summary?: ImportSummary;
+  statementAccount?: { number?: string; holder?: string };
 };
 
 export type Parser = {
