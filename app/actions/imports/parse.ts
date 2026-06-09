@@ -64,39 +64,45 @@ export async function parseImport(
 }
 
 /**
- * Variante SÍNCRONA del parseo: marca `parsing` y AWAITa `parseImportInternal`
- * (que setea el estado final parsed/error). La usa el drenado en lote de la lista
- * para **acotar la concurrencia real**: cada `parseImportSync` ocupa el worker
- * hasta terminar el parse, así el pool del cliente limita cuántos parses corren
- * a la vez. (`parseImport` es fire-and-forget con `after()`: dispararía N parses
- * en paralelo y, encima, el `after()` hereda la maxDuration de la ruta que lo
- * invoca.)
+ * Drena en SEGUNDO PLANO todos los imports en estado 'uploaded' del household:
+ * agenda con `after()` un único job que los parsea **secuencialmente** (uno a la
+ * vez, sin saturar la API ni reventar la concurrencia). La request del cliente
+ * devuelve al instante (no espera al LLM), así no se cuelga ni tira "This page
+ * couldn't load". El job sobrevive a que el usuario navegue (es la razón de `after()`).
  *
- * DEBE invocarse desde una ruta con maxDuration suficiente: la lista `/imports`
- * está en 300s.
+ * Corre dentro de la maxDuration de la ruta que lo invoca (la lista `/imports`
+ * está en 300s). Si no alcanza para todos: los que queden siguen en 'uploaded'
+ * (re-clickear), y el que estaba en curso queda 'parsing' (lo barre el reaper /
+ * se reintenta). `parseImportInternal` setea el estado final de cada uno.
  */
-export async function parseImportSync(importId: string): Promise<{ ok: boolean }> {
+export async function drainUploadedImports(): Promise<{ ok: boolean; queued: number }> {
   let session;
   try {
     session = await requireHouseholdSession();
   } catch (err) {
-    if (err instanceof SessionError) return { ok: false };
+    if (err instanceof SessionError) return { ok: false, queued: 0 };
     throw err;
   }
 
   const db = getDb();
-  const [imp] = await db
+  const rows = await db
     .select({ id: imports.id })
     .from(imports)
-    .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)))
-    .limit(1);
-  if (!imp) return { ok: false };
+    .where(and(eq(imports.householdId, session.householdId), eq(imports.status, 'uploaded')));
+  const ids = rows.map((r) => r.id);
+  const householdId = session.householdId;
 
-  await db
-    .update(imports)
-    .set({ status: 'parsing', parsingStartedAt: sql`now()`, errorMessage: null })
-    .where(and(eq(imports.id, importId), eq(imports.householdId, session.householdId)));
+  if (ids.length > 0) {
+    after(async () => {
+      for (const id of ids) {
+        try {
+          await parseImportInternal(id, householdId);
+        } catch {
+          console.error('[imports] drain parse job threw', { id });
+        }
+      }
+    });
+  }
 
-  const result = await parseImportInternal(importId, session.householdId);
-  return { ok: result.ok };
+  return { ok: true, queued: ids.length };
 }
