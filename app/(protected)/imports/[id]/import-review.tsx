@@ -22,6 +22,7 @@ import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
 import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
+import { bulkSetTransfer } from '@/app/actions/imports/bulk-set-transfer';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
@@ -197,6 +198,29 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }
 
+  function doBulkTransfer(isTransfer: boolean) {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    startTransition(async () => {
+      const res = await bulkSetTransfer({
+        importId,
+        lineIds: [...selectedIds],
+        isTransfer,
+      });
+      if (res.ok) {
+        toast.success(
+          `${res.updated} ${res.updated === 1 ? 'línea marcada' : 'líneas marcadas'} como ${isTransfer ? 'transferencia' : 'no transferencia'}`,
+        );
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
   function doBulk(status: 'accepted' | 'rejected') {
     const ids = lines.filter((l) => l.status === 'pending').map((l) => l.id);
     if (ids.length === 0) {
@@ -354,6 +378,33 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             >
               Aplicar moneda
             </Button>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Transferencia</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkTransfer(true)}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  Marcar transfer
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkTransfer(false)}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  No es transfer
+                </Button>
+              </div>
+            </div>
           </div>
           <Button
             type="button"
