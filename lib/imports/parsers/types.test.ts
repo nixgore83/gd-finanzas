@@ -147,6 +147,34 @@ describe('parsedTxLineSchema preprocess (alias + coerce)', () => {
   });
 });
 
+describe('parsedTxLineSchema isRefund', () => {
+  const base = {
+    date: '2026-04-09',
+    description: 'Transf. de ARBA',
+    amountOriginal: '166329.00',
+    currencyOriginal: 'ARS' as const,
+    kind: 'expense' as const,
+  };
+
+  it('default false', () => {
+    const out = parsedTxLineSchema.safeParse(base);
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.isRefund).toBe(false);
+  });
+
+  it('acepta isRefund=true', () => {
+    const out = parsedTxLineSchema.safeParse({ ...base, isRefund: true });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.isRefund).toBe(true);
+  });
+
+  it('normaliza alias esDevolucion + coerce string', () => {
+    const out = parsedTxLineSchema.safeParse({ ...base, esDevolucion: 'true' });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.isRefund).toBe(true);
+  });
+});
+
 describe('parsedTxLineSchema counterparty', () => {
   it('acepta counterparty completo', () => {
     const out = parsedTxLineSchema.safeParse({

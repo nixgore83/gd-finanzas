@@ -50,6 +50,10 @@ const parsedTxLineStrictSchema = z.object({
   transferAccountId: z.string().uuid().optional(),
   /** Identificadores de la contraparte (ordenante/beneficiario). Ver counterpartySchema. */
   counterparty: counterpartySchema.optional(),
+  /** True si la línea es una devolución/reembolso de un gasto. La marca el usuario en
+   * la revisión; al confirmar, el monto se persiste NEGADO (gasto negativo en la
+   * misma categoría). Ver regla de reembolsos en el PRD §4.3. */
+  isRefund: z.boolean().optional().default(false),
 });
 
 /**
@@ -95,6 +99,14 @@ export const parsedTxLineSchema = z.preprocess((val) => {
   // Coerce string "true"/"false" to boolean
   if (typeof out.isTransfer === 'string') {
     out.isTransfer = out.isTransfer.toLowerCase() === 'true';
+  }
+
+  // isRefund aliases + coerce
+  if (out.isRefund == null) {
+    out.isRefund = out.is_refund ?? out.refund ?? out.esDevolucion ?? out.reembolso;
+  }
+  if (typeof out.isRefund === 'string') {
+    out.isRefund = out.isRefund.toLowerCase() === 'true';
   }
 
   // Number → string
