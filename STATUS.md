@@ -1052,6 +1052,29 @@ DELETE FROM auth.mfa_factors WHERE user_id = '<user-id-del-paso-1>';
 Después de eso, el próximo login del user lo manda automáticamente a `/auth/mfa/enroll`.
 **No registrar este SQL en consola compartida** — usar Supabase Studio o un terminal local con `DIRECT_URL`.
 
+### `statement_timeout` por rol (aplicado 2026-06-09)
+Para mitigar los errores intermitentes "This page couldn't load" (timeouts en cold-start
+del free tier, no en queries lentas reales — todas miden <70ms en los logs), se subió el
+`statement_timeout` de los roles de Postgres por encima del default de Supabase. **Es config
+aplicada por `ALTER ROLE`, no por migración Drizzle**: si Supabase resetea la config de roles
+(pausa del proyecto, upgrade de plan, soporte), hay que re-aplicarla a mano. SQL:
+
+```sql
+ALTER ROLE authenticated  SET statement_timeout = '15s';
+ALTER ROLE authenticator  SET statement_timeout = '15s';
+ALTER ROLE anon           SET statement_timeout = '10s';
+NOTIFY pgrst, 'reload config';
+```
+
+Verificar con:
+```sql
+SELECT rolname, rolconfig FROM pg_roles
+WHERE rolname IN ('authenticated','authenticator','anon');
+```
+
+Defaults previos de Supabase eran anon=3s, authenticated/authenticator=8s. La app se conecta
+como `postgres` (sin timeout), así que esto afecta sobre todo a PostgREST/Supabase SDK.
+
 ## Notas
 - Vercel deploy: https://gd-finanzas-z4dl.vercel.app
 - Repo GitHub: https://github.com/nixgore83/gd-finanzas (privado)
