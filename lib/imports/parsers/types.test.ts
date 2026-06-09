@@ -218,3 +218,44 @@ describe('parsedTxLineSchema counterparty', () => {
     if (out.success) expect(out.data.counterparty).toBeUndefined();
   });
 });
+
+describe('parserOutputSchema statementAccount', () => {
+  it('acepta statementAccount con number y holder', () => {
+    const out = parserOutputSchema.safeParse({
+      lines: [],
+      statementAccount: { number: '0926/01109094/30', holder: 'GORE NICOLAS MARIO' },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) {
+      expect(out.data.statementAccount?.number).toBe('0926/01109094/30');
+      expect(out.data.statementAccount?.holder).toBe('GORE NICOLAS MARIO');
+    }
+  });
+
+  it('normaliza aliases (account_number→number, titular→holder) y trimea', () => {
+    const out = parserOutputSchema.safeParse({
+      lines: [],
+      statementAccount: { account_number: '  0072/00012345/01  ', titular: ' PAULA DALMASSO ' },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) {
+      expect(out.data.statementAccount?.number).toBe('0072/00012345/01');
+      expect(out.data.statementAccount?.holder).toBe('PAULA DALMASSO');
+    }
+  });
+
+  it('statementAccount sin datos útiles → undefined', () => {
+    const out = parserOutputSchema.safeParse({
+      lines: [],
+      statementAccount: { number: '   ' },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.statementAccount).toBeUndefined();
+  });
+
+  it('output sin statementAccount sigue siendo válido', () => {
+    const out = parserOutputSchema.safeParse({ lines: [] });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.statementAccount).toBeUndefined();
+  });
+});

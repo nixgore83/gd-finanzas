@@ -21,6 +21,7 @@ import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
 import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
+import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
 type LineRow = {
@@ -42,9 +43,13 @@ type Props = {
   status: string;
   lines: LineRow[];
   tree: CategoryNode[];
-  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
+  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
+  /** Nº de cuenta propia del extracto extraído por el parser (encabezado). */
+  statementAccountRef: string | null;
+  /** ID de la cuenta que matchea statementAccountRef (ya aprendida), si la hay. */
+  suggestedAccountId: string | null;
   pdfUrl: string | null;
   summary: ImportSummary;
 };
@@ -63,14 +68,18 @@ const STATUS_LABEL: Record<string, string> = {
   edited: 'Editada',
 };
 
-export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, pdfUrl, summary }: Props) {
+export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
   const [sortField, setSortField] = useState<string>('category');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const handleSort = (field: string, dir: 'asc' | 'desc') => { setSortField(field); setSortDir(dir); };
-  const defaultAccount = (importAccountId
+  // Preferencia de cuenta destino: cuenta sugerida por nº de extracto > la del
+  // import > la de la institución > la primera.
+  const defaultAccount = (suggestedAccountId
+    ? accounts.find((a) => a.id === suggestedAccountId)
+    : null) ?? (importAccountId
     ? accounts.find((a) => a.id === importAccountId)
     : null) ?? (importInstitutionId
     ? accounts.find((a) => a.institutionId === importInstitutionId)
@@ -519,7 +528,29 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             <label className="text-sm font-medium" htmlFor="accountId">
               Cuenta destino (común a todas las líneas)
             </label>
-            <Select value={accountId} onValueChange={setAccountId}>
+            <Select
+              value={accountId}
+              onValueChange={(v) => {
+                setAccountId(v);
+                // Si el extracto trae un nº no reconocido, lo "aprendemos" en la
+                // cuenta elegida para auto-sugerirla en imports futuros.
+                if (statementAccountRef && !suggestedAccountId && v) {
+                  startTransition(async () => {
+                    const res = await learnAccountNumber({
+                      accountId: v,
+                      accountNumber: statementAccountRef,
+                      importId,
+                    });
+                    if (res.ok && res.updated) {
+                      toast.success(
+                        `Nº ${statementAccountRef} guardado en la cuenta — la próxima se sugiere sola`,
+                      );
+                      router.refresh();
+                    }
+                  });
+                }
+              }}
+            >
               <SelectTrigger id="accountId" className="w-72">
                 <SelectValue placeholder="Elegí una cuenta" />
               </SelectTrigger>
@@ -531,6 +562,17 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 ))}
               </SelectContent>
             </Select>
+            {statementAccountRef &&
+              (suggestedAccountId ? (
+                <p className="text-xs text-emerald-700">
+                  ✓ Cuenta sugerida por el Nº <span className="font-mono">{statementAccountRef}</span> del extracto.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700">
+                  Extracto de la cuenta Nº <span className="font-mono">{statementAccountRef}</span> (no reconocido).
+                  Al elegir la cuenta correcta, guardamos el número para sugerirla sola la próxima vez.
+                </p>
+              ))}
           </div>
           <Button
             type="button"

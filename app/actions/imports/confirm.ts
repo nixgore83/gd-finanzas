@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { imports, importLines, transactions } from '@/db/schema';
+import { accounts, imports, importLines, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
@@ -50,7 +50,11 @@ export async function confirmImport(input: {
   const db = getDb();
 
   const [imp] = await db
-    .select({ id: imports.id, status: imports.status })
+    .select({
+      id: imports.id,
+      status: imports.status,
+      statementAccountRef: imports.statementAccountRef,
+    })
     .from(imports)
     .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)))
     .limit(1);
@@ -58,6 +62,21 @@ export async function confirmImport(input: {
   if (!imp) return { ok: false, error: 'not_found' };
   if (imp.status !== 'parsed' && imp.status !== 'reviewing' && imp.status !== 'confirmed') {
     return { ok: false, error: 'invalid_state' };
+  }
+
+  // "Aprender" el nº de cuenta del extracto en la cuenta destino, si la cuenta
+  // todavía no lo tiene (red de seguridad por si no se aprendió en la revisión).
+  if (imp.statementAccountRef && input.accountId) {
+    await db
+      .update(accounts)
+      .set({ accountNumber: imp.statementAccountRef })
+      .where(
+        and(
+          eq(accounts.id, input.accountId),
+          eq(accounts.householdId, session.householdId),
+          isNull(accounts.accountNumber),
+        ),
+      );
   }
 
   // Líneas a procesar: solo accepted/edited y SIN transaction_id aún (idempotente

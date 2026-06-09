@@ -66,6 +66,7 @@ export default async function ImportDetailPage({
       fileHash: imports.fileHash,
       fileName: imports.fileName,
       summary: imports.summary,
+      statementAccountRef: imports.statementAccountRef,
       errorMessage: imports.errorMessage,
       transactionCount: imports.transactionCount,
       confirmedAt: imports.confirmedAt,
@@ -101,10 +102,17 @@ export default async function ImportDetailPage({
       currency: accounts.currencyDefault,
       institutionId: accounts.institutionId,
       ownerTag: accounts.ownerTag,
+      accountNumber: accounts.accountNumber,
     })
     .from(accounts)
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(accounts.name));
+
+  // Auto-sugerencia de cuenta destino: si el parser extrajo el nº de cuenta del
+  // extracto y matchea una cuenta ya "aprendida", la preseleccionamos.
+  const suggestedAccountId = row.statementAccountRef
+    ? accountRows.find((a) => a.accountNumber && a.accountNumber === row.statementAccountRef)?.id ?? null
+    : null;
 
   const hasParser =
     row.institutionName !== null && resolveParser(row.institutionName, row.type) !== null;
@@ -256,6 +264,8 @@ export default async function ImportDetailPage({
           accounts={accountRows}
           importInstitutionId={row.institutionId}
           importAccountId={row.accountId}
+          statementAccountRef={row.statementAccountRef ?? null}
+          suggestedAccountId={suggestedAccountId}
           pdfUrl={pdfUrl}
           summary={row.summary ?? null}
         />

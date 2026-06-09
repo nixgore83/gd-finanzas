@@ -37,7 +37,13 @@ REGLAS GENERALES:
 SUBTOTALES:
 Extraé los subtotales impresos (si los hay) como campo "summary":
 { "lines": [...], "summary": { "totalExpense": "12345.67", "totalIncome": "890.00", "currency": "ARS" } }
-- Si no hay subtotales impresos, omití "summary".`;
+- Si no hay subtotales impresos, omití "summary".
+
+CUENTA DEL EXTRACTO (encabezado):
+Además de ignorar el encabezado para los movimientos, extraé el número de la cuenta PROPIA del extracto (la del titular, que figura en el encabezado del PDF — NO la contraparte de cada movimiento) como campo "statementAccount":
+{ "lines": [...], "statementAccount": { "number": "0926/01109094/30", "holder": "GORE NICOLAS MARIO" } }
+- "number": nº de cuenta tal cual aparece en el encabezado (sucursal/cuenta/dígito). Si no figura, omití "statementAccount".
+- No lo confundas con el "accountRef" de la contraparte de un movimiento.`;
 
 const USER_PROMPT = `Extraé todos los movimientos del extracto bancario ICBC del PDF. Devolvé el JSON con "lines".`;
 

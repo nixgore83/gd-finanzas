@@ -269,6 +269,11 @@ export async function parseImportInternal(
     }
   ).summary ?? null;
 
+  // Nº de cuenta propia del extracto (encabezado) → para auto-sugerir la cuenta destino.
+  const statementAccountRef = (
+    result.data as { statementAccount?: { number?: string } }
+  ).statementAccount?.number ?? null;
+
   await db
     .update(imports)
     .set({
@@ -276,6 +281,7 @@ export async function parseImportInternal(
       parserModel: result.model,
       transactionCount: confirmedDescs.size + lineRows.length,
       summary,
+      statementAccountRef,
       errorMessage:
         dupCount > 0
           ? `${dupCount} líneas duplicadas rechazadas automáticamente (ya existen como transacciones). ${pendingCount} pendientes de revisión.`
