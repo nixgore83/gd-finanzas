@@ -99,3 +99,64 @@ describe('rollupBuckets', () => {
     }
   });
 });
+
+describe('rollupBuckets · reembolsos (montos negativos)', () => {
+  const cole = (amount: string): BreakdownInput => ({
+    id: 'cole',
+    parentId: null,
+    name: 'Cole',
+    parentName: null,
+    color: '#8fb89a',
+    parentColor: null,
+    amount,
+  });
+
+  it('un reembolso netea el gasto de la categoría', () => {
+    // Pagás 100, te devuelven 50 → gasto neto 50.
+    const { total, rows } = rollupBuckets([cole('100'), cole('-50')], 'leaf');
+    expect(total).toBe('50.00');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.amount).toBe('50.00');
+  });
+
+  it('reembolso que supera el gasto deja la categoría en neto negativo (no se omite)', () => {
+    const { total, rows } = rollupBuckets([cole('100'), cole('-130')], 'leaf');
+    expect(total).toBe('-30.00');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.amount).toBe('-30.00');
+  });
+
+  it('reembolso que cancela el gasto (neto 0) se omite', () => {
+    const { total, rows } = rollupBuckets([cole('100'), cole('-100')], 'leaf');
+    expect(total).toBe('0.00');
+    expect(rows).toEqual([]);
+  });
+
+  it('reembolso de una hoja netea al parent en level=parent', () => {
+    const buckets: BreakdownInput[] = [
+      {
+        id: 'alquiler',
+        parentId: 'vivienda',
+        name: 'Alquiler',
+        parentName: 'Vivienda',
+        color: null,
+        parentColor: '#6366f1',
+        amount: '500',
+      },
+      {
+        id: 'reintegro',
+        parentId: 'vivienda',
+        name: 'Reintegro expensas',
+        parentName: 'Vivienda',
+        color: null,
+        parentColor: '#6366f1',
+        amount: '-80',
+      },
+    ];
+    const { total, rows } = rollupBuckets(buckets, 'parent');
+    expect(total).toBe('420.00');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe('vivienda');
+    expect(rows[0]?.amount).toBe('420.00');
+  });
+});

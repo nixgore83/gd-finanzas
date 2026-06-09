@@ -10,6 +10,25 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-08 (cont.) — Reembolsos / devoluciones de gastos
+
+Caso de Nico: transferencias recibidas que no son ingresos sino **devoluciones de un gasto** (ej. paga el 100% de la cuota del cole y le devuelven la mitad → quiere que el gasto neto sea 50%). Decisión de modelado: un reembolso es un **gasto con monto negativo en la misma categoría** (no un ingreso). El mecanismo ya existía parcialmente (la tabla ya badgeaba "Devolución" por signo, schema y reportes ya neteaban); esta sesión agrega la UX guiada + blinda el donut.
+
+**Decisiones de negocio (Nico, 2026-06-08):**
+- Reembolso = **gasto negativo suelto contra la categoría** (sin vincular a la transacción original). Más simple; netea igual en todos los reportes.
+- Si el gasto era deducible Ganancias, el reembolso lleva `deducible_ganancias=true` → el deducible baja al **neto** (el export ya suma `monto_usd` con signo, sale solo).
+- Atribución al **mes en que se recibe** la plata (consistente con flujo de caja; puede dejar una categoría en neto negativo ese mes).
+
+**Cambios:**
+- [x] `transaction-form.tsx`: checkbox "Es una devolución / reembolso recibido" (solo en gasto). El usuario tipea el monto en positivo; al enviar se persiste negado (flip de signo sobre el string, sin float). Label "Monto recuperado", helper text, reset al cambiar a ingreso, y detección en modo edición (gasto con monto negativo → pre-tilda + muestra en positivo).
+- [x] `reports/breakdown/donut.tsx`: excluye del Pie las categorías con neto ≤ 0 (Recharts rompe con porciones negativas); alinea los `Cell` con las filas visibles; fallback si no queda ninguna positiva.
+- [x] `reports/breakdown/page.tsx`: clamp del ancho de la barra del detalle a ≥ 0.
+- [x] `lib/reports/breakdown.test.ts`: +4 tests de netting con montos negativos (netea, neto negativo se mantiene, neto 0 se omite, netting al parent).
+- **Sin migración de DB** (reusa la convención de signo ya existente). **No se tocó** `_build.ts` (kind sigue `expense`, `category.kind===input.kind` se respeta) ni el export contador (ya neta solo).
+- Validación: `typecheck` ✅, suite full **278 tests / 29 files** ✅, `eslint .` ✅, build implícito.
+- [x] **Higiene de entorno:** vitest y eslint estaban escaneando `node_modules` de worktrees viejos en `.claude/worktrees/` (inflaba el run a ~1996 tests y tiraba el lint por OOM). Agregado `.claude/**` a `vitest.config.ts` (exclude, + `node_modules` ahora `**/node_modules/**`) y a `globalIgnores` de `eslint.config.mjs`.
+- [x] **Sync PRD Notion:** regla de reembolsos agregada en §4.3 + changelog v1.4 (2026-06-08).
+
 ### Sesión 2026-06-08 — Fixes de imports en producción + contraparte de transferencias
 
 Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature de contraparte.

@@ -80,6 +80,19 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Devuelve el monto sin signo (para mostrar un reembolso en positivo). */
+function absMoney(s: string): string {
+  return s.startsWith('-') ? s.slice(1) : s;
+}
+
+/** Fuerza el monto a negativo sin aritmética float (solo flip de signo sobre el string). */
+function negMoney(s: string): string {
+  const t = s.trim();
+  if (t === '') return t;
+  const unsigned = t.startsWith('-') || t.startsWith('+') ? t.slice(1) : t;
+  return `-${unsigned}`;
+}
+
 export function TransactionForm({
   accounts,
   categories,
@@ -100,6 +113,12 @@ export function TransactionForm({
   const firstAccount = accounts[0];
   const initialKind: TransactionKind = initial?.kind ?? 'expense';
   const [kind, setKind] = useState<TransactionKind>(initialKind);
+
+  // Un reembolso/devolución es un gasto con monto negativo en la misma categoría.
+  // Lo detectamos por el signo (misma convención que la tabla de transacciones).
+  const initialIsReembolso =
+    initialKind === 'expense' && (initial?.amountOriginal?.startsWith('-') ?? false);
+  const [isReembolso, setIsReembolso] = useState<boolean>(initialIsReembolso);
 
   const [accountId, setAccountId] = useState<string>(
     initial?.accountId ?? firstAccount?.id ?? '',
@@ -146,6 +165,10 @@ export function TransactionForm({
     if (nextKind !== 'expense' && transactionSubtype === 'domestic_service') {
       setTransactionSubtype('standard');
     }
+    // Reembolso solo aplica a gasto.
+    if (nextKind !== 'expense' && isReembolso) {
+      setIsReembolso(false);
+    }
   }
 
   function handleAccountChange(next: string) {
@@ -163,6 +186,11 @@ export function TransactionForm({
     formData.set('accountId', accountId);
     formData.set('categoryId', categoryId);
     formData.set('currencyOriginal', currencyOriginal);
+    // Reembolso: el usuario tipea el monto en positivo, lo persistimos negado.
+    const rawAmount = formData.get('amountOriginal');
+    if (isReembolso && kind === 'expense' && typeof rawAmount === 'string') {
+      formData.set('amountOriginal', negMoney(rawAmount));
+    }
     formData.set('transactionSubtype', transactionSubtype);
     formData.set('deducibleGanancias', deducibleGanancias ? '1' : '');
     if (transactionSubtype === 'domestic_service') {
@@ -297,14 +325,22 @@ export function TransactionForm({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="amountOriginal">Monto</Label>
+              <Label htmlFor="amountOriginal">
+                {isReembolso ? 'Monto recuperado' : 'Monto'}
+              </Label>
               <Input
                 id="amountOriginal"
                 name="amountOriginal"
                 type="number"
                 step="0.01"
                 required
-                defaultValue={initial?.amountOriginal ?? ''}
+                defaultValue={
+                  initial
+                    ? initialIsReembolso
+                      ? absMoney(initial.amountOriginal)
+                      : initial.amountOriginal
+                    : ''
+                }
                 disabled={isPending}
                 placeholder="0.00"
                 aria-invalid={errors.amountOriginal ? true : undefined}
@@ -396,6 +432,29 @@ export function TransactionForm({
                 Deducible Ganancias
               </Label>
             </div>
+
+            {kind === 'expense' && (
+              <div className="flex items-start gap-2">
+                <input
+                  id="isReembolso"
+                  type="checkbox"
+                  checked={isReembolso}
+                  onChange={(e) => setIsReembolso(e.target.checked)}
+                  disabled={isPending}
+                  className="mt-0.5 size-4 rounded border-input"
+                />
+                <div>
+                  <Label htmlFor="isReembolso" className="cursor-pointer">
+                    Es una devolución / reembolso recibido
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Resta lo que te devolvieron de un gasto. Entra como gasto negativo en la
+                    categoría elegida: baja tu gasto neto, no suma a ingresos. Si el gasto
+                    original era deducible, tildá también «Deducible Ganancias».
+                  </p>
+                </div>
+              </div>
+            )}
 
             {kind === 'expense' && (
               <div className="space-y-2">

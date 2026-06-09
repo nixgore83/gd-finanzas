@@ -74,11 +74,23 @@ export function BreakdownDonut({ rows, total }: Props) {
     );
   }
 
-  const data = rows.map((r) => ({
+  // Recharts no grafica porciones negativas (un neto negativo aparece cuando un
+  // reembolso supera el gasto del mes en esa categoría). Las excluimos del Pie;
+  // siguen visibles en el detalle de la página.
+  const visibleRows = rows.filter((r) => Number.parseFloat(r.amount) > 0);
+  const data = visibleRows.map((r) => ({
     name: r.name,
     value: Number.parseFloat(r.amount),
     pct: r.pct,
   }));
+
+  if (data.length === 0) {
+    return (
+      <div className="flex h-80 items-center justify-center border border-dashed border-border text-sm text-muted-foreground">
+        Sin gastos netos positivos para graficar.
+      </div>
+    );
+  }
 
   const cardColor = resolveCard();
   const borderColor = resolveBorder();
@@ -100,7 +112,7 @@ export function BreakdownDonut({ rows, total }: Props) {
             stroke={cardColor}
             strokeWidth={1.5}
           >
-            {rows.map((row, i) => (
+            {visibleRows.map((row, i) => (
               <Cell key={row.id} fill={colorFor(row, i)} />
             ))}
           </Pie>
