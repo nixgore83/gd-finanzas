@@ -41,12 +41,13 @@ export const IMPORT_VIEW_LABELS: Record<ImportView, string> = {
 
 /**
  * Statuses que cubre cada tab. `null` = sin filtro (todos).
- * `review` agrupa los dos estados accionables que esperan confirmación humana.
+ * `review` = todo lo que espera acción del usuario: cualquier estado que no sea
+ * terminal (`confirmed`) ni `error` (incluye uploaded/parsing/parsed/reviewing).
  */
 export function viewToStatuses(view: ImportView): ImportStatus[] | null {
   switch (view) {
     case 'review':
-      return ['parsed', 'reviewing'];
+      return IMPORT_STATUSES.filter((s) => s !== 'confirmed' && s !== 'error');
     case 'confirmed':
       return ['confirmed'];
     case 'error':
