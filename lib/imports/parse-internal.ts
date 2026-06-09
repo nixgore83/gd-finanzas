@@ -7,6 +7,10 @@ import { resolveParser } from '@/lib/imports/parsers/registry';
 import { runParser, LlmError } from '@/lib/imports/llm';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
+import {
+  counterpartyHasIdentity,
+  lookupCounterpartyHistory,
+} from '@/lib/imports/counterparty-suggest';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
@@ -233,12 +237,30 @@ export async function parseImportInternal(
 
   const lineRows = await Promise.all(
     lines.map(async (line) => {
-      let proposedCategoryId = await suggestCategoryForDescription(
-        householdId,
-        line.description,
-      );
+      // Historial por contraparte (categoría + etiqueta) si la línea trae una con identidad.
+      const cpHistory =
+        line.counterparty && counterpartyHasIdentity(line.counterparty)
+          ? await lookupCounterpartyHistory(householdId, line.counterparty)
+          : { categoryId: null, label: null };
+
+      // Categoría: contraparte (señal fuerte para pagos recurrentes a terceros) →
+      // descripción histórica → sugerencia del LLM. Las transferencias entre cuentas
+      // propias no llevan categoría.
+      let proposedCategoryId = line.isTransfer ? null : cpHistory.categoryId;
+      if (!proposedCategoryId) {
+        proposedCategoryId = await suggestCategoryForDescription(householdId, line.description);
+      }
       if (!proposedCategoryId && line.suggestedCategory) {
         proposedCategoryId = catByName.get(line.suggestedCategory.toLowerCase()) ?? null;
+      }
+
+      // Etiqueta: precargar desde el historial si la contraparte no trae una.
+      let lineData: ParsedTxLine = line;
+      if (cpHistory.label && line.counterparty && !line.counterparty.label?.trim()) {
+        lineData = {
+          ...line,
+          counterparty: { ...line.counterparty, label: cpHistory.label },
+        };
       }
 
       const lineKey = `${line.date}|${line.description.toLowerCase()}|${line.amountOriginal}`;
@@ -248,8 +270,8 @@ export async function parseImportInternal(
         importId,
         rawData: line,
         parsedData: isDuplicate
-          ? { ...line, notes: `[DUPLICADA] Ya existe como transacción en esta cuenta` }
-          : line,
+          ? { ...lineData, notes: `[DUPLICADA] Ya existe como transacción en esta cuenta` }
+          : lineData,
         proposedCategoryId,
         status: isDuplicate ? ('rejected' as const) : ('pending' as const),
       };

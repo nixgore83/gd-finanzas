@@ -16,7 +16,8 @@ import {
 import { cn } from '@/lib/utils';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import type { CategoryNode } from '@/lib/categories/tree';
-import type { Counterparty, ParsedTxLine } from '@/lib/imports/parsers/types';
+import type { ParsedTxLine } from '@/lib/imports/parsers/types';
+import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
@@ -708,7 +709,7 @@ function LineRowEditor({
       <td className="px-2 py-1.5 tabular-nums">{line.parsedData.date}</td>
       <td className="px-2 py-1.5">
         {line.parsedData.description}
-        <CounterpartyTag counterparty={line.parsedData.counterparty} />
+        <CounterpartyTag counterparty={line.parsedData.counterparty} className="mt-0.5" />
       </td>
       <td className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1">
@@ -904,6 +905,21 @@ function LineRowEditor({
                   className="h-8 w-full"
                 />
               </Field>
+              {draft.counterparty && (
+                <Field label="Etiqueta contraparte" className="min-w-[180px]">
+                  <Input
+                    value={draft.counterparty.label ?? ''}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        counterparty: { ...draft.counterparty, label: e.target.value || undefined },
+                      })
+                    }
+                    placeholder="ej. Niñera, Alquiler…"
+                    className="h-8 w-48"
+                  />
+                </Field>
+              )}
               {draft.isTransfer ? (
                 <Field label="Cuenta contraparte">
                   <Select
@@ -982,26 +998,6 @@ function LineRowEditor({
       </tr>
     )}
     </>
-  );
-}
-
-function CounterpartyTag({ counterparty }: { counterparty?: Counterparty }) {
-  if (!counterparty) return null;
-  const { name, accountRef, cuil, cbu, alias } = counterparty;
-  const ids = [
-    accountRef && `cta ${accountRef}`,
-    cuil && `CUIL ${cuil}`,
-    cbu && `CBU ${cbu}`,
-    alias && `alias ${alias}`,
-  ].filter(Boolean);
-  if (!name && ids.length === 0) return null;
-  return (
-    <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
-      {name && <span className="font-medium">{name}</span>}
-      {ids.length > 0 && (
-        <span className="block font-mono">{ids.join(' · ')}</span>
-      )}
-    </div>
   );
 }
 

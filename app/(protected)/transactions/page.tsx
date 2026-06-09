@@ -19,6 +19,7 @@ import { getDb } from '@/lib/db/client';
 import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
+import { counterpartyFromMeta } from '@/lib/imports/parsers/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
@@ -178,6 +179,7 @@ export default async function TransactionsPage({
       currencyOriginal: transactions.currencyOriginal,
       amountUsd: transactions.amountUsd,
       description: transactions.description,
+      meta: transactions.meta,
       accountName: accounts.name,
       categoryName: categories.name,
     })
@@ -479,6 +481,7 @@ export default async function TransactionsPage({
                   currencyOriginal: row.currencyOriginal,
                   amountUsd: row.amountUsd,
                   description: row.description,
+                  counterparty: counterpartyFromMeta(row.meta),
                   accountName: row.accountName,
                   categoryName: row.categoryName,
                   tags: tagsByTx.get(row.id) ?? [],

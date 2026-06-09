@@ -15,9 +15,25 @@ const counterpartySchema = z.object({
   cuil: z.string().max(20).optional(),
   cbu: z.string().max(40).optional(),
   alias: z.string().max(100).optional(),
+  /** Etiqueta amigable editable por el usuario (ej. "Niñera", "Alquiler"). No la
+   * parsea el LLM: se autocompleta desde el historial o se carga en revisión. */
+  label: z.string().max(120).optional(),
 });
 
 export type Counterparty = z.infer<typeof counterpartySchema>;
+
+/**
+ * Extrae y valida (Zod) el counterparty embebido en un `meta` / `parsed_data`
+ * jsonb. Devuelve null si no hay datos válidos. Reutilizable en cualquier vista
+ * que lea `transactions.meta`.
+ */
+export function counterpartyFromMeta(meta: unknown): Counterparty | null {
+  if (!meta || typeof meta !== 'object') return null;
+  const raw = (meta as Record<string, unknown>).counterparty;
+  if (!raw || typeof raw !== 'object') return null;
+  const res = counterpartySchema.safeParse(raw);
+  return res.success && Object.keys(res.data).length > 0 ? res.data : null;
+}
 
 const parsedTxLineStrictSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha en formato YYYY-MM-DD'),
@@ -139,6 +155,7 @@ export const parsedTxLineSchema = z.preprocess((val) => {
       cuil: cp.cuil ?? cp.cuit ?? cp.cuilCuit ?? cp.cuil_cuit,
       cbu: cp.cbu,
       alias: cp.alias,
+      label: cp.label ?? cp.etiqueta ?? cp.nick ?? cp.apodo,
     };
     // Quitar campos undefined/vacíos; si no queda nada, omitir counterparty.
     const cleaned: Record<string, unknown> = {};

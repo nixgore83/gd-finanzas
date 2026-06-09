@@ -20,6 +20,8 @@ import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import type { CategoryNode } from '@/lib/categories/tree';
 import { bulkDeleteTransactions } from '@/app/actions/transactions/bulk-delete';
 import { bulkSetTransactionCategory } from '@/app/actions/transactions/bulk-set-category';
+import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
+import type { Counterparty } from '@/lib/imports/parsers/types';
 import { DeleteTransactionButton } from './delete-button';
 
 export type TxRow = {
@@ -30,6 +32,7 @@ export type TxRow = {
   currencyOriginal: 'ARS' | 'USD';
   amountUsd: string;
   description: string;
+  counterparty?: Counterparty | null;
   accountName: string | null;
   categoryName: string | null;
   tags: Array<{ name: string; color: string | null }>;
@@ -422,6 +425,7 @@ function ByDayGroup({
                 </span>
               ))}
             </div>
+            <CounterpartyTag counterparty={row.counterparty} className="mt-0.5" />
           </td>
           <td className="px-3 py-3 text-right">
             <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 [tr:hover_&]:opacity-100">
