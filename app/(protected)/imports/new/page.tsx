@@ -9,10 +9,11 @@ export const metadata = {
   title: 'Nuevo import · gd-finanzas',
 };
 
-// La acción `createImport` (sube a Storage + varios round-trips a DB) corre en
-// el contexto de esta ruta. El default puede quedar corto en el primer hit tras
-// un deploy (cold start) o con varios archivos; le damos margen explícito.
-export const maxDuration = 60;
+// La acción `createImport` corre en el contexto de esta ruta: sube a Storage y
+// AHORA además auto-dispara el parseo (status='parsing' + after(parseImportInternal)).
+// El trabajo pesado corre en el after() acotado a esta maxDuration, así que necesita
+// los 300s (igual que /imports/[id]); el default bajo de Hobby lo mataría a mitad.
+export const maxDuration = 300;
 
 export default async function NewImportPage() {
   let session;

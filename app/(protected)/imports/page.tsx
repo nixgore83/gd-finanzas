@@ -19,6 +19,7 @@ import { Label as FormLabel } from '@/components/ui/label';
 import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 import { ImportsTable, type ImportRow } from './imports-table';
+import { ParseUploadedButton } from './parse-uploaded-button';
 
 export const metadata = { title: 'Imports · gd-finanzas' };
 
@@ -120,6 +121,14 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
     .where(eq(imports.householdId, householdId))
     .groupBy(imports.status);
   const byStatus = new Map(statusCountRows.map((r) => [r.status, Number(r.c)]));
+
+  // IDs en estado 'uploaded' (subidos sin parsear) → botón "Parsear N subidos".
+  const uploadedRows = await db
+    .select({ id: imports.id })
+    .from(imports)
+    .where(and(eq(imports.householdId, householdId), eq(imports.status, 'uploaded')));
+  const uploadedIds = uploadedRows.map((r) => r.id);
+
   const reviewStatuses = viewToStatuses('review') ?? [];
   const tabCounts: Record<ImportView, number> = {
     all: statusCountRows.reduce((s, r) => s + Number(r.c), 0),
@@ -283,9 +292,12 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
             )}
           </Body>
         </div>
-        <Button asChild size="lg">
-          <Link href="/imports/new">+ Subir extracto</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <ParseUploadedButton ids={uploadedIds} />
+          <Button asChild size="lg">
+            <Link href="/imports/new">+ Subir extracto</Link>
+          </Button>
+        </div>
       </header>
 
       <Hair thick />
