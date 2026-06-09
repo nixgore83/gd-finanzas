@@ -920,11 +920,10 @@ function LineRowEditor({
               <Field label="Tipo">
                 <Select
                   value={draft.kind}
-                  onValueChange={(v) => {
-                    const k = v as 'income' | 'expense';
-                    // El reembolso solo aplica a gasto: al pasar a ingreso, se resetea.
-                    setDraft({ ...draft, kind: k, isRefund: k === 'expense' ? draft.isRefund : false });
-                  }}
+                  // Un reembolso es siempre un gasto negativo: con el checkbox tildado
+                  // el Tipo queda fijo en Gasto (no se puede cambiar a Ingreso).
+                  disabled={draft.isRefund}
+                  onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
                 >
                   <SelectTrigger className="h-8 w-28">
                     <SelectValue />
@@ -1010,18 +1009,28 @@ function LineRowEditor({
                 </Field>
               )}
             </div>
-            {draft.kind === 'expense' && !draft.isTransfer && (
+            {!draft.isTransfer && (
               <label className="flex max-w-xl items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
                 <input
                   type="checkbox"
                   checked={draft.isRefund ?? false}
-                  onChange={(e) => setDraft({ ...draft, isRefund: e.target.checked })}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      // Un reembolso es siempre un gasto negativo → forzar Gasto y, si la
+                      // categoría elegida era de ingreso, resetearla para que se re-elija.
+                      setDraft({ ...draft, isRefund: true, kind: 'expense' });
+                      const cat = tree.find((c) => c.id === categoryId);
+                      if (cat && cat.kind !== 'expense') setCategoryId(null);
+                    } else {
+                      setDraft({ ...draft, isRefund: false });
+                    }
+                  }}
                   className="mt-0.5 size-4 rounded border-input"
                 />
                 <span>
                   <span className="font-medium">Es una devolución / reembolso recibido</span>
                   <span className="block text-xs text-muted-foreground">
-                    Resta lo devuelto de un gasto: entra como gasto negativo en la misma categoría.
+                    Entra como gasto negativo en la misma categoría (fija el Tipo en Gasto).
                     Cargá el monto en positivo; se niega al confirmar.
                   </span>
                 </span>
@@ -1050,7 +1059,7 @@ function LineRowEditor({
                   type="button"
                   variant="ghost"
                   onClick={() => {
-                    setDraft({ ...draft, isTransfer: true });
+                    setDraft({ ...draft, isTransfer: true, isRefund: false });
                     setCategoryId(null);
                   }}
                   className="text-amber-700"
