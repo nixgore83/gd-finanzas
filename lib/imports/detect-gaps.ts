@@ -51,58 +51,59 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
   const today = new Date();
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  const gaps: ImportGap[] = [];
+  // Una query por cuenta vigilada, pero en paralelo (antes era secuencial y la
+  // latencia se acumulaba; en cold start podía empujar a /imports al timeout 504).
+  const perAccount = await Promise.all(
+    watchedAccounts.map(async (acc): Promise<ImportGap | null> => {
+      // 2. Find months that have confirmed import lines for this account
+      const coveredRows = await db
+        .select({
+          month: sql<string>`to_char(
+            (${importLines.parsedData}->>'date')::date,
+            'YYYY-MM'
+          )`,
+        })
+        .from(importLines)
+        .innerJoin(imports, eq(imports.id, importLines.importId))
+        .where(
+          and(
+            eq(imports.householdId, householdId),
+            eq(imports.accountId, acc.id),
+            eq(imports.status, 'confirmed'),
+            sql`${importLines.transactionId} IS NOT NULL`,
+          ),
+        )
+        .groupBy(sql`to_char((${importLines.parsedData}->>'date')::date, 'YYYY-MM')`);
 
-  for (const acc of watchedAccounts) {
-    // 2. Find months that have confirmed import lines for this account
-    const coveredRows = await db
-      .select({
-        month: sql<string>`to_char(
-          (${importLines.parsedData}->>'date')::date,
-          'YYYY-MM'
-        )`,
-      })
-      .from(importLines)
-      .innerJoin(imports, eq(imports.id, importLines.importId))
-      .where(
-        and(
-          eq(imports.householdId, householdId),
-          eq(imports.accountId, acc.id),
-          eq(imports.status, 'confirmed'),
-          sql`${importLines.transactionId} IS NOT NULL`,
-        ),
-      )
-      .groupBy(sql`to_char((${importLines.parsedData}->>'date')::date, 'YYYY-MM')`);
+      const coveredMonths = new Set(coveredRows.map((r) => r.month));
 
-    const coveredMonths = new Set(coveredRows.map((r) => r.month));
+      if (coveredMonths.size === 0) return null; // No imports yet — no gaps to report
 
-    if (coveredMonths.size === 0) continue; // No imports yet — no gaps to report
+      // 3. Find the range: earliest covered month to current month, pero nunca
+      //    antes de EARLIEST_TRACKED_MONTH (no esperamos imports previos a 2026).
+      const sortedMonths = [...coveredMonths].sort();
+      const earliest = sortedMonths[0]!;
+      const rangeStart = earliest < EARLIEST_TRACKED_MONTH ? EARLIEST_TRACKED_MONTH : earliest;
 
-    // 3. Find the range: earliest covered month to current month, pero nunca
-    //    antes de EARLIEST_TRACKED_MONTH (no esperamos imports previos a 2026).
-    const sortedMonths = [...coveredMonths].sort();
-    const earliest = sortedMonths[0]!;
-    const rangeStart = earliest < EARLIEST_TRACKED_MONTH ? EARLIEST_TRACKED_MONTH : earliest;
+      // 4. Generate all expected months in range
+      const expectedMonths = generateMonthRange(rangeStart, currentMonth);
 
-    // 4. Generate all expected months in range
-    const expectedMonths = generateMonthRange(rangeStart, currentMonth);
+      // 5. Find missing months (exclude current month — it may not be due yet)
+      const missing = expectedMonths.filter((m) => m !== currentMonth && !coveredMonths.has(m));
 
-    // 5. Find missing months (exclude current month — it may not be due yet)
-    const missing = expectedMonths
-      .filter((m) => m !== currentMonth && !coveredMonths.has(m));
+      if (missing.length === 0) return null;
 
-    if (missing.length > 0) {
-      gaps.push({
+      return {
         accountId: acc.id,
         accountName: acc.name,
         institutionId: acc.institutionId,
         institutionName: acc.institutionName,
         missingMonths: missing,
-      });
-    }
-  }
+      };
+    }),
+  );
 
-  return gaps;
+  return perAccount.filter((g): g is ImportGap => g !== null);
 }
 
 function generateMonthRange(from: string, to: string): string[] {
