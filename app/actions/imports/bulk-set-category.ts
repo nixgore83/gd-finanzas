@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { categories, imports, importLines } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
+import { parsedTxLineSchema, type ParsedTxLine } from '@/lib/imports/parsers/types';
 
 const inputSchema = z.object({
   importId: z.string().uuid(),
@@ -86,6 +86,9 @@ export async function bulkSetCategory(input: {
     );
 
   const targetIds: string[] = [];
+  // Asignar categoría implica NO transferencia: las líneas target que sean transfer
+  // se desmarcan y se les limpia la contraparte.
+  const transferTargets: Array<{ id: string; parsed: ParsedTxLine }> = [];
   let skipped = 0;
   for (const r of rows) {
     const pd = parsedTxLineSchema.safeParse(r.parsedData);
@@ -98,6 +101,12 @@ export async function bulkSetCategory(input: {
       continue;
     }
     targetIds.push(r.id);
+    if (pd.data.isTransfer) {
+      transferTargets.push({
+        id: r.id,
+        parsed: { ...pd.data, isTransfer: false, transferAccountId: undefined },
+      });
+    }
   }
 
   if (targetIds.length === 0) {
@@ -115,6 +124,20 @@ export async function bulkSetCategory(input: {
         ),
       )
       .returning({ id: importLines.id });
+
+    // Persistir el desmarcado de transfer en las líneas que lo eran.
+    for (const t of transferTargets) {
+      await db
+        .update(importLines)
+        .set({ parsedData: t.parsed })
+        .where(
+          and(
+            eq(importLines.importId, parsed.data.importId),
+            eq(importLines.id, t.id),
+          ),
+        );
+    }
+
     revalidatePath(`/imports/${parsed.data.importId}`);
     return {
       ok: true,
