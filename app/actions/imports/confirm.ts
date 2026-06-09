@@ -259,7 +259,13 @@ export async function confirmImport(input: {
             accountId: input.accountId,
             categoryId: line.proposedCategoryId,
             kind: parsed.data.kind,
-            amountOriginal: parsed.data.amountOriginal,
+            // Reembolso/devolución: gasto con monto NEGATIVO en la misma categoría
+            // (regla de negocio §4.3). El parsed_data guarda el monto positivo + el
+            // flag; acá se niega al crear la transacción (mismo modelo que el form manual).
+            amountOriginal:
+              parsed.data.isRefund && parsed.data.kind === 'expense'
+                ? `-${parsed.data.amountOriginal}`
+                : parsed.data.amountOriginal,
             currencyOriginal: parsed.data.currencyOriginal,
             description: parsed.data.description,
             notes: parsed.data.notes ?? null,

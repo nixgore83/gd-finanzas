@@ -774,6 +774,11 @@ function LineRowEditor({
               Transfer
             </span>
           )}
+          {line.parsedData.isRefund && (
+            <span className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+              Devolución
+            </span>
+          )}
         </div>
       </td>
       <td className="px-2 py-1.5 text-right tabular-nums">
@@ -915,7 +920,11 @@ function LineRowEditor({
               <Field label="Tipo">
                 <Select
                   value={draft.kind}
-                  onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
+                  onValueChange={(v) => {
+                    const k = v as 'income' | 'expense';
+                    // El reembolso solo aplica a gasto: al pasar a ingreso, se resetea.
+                    setDraft({ ...draft, kind: k, isRefund: k === 'expense' ? draft.isRefund : false });
+                  }}
                 >
                   <SelectTrigger className="h-8 w-28">
                     <SelectValue />
@@ -1001,6 +1010,23 @@ function LineRowEditor({
                 </Field>
               )}
             </div>
+            {draft.kind === 'expense' && !draft.isTransfer && (
+              <label className="flex max-w-xl items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
+                <input
+                  type="checkbox"
+                  checked={draft.isRefund ?? false}
+                  onChange={(e) => setDraft({ ...draft, isRefund: e.target.checked })}
+                  className="mt-0.5 size-4 rounded border-input"
+                />
+                <span>
+                  <span className="font-medium">Es una devolución / reembolso recibido</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Resta lo devuelto de un gasto: entra como gasto negativo en la misma categoría.
+                    Cargá el monto en positivo; se niega al confirmar.
+                  </span>
+                </span>
+              </label>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" type="button" onClick={save} disabled={isPending}>
                 Guardar
