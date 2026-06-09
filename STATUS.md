@@ -3,12 +3,25 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-06-08 por Claude
+**Última actualización:** 2026-06-09 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-06-09 — Contrapartes editables + UX de revisión de imports (en paralelo con otro agente)
+
+Sesión de soporte/UX sobre imports, **con otro(s) agente(s) trabajando en paralelo** sobre `main` (de ahí los PRs intercalados #17/#19/async-parsing de la otra tanda). Todo el trabajo de esta sesión salió en worktrees aislados + PRs propios, ya **mergeados y en producción**.
+
+- [x] **#16** — Sección "Trabajo en paralelo — varios agentes" agregada a `CLAUDE.md`: branch propio obligatorio, git acotado por path (prohibido `stash`/`reset --hard`/`add -A`), cómo interpretar fallos de typecheck en árbol compartido, archivos calientes, cierre vía PR. Disparado por un `git stash` que casi se lleva el WIP ajeno.
+- [x] **#18** — **Contrapartes: etiqueta + categoría auto por contraparte.** (1) Campo `label` editable en el counterparty (jsonb, sin migración), editable en revisión y visible (solo-lectura) en lista y detalle de transacciones (componente compartido `CounterpartyTag`). (2) Nuevo `lib/imports/counterparty-suggest.ts` (`lookupCounterpartyHistory`): matchea la misma contraparte entre meses por CUIL/CBU/cuenta/alias o nombre normalizado y precarga la **categoría más frecuente** (desempate: más reciente) + la etiqueta. Cableado en el parse con prioridad sobre la sugerencia por descripción para líneas no-transfer. **Backfill** de `imports.account_id` para imports viejos que mostraban la cuenta del header en vez de la real (vía MCP SQL).
+- [x] **#21/#18** — **UX revisión:** (a) asignar categoría a una línea marcada como transfer la **desmarca** automáticamente (inline, en edición y en lote) — categoría y "cuenta contraparte" mutuamente excluyentes. (b) **Type-ahead** en los selectores inline de categoría y contraparte (`CategoryCombobox` generalizado a `Combobox` reutilizable). (c) Barra de selección masiva **sticky** arriba (movida a hija directa de la `section` para que el `sticky` no se despegue; un intento previo con scroll interno de la tabla se revirtió por feedback).
+- [x] **#22** — **Lista de imports:** (a) entra por default a la vista **"Para revisar"** = todos los estados accionables, no solo `parsed`+`reviewing` → ahora incluye `uploaded`/`parsing` (todo lo que no es `confirmed` ni `error`, derivado de `IMPORT_STATUSES`). (b) "Resúmenes faltantes" (`detect-gaps`) no reporta meses **previos a 2026** (`EARLIEST_TRACKED_MONTH='2026-01'`); el tracking del household arranca en 2026.
+- [x] **#23** — **Marcar/desmarcar transferencia en lote** (`bulkSetTransfer`, jsonb_set): la detección automática marca como transfer muchos pagos a terceros que son gastos; botones "Marcar transfer"/"No es transfer" en la barra de selección. Marcar limpia la categoría; desmarcar limpia `transferAccountId`. SQL jsonb validado contra Postgres.
+- **Sin migraciones nuevas** en esta sesión (todo jsonb existente). Validación por PR: typecheck + lint + suite (de 281 → 295 tests con merges de la otra tanda).
+- **Incidente prod (resuelto):** 500 transitorio ("This page couldn't load") — diagnóstico vía logs Postgres de Supabase mostró statement timeout + EOF mid-transaction (función colgada), no un build roto ni query lenta de la app; destrabó con Reload. Es el patrón conocido del parse síncrono. Memoria de debugging actualizada.
+- [x] **Sync PRD Notion:** changelog v1.5 (2026-06-09) + §5.2.1 (sugerencia por contraparte).
 
 ### Sesión 2026-06-08 (cont.) — Reembolsos / devoluciones de gastos
 
