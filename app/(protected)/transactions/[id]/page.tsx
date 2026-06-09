@@ -6,6 +6,8 @@ import { getDb } from '@/lib/db/client';
 import { accounts, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
+import { counterpartyFromMeta } from '@/lib/imports/parsers/types';
+import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { updateTransaction } from '@/app/actions/transactions/update';
 import { updateTransfer } from '@/app/actions/transactions/update-transfer';
 import { findMatchCandidates } from '@/app/actions/forecasts/_candidates';
@@ -44,6 +46,8 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     .limit(1);
 
   if (!tx) notFound();
+
+  const counterparty = counterpartyFromMeta(tx.meta);
 
   const accountRows = await db
     .select({
@@ -214,6 +218,15 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
         }}
         initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
       />
+
+      {counterparty && (
+        <div className="rounded-md border border-border bg-card/40 p-4">
+          <p className="mb-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Contraparte
+          </p>
+          <CounterpartyTag counterparty={counterparty} className="text-xs" />
+        </div>
+      )}
 
       {linkedInfo ? (
         <ForecastMatcher

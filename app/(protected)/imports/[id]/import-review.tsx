@@ -16,7 +16,8 @@ import {
 import { cn } from '@/lib/utils';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import type { CategoryNode } from '@/lib/categories/tree';
-import type { Counterparty, ParsedTxLine } from '@/lib/imports/parsers/types';
+import type { ParsedTxLine } from '@/lib/imports/parsers/types';
+import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
@@ -293,7 +294,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           </div>
 
           {selectedIds.size > 0 && (
-            <div className="flex flex-wrap items-end gap-3 rounded-md border border-blue-300 bg-blue-50 p-3">
+            <div className="sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-md border border-blue-300 bg-blue-50 p-3 shadow-sm">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-blue-900">
                   {selectedIds.size} línea{selectedIds.size === 1 ? '' : 's'} seleccionada
@@ -365,9 +366,9 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="max-h-[75vh] overflow-auto rounded-md border">
         <table className="w-full text-sm">
-          <thead className="bg-muted/40">
+          <thead className="sticky top-0 z-10 bg-muted">
             <tr className="text-left">
               {!readOnly && (
                 <th className="px-2 py-2 w-8">
@@ -708,7 +709,7 @@ function LineRowEditor({
       <td className="px-2 py-1.5 tabular-nums">{line.parsedData.date}</td>
       <td className="px-2 py-1.5">
         {line.parsedData.description}
-        <CounterpartyTag counterparty={line.parsedData.counterparty} />
+        <CounterpartyTag counterparty={line.parsedData.counterparty} className="mt-0.5" />
       </td>
       <td className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1">
@@ -904,44 +905,48 @@ function LineRowEditor({
                   className="h-8 w-full"
                 />
               </Field>
-              {draft.isTransfer ? (
-                <Field label="Cuenta contraparte">
-                  <Select
-                    value={draft.transferAccountId ?? ''}
-                    onValueChange={(v) => setDraft({ ...draft, transferAccountId: v || undefined })}
-                  >
-                    <SelectTrigger className="h-8 w-64">
-                      <SelectValue placeholder="Cuenta contraparte…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts
-                        .filter((a) => a.id !== currentAccountId)
-                        .map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({a.ownerTag}) · {a.currency}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+              {draft.counterparty && (
+                <Field label="Etiqueta contraparte" className="min-w-[180px]">
+                  <Input
+                    value={draft.counterparty.label ?? ''}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        counterparty: { ...draft.counterparty, label: e.target.value || undefined },
+                      })
+                    }
+                    placeholder="ej. Niñera, Alquiler…"
+                    className="h-8 w-48"
+                  />
                 </Field>
-              ) : (
-                <Field label="Categoría">
-                  <Select
-                    value={categoryId ?? ''}
-                    onValueChange={(v) => setCategoryId(v || null)}
-                  >
-                    <SelectTrigger className="h-8 w-64">
-                      <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoriesForKind.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.depth === 1 ? '↳ ' : ''}
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              )}
+              <Field label="Categoría">
+                <CategoryCombobox
+                  options={categoriesForKind}
+                  value={categoryId ?? ''}
+                  onChange={(id) => {
+                    setCategoryId(id || null);
+                    // Asignar categoría desmarca la transferencia (mutuamente excluyentes).
+                    if (id && draft.isTransfer) {
+                      setDraft({ ...draft, isTransfer: false, transferAccountId: undefined });
+                    }
+                  }}
+                  placeholder="Buscar categoría…"
+                />
+              </Field>
+              {draft.isTransfer && (
+                <Field label="Cuenta contraparte">
+                  <Combobox
+                    options={accounts
+                      .filter((a) => a.id !== currentAccountId)
+                      .map((a) => ({
+                        id: a.id,
+                        label: `${a.name} (${a.ownerTag}) · ${a.currency}`,
+                      }))}
+                    value={draft.transferAccountId ?? ''}
+                    onChange={(id) => setDraft({ ...draft, transferAccountId: id || undefined })}
+                    placeholder="Buscar cuenta…"
+                  />
                 </Field>
               )}
             </div>
@@ -982,26 +987,6 @@ function LineRowEditor({
       </tr>
     )}
     </>
-  );
-}
-
-function CounterpartyTag({ counterparty }: { counterparty?: Counterparty }) {
-  if (!counterparty) return null;
-  const { name, accountRef, cuil, cbu, alias } = counterparty;
-  const ids = [
-    accountRef && `cta ${accountRef}`,
-    cuil && `CUIL ${cuil}`,
-    cbu && `CBU ${cbu}`,
-    alias && `alias ${alias}`,
-  ].filter(Boolean);
-  if (!name && ids.length === 0) return null;
-  return (
-    <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
-      {name && <span className="font-medium">{name}</span>}
-      {ids.length > 0 && (
-        <span className="block font-mono">{ids.join(' · ')}</span>
-      )}
-    </div>
   );
 }
 
@@ -1081,29 +1066,37 @@ function computeTotalsByCurrency(lines: LineRow[]): CurrencyTotals[] {
   return out;
 }
 
-function CategoryCombobox({
+type ComboOption = { id: string; label: string; indent?: boolean };
+
+/**
+ * Combobox genérico con búsqueda (type-ahead) + cierre por click-outside.
+ * Reusado por el selector masivo y los selectores inline (categoría, contraparte).
+ */
+function Combobox({
   options,
   value,
   onChange,
   disabled,
   placeholder,
+  widthClassName = 'w-64',
 }: {
-  options: CategoryNode[];
+  options: ComboOption[];
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  widthClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
-  const selected = options.find((c) => c.id === value);
+  const selected = options.find((o) => o.id === value);
 
   const filtered = useMemo(() => {
     if (!search) return options;
     const q = search.toLowerCase();
-    return options.filter((c) => c.name.toLowerCase().includes(q));
+    return options.filter((o) => o.label.toLowerCase().includes(q));
   }, [options, search]);
 
   // Close on outside click
@@ -1117,7 +1110,7 @@ function CategoryCombobox({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative w-64">
+    <div ref={ref} className={cn('relative', widthClassName)}>
       <button
         type="button"
         onClick={() => { if (!disabled) setOpen(!open); }}
@@ -1128,10 +1121,10 @@ function CategoryCombobox({
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         )}
       >
-        <span className={selected ? '' : 'text-muted-foreground'}>
-          {selected ? (selected.depth === 1 ? `↳ ${selected.name}` : selected.name) : (placeholder ?? 'Elegí categoría')}
+        <span className={cn('truncate', selected ? '' : 'text-muted-foreground')}>
+          {selected ? (selected.indent ? `↳ ${selected.label}` : selected.label) : (placeholder ?? 'Elegí…')}
         </span>
-        <svg className="h-4 w-4 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+        <svg className="ml-1 h-4 w-4 shrink-0 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
@@ -1149,24 +1142,52 @@ function CategoryCombobox({
             {filtered.length === 0 && (
               <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin resultados</p>
             )}
-            {filtered.map((c) => (
+            {filtered.map((o) => (
               <button
-                key={c.id}
+                key={o.id}
                 type="button"
-                onClick={() => { onChange(c.id); setOpen(false); setSearch(''); }}
+                onClick={() => { onChange(o.id); setOpen(false); setSearch(''); }}
                 className={cn(
                   'flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
-                  c.id === value && 'bg-accent font-medium',
+                  o.id === value && 'bg-accent font-medium',
                 )}
               >
-                {c.depth === 1 ? <span className="mr-1 text-muted-foreground">↳</span> : null}
-                {c.name}
+                {o.indent ? <span className="mr-1 text-muted-foreground">↳</span> : null}
+                {o.label}
               </button>
             ))}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function CategoryCombobox({
+  options,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  options: CategoryNode[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const comboOptions = useMemo<ComboOption[]>(
+    () => options.map((c) => ({ id: c.id, label: c.name, indent: c.depth === 1 })),
+    [options],
+  );
+  return (
+    <Combobox
+      options={comboOptions}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      placeholder={placeholder ?? 'Elegí categoría'}
+    />
   );
 }
 

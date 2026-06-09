@@ -2,6 +2,13 @@ import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions } from '@/db/schema';
 
+/**
+ * No se esperan ni se sugieren imports previos a esta fecha: el tracking del
+ * household arranca en 2026. Aunque haya líneas confirmadas con fechas anteriores
+ * (p. ej. saldos/movimientos viejos), no se reportan gaps antes de este mes.
+ */
+const EARLIEST_TRACKED_MONTH = '2026-01';
+
 export interface ImportGap {
   accountId: string;
   accountName: string;
@@ -71,12 +78,14 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
 
     if (coveredMonths.size === 0) continue; // No imports yet — no gaps to report
 
-    // 3. Find the range: earliest covered month to current month
+    // 3. Find the range: earliest covered month to current month, pero nunca
+    //    antes de EARLIEST_TRACKED_MONTH (no esperamos imports previos a 2026).
     const sortedMonths = [...coveredMonths].sort();
     const earliest = sortedMonths[0]!;
+    const rangeStart = earliest < EARLIEST_TRACKED_MONTH ? EARLIEST_TRACKED_MONTH : earliest;
 
     // 4. Generate all expected months in range
-    const expectedMonths = generateMonthRange(earliest, currentMonth);
+    const expectedMonths = generateMonthRange(rangeStart, currentMonth);
 
     // 5. Find missing months (exclude current month — it may not be due yet)
     const missing = expectedMonths

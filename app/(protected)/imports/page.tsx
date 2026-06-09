@@ -57,7 +57,8 @@ function parseFilters(sp: Record<string, string | string[] | undefined>): Filter
   const page = z.coerce.number().int().positive().safeParse(get('page'));
 
   return {
-    view: view.success ? view.data : 'all',
+    // Default: la vista "para revisar" (los que esperan acción del usuario).
+    view: view.success ? view.data : 'review',
     type: type.success ? type.data : undefined,
     institutionId: institutionId.success ? institutionId.data : undefined,
     accountId: accountId.success ? accountId.data : undefined,
@@ -72,7 +73,8 @@ function parseFilters(sp: Record<string, string | string[] | undefined>): Filter
 
 function buildHref(filters: Filters, pageOverride: number): string {
   const sp = new URLSearchParams();
-  if (filters.view !== 'all') sp.set('view', filters.view);
+  // 'review' es el default (URL sin ?view); cualquier otra vista va explícita.
+  if (filters.view !== 'review') sp.set('view', filters.view);
   if (filters.type) sp.set('type', filters.type);
   if (filters.institutionId) sp.set('institutionId', filters.institutionId);
   if (filters.accountId) sp.set('accountId', filters.accountId);

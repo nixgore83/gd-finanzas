@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsedTxLineSchema, parserOutputSchema } from './types';
+import { counterpartyFromMeta, parsedTxLineSchema, parserOutputSchema } from './types';
 
 describe('parsedTxLineSchema', () => {
   it('happy path', () => {
@@ -216,6 +216,52 @@ describe('parsedTxLineSchema counterparty', () => {
     });
     expect(out.success).toBe(true);
     if (out.success) expect(out.data.counterparty).toBeUndefined();
+  });
+
+  it('acepta y trimea label', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-01-23',
+      description: 'ALQUILER',
+      amountOriginal: '300000.00',
+      currencyOriginal: 'ARS',
+      kind: 'expense',
+      counterparty: { cuil: '27-98765432-1', label: '  Alquiler depto  ' },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.counterparty?.label).toBe('Alquiler depto');
+  });
+
+  it('normaliza alias de label (etiqueta/apodo)', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-01-23',
+      description: 'PAGO',
+      amountOriginal: '50000.00',
+      currencyOriginal: 'ARS',
+      kind: 'expense',
+      counterparty: { cuil: '20-11111111-2', etiqueta: 'Niñera' },
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.counterparty?.label).toBe('Niñera');
+  });
+});
+
+describe('counterpartyFromMeta', () => {
+  it('extrae counterparty válido de un meta', () => {
+    const cp = counterpartyFromMeta({
+      counterparty: { name: 'GORE NICOLAS', cuil: '20-12345678-9', label: 'Sueldo' },
+      otraCosa: 1,
+    });
+    expect(cp).not.toBeNull();
+    expect(cp?.name).toBe('GORE NICOLAS');
+    expect(cp?.label).toBe('Sueldo');
+  });
+
+  it('devuelve null cuando no hay counterparty', () => {
+    expect(counterpartyFromMeta({})).toBeNull();
+    expect(counterpartyFromMeta(null)).toBeNull();
+    expect(counterpartyFromMeta(undefined)).toBeNull();
+    expect(counterpartyFromMeta('no-objeto')).toBeNull();
+    expect(counterpartyFromMeta({ counterparty: {} })).toBeNull();
   });
 });
 

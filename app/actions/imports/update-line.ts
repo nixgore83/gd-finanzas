@@ -48,7 +48,18 @@ export async function updateImportLine(input: {
     .limit(1);
   if (!imp) return { ok: false, error: 'not_found' };
 
-  // Transfers don't need a category; skip validation for them
+  // Asignar categoría implica NO transferencia: si la línea venía marcada como
+  // transfer pero se eligió una categoría, la desmarcamos y limpiamos la contraparte
+  // (categoría y "cuenta contraparte" son mutuamente excluyentes).
+  if (parsed.data.proposedCategoryId && parsed.data.parsed.isTransfer) {
+    parsed.data.parsed = {
+      ...parsed.data.parsed,
+      isTransfer: false,
+      transferAccountId: undefined,
+    };
+  }
+
+  // Validar kind de la categoría (ya resuelto si la línea es transfer o no).
   if (parsed.data.proposedCategoryId && !parsed.data.parsed.isTransfer) {
     const [cat] = await db
       .select({ id: categories.id, kind: categories.kind })
@@ -66,7 +77,7 @@ export async function updateImportLine(input: {
     }
   }
 
-  // If marked as transfer, clear category
+  // Si sigue siendo transfer (no se eligió categoría), no lleva categoría.
   if (parsed.data.parsed.isTransfer) {
     parsed.data.proposedCategoryId = null;
   }
