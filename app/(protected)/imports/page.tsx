@@ -23,9 +23,11 @@ import { ParseUploadedButton } from './parse-uploaded-button';
 
 export const metadata = { title: 'Imports · gd-finanzas' };
 
-// Headroom para cold starts: el default de Hobby es bajo y la lista (con detect-gaps
-// + conteos) puede pasarse y dar 504. Las otras rutas de imports ya lo setean.
-export const maxDuration = 60;
+// 300s: además del headroom para cold starts (detect-gaps + conteos, evita 504),
+// el botón "Parsear subidos" invoca `parseImportSync` DESDE esta ruta, y el parse
+// (LLM, hasta 220s) corre dentro de esta maxDuration. Con 60s se moría a mitad y
+// dejaba los imports colgados en 'parsing'.
+export const maxDuration = 300;
 
 const PAGE_LIMIT = 50;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

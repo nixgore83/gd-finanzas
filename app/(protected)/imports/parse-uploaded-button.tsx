@@ -4,15 +4,16 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { parseImport } from '@/app/actions/imports/parse';
+import { parseImportSync } from '@/app/actions/imports/parse';
 
 /**
- * Dispara el parseo de TODOS los imports en estado 'uploaded'. Cada `parseImport`
- * es su propia request/invocación (con sus 300s), así que en vez de batchear en una
- * sola función (que reventaría el límite) se disparan N requests. Pool acotado para
- * no mandar una ráfaga de N a la vez.
+ * Parsea en lote los imports en estado 'uploaded'. Usa `parseImportSync` (que
+ * AWAITa el parse completo), así el pool acota la **concurrencia real** a `POOL`
+ * parses simultáneos — evita disparar N parses en paralelo (rate limits de
+ * Anthropic / límites de Hobby) y que el `after()` herede una maxDuration corta.
+ * Cada llamada es su request/invocación con los 300s de la ruta `/imports`.
  */
-const POOL = 3;
+const POOL = 2;
 
 export function ParseUploadedButton({ ids }: { ids: string[] }) {
   const router = useRouter();
@@ -31,7 +32,7 @@ export function ParseUploadedButton({ ids }: { ids: string[] }) {
           const id = queue.shift();
           if (!id) return;
           try {
-            const res = await parseImport(id);
+            const res = await parseImportSync(id);
             if (res.ok) ok += 1;
             else fail += 1;
           } catch {
@@ -44,9 +45,9 @@ export function ParseUploadedButton({ ids }: { ids: string[] }) {
       );
       setFired(true);
       if (fail === 0) {
-        toast.success(`${ok} ${ok === 1 ? 'import puesto' : 'imports puestos'} a parsear`);
+        toast.success(`${ok} ${ok === 1 ? 'import parseado' : 'imports parseados'}`);
       } else {
-        toast.warning(`${ok} a parsear · ${fail} no se pudieron disparar`);
+        toast.warning(`${ok} parseados · ${fail} con error (reintentá los que fallen)`);
       }
       router.refresh();
     });
@@ -55,7 +56,7 @@ export function ParseUploadedButton({ ids }: { ids: string[] }) {
   return (
     <Button type="button" variant="outline" size="lg" onClick={run} disabled={isPending || fired}>
       {isPending
-        ? 'Disparando…'
+        ? `Parseando ${ids.length}…`
         : `Parsear ${ids.length} ${ids.length === 1 ? 'subido' : 'subidos'}`}
     </Button>
   );
