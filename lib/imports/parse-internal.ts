@@ -76,10 +76,10 @@ export async function parseImportInternal(
     .delete(importLines)
     .where(and(eq(importLines.importId, importId), isNull(importLines.transactionId)));
 
-  // status → parsing
+  // status → parsing (+ timestamp para detectar parseos cortados / stale)
   await db
     .update(imports)
-    .set({ status: 'parsing', errorMessage: null })
+    .set({ status: 'parsing', parsingStartedAt: sql`now()`, errorMessage: null })
     .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
 
   let bytes: Uint8Array;

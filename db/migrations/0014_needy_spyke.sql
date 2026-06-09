@@ -1,0 +1,1 @@
+ALTER TABLE "imports" ADD COLUMN IF NOT EXISTS "parsing_started_at" timestamp with time zone;
