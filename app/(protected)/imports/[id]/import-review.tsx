@@ -271,104 +271,104 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       </div>
 
       {!readOnly && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => doBulk('accepted')}
-              disabled={isPending || lineSummary.pending === 0}
-            >
-              Aceptar todas las pending
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => doBulk('rejected')}
-              disabled={isPending || lineSummary.pending === 0}
-            >
-              Rechazar todas las pending
-            </Button>
-          </div>
-
-          {selectedIds.size > 0 && (
-            <div className="sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-md border border-blue-300 bg-blue-50 p-3 shadow-sm">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-blue-900">
-                  {selectedIds.size} línea{selectedIds.size === 1 ? '' : 's'} seleccionada
-                  {selectedIds.size === 1 ? '' : 's'}
-                </p>
-                {uniformKind === null ? (
-                  <p className="text-xs text-blue-800">
-                    Mezcla de ingresos y gastos. Filtrá por tipo antes de asignar
-                    categoría en lote.
-                  </p>
-                ) : (
-                  <p className="text-xs text-blue-800">
-                    Todas son {uniformKind === 'expense' ? 'gastos' : 'ingresos'}.
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <CategoryCombobox
-                  options={bulkCategoryOptions}
-                  value={bulkCategoryId}
-                  onChange={setBulkCategoryId}
-                  disabled={uniformKind === null || isPending}
-                  placeholder="Buscar categoría…"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={doBulkCategory}
-                  disabled={isPending || !bulkCategoryId || uniformKind === null}
-                >
-                  Aplicar categoría
-                </Button>
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-blue-900">Moneda</label>
-                  <Select
-                    value={bulkCurrency}
-                    onValueChange={(v) => setBulkCurrency(v as 'ARS' | 'USD')}
-                  >
-                    <SelectTrigger className="h-9 w-24 bg-background">
-                      <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ARS">ARS</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={doBulkCurrency}
-                  disabled={isPending || !bulkCurrency}
-                >
-                  Aplicar moneda
-                </Button>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setSelectedIds(new Set())}
-              >
-                Limpiar selección
-              </Button>
-            </div>
-          )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => doBulk('accepted')}
+            disabled={isPending || lineSummary.pending === 0}
+          >
+            Aceptar todas las pending
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => doBulk('rejected')}
+            disabled={isPending || lineSummary.pending === 0}
+          >
+            Rechazar todas las pending
+          </Button>
         </div>
       )}
 
-      <div className="max-h-[75vh] overflow-auto rounded-md border">
+      {/* Barra de acciones en lote: hija directa de la section (no de un div corto)
+          para que `sticky` la mantenga pegada arriba mientras se scrollea la lista. */}
+      {!readOnly && selectedIds.size > 0 && (
+        <div className="sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-md border border-blue-300 bg-blue-50 p-3 shadow-sm">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-blue-900">
+              {selectedIds.size} línea{selectedIds.size === 1 ? '' : 's'} seleccionada
+              {selectedIds.size === 1 ? '' : 's'}
+            </p>
+            {uniformKind === null ? (
+              <p className="text-xs text-blue-800">
+                Mezcla de ingresos y gastos. Filtrá por tipo antes de asignar
+                categoría en lote.
+              </p>
+            ) : (
+              <p className="text-xs text-blue-800">
+                Todas son {uniformKind === 'expense' ? 'gastos' : 'ingresos'}.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <CategoryCombobox
+              options={bulkCategoryOptions}
+              value={bulkCategoryId}
+              onChange={setBulkCategoryId}
+              disabled={uniformKind === null || isPending}
+              placeholder="Buscar categoría…"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={doBulkCategory}
+              disabled={isPending || !bulkCategoryId || uniformKind === null}
+            >
+              Aplicar categoría
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Moneda</label>
+              <Select
+                value={bulkCurrency}
+                onValueChange={(v) => setBulkCurrency(v as 'ARS' | 'USD')}
+              >
+                <SelectTrigger className="h-9 w-24 bg-background">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">ARS</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={doBulkCurrency}
+              disabled={isPending || !bulkCurrency}
+            >
+              Aplicar moneda
+            </Button>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Limpiar selección
+          </Button>
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-muted">
+          <thead className="bg-muted/40">
             <tr className="text-left">
               {!readOnly && (
                 <th className="px-2 py-2 w-8">
