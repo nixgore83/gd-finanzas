@@ -57,7 +57,13 @@ export async function parseImportInternal(
     .limit(1);
 
   if (!row) return { ok: false, error: 'not_found' };
-  const reparseable = ['uploaded', 'error', 'parsed', 'reviewing'];
+  // 'parsing' DEBE estar incluido: el parseo async (`parseImport`/`parseImportSync`)
+  // marca status='parsing' ANTES de invocar a parseImportInternal (para feedback en
+  // la UI), así que al llegar acá el estado ya es 'parsing'. Sin esto, todo parse
+  // disparado por esa vía devolvía 'invalid_state' y quedaba colgado en 'parsing'
+  // (el cron de Gmail no, porque llama a parseImportInternal directo). También
+  // permite reintentar un import realmente trabado en 'parsing'.
+  const reparseable = ['uploaded', 'parsing', 'error', 'parsed', 'reviewing'];
   if (!reparseable.includes(row.status)) {
     return { ok: false, error: 'invalid_state' };
   }
