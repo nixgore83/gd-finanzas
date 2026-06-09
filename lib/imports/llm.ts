@@ -57,6 +57,18 @@ function extractJson(text: string): unknown {
 }
 
 /**
+ * Timeout explícito de cada llamada al LLM, por DEBAJO de la maxDuration de la
+ * función de parseo (300s) y dejando margen para el post-procesado (dedup +
+ * inserts). Si la generación se pasa de esto, el SDK aborta y el caller marca el
+ * import como 'error' — en vez de que Vercel mate la función a mitad de la llamada
+ * y el import quede colgado en 'parsing' (ahí el catch no llega a correr).
+ * `maxRetries: 0`: que el SDK NO reintente el timeout (duplicaría la duración y
+ * reventaría el presupuesto de la función). El retry de JSON/schema lo maneja
+ * `runParser` aparte.
+ */
+const PARSE_LLM_TIMEOUT_MS = 220_000;
+
+/**
  * Llama al modelo con un mensaje compuesto (PDF + texto) o solo texto, valida
  * con Zod, y reintenta UNA vez si el JSON viene roto.
  */
@@ -89,12 +101,15 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
 
     let response: Anthropic.Messages.Message;
     try {
-      response = await client.messages.create({
-        model: input.modelId,
-        max_tokens: maxTokens,
-        system: input.systemPrompt,
-        messages: [{ role: 'user', content }],
-      });
+      response = await client.messages.create(
+        {
+          model: input.modelId,
+          max_tokens: maxTokens,
+          system: input.systemPrompt,
+          messages: [{ role: 'user', content }],
+        },
+        { timeout: PARSE_LLM_TIMEOUT_MS, maxRetries: 0 },
+      );
     } catch (err) {
       // Extraer info útil del error del SDK (sin loggear el body crudo, que
       // podría contener prompt/contenido). Surface status + tipo + modelo.
