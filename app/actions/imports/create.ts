@@ -16,6 +16,7 @@ import {
   hashBytes,
   uploadImportFile,
 } from '@/lib/imports/storage';
+import { parseImport } from './parse';
 
 export type CreateImportResult =
   | { ok: true; importId: string }
@@ -146,6 +147,16 @@ export async function createImport(formData: FormData): Promise<CreateImportResu
   }
 
   await db.update(imports).set({ fileUrl: path }).where(eq(imports.id, importId));
+
+  // Auto-parse: disparar el parseo async apenas se sube (hands-off). `parseImport`
+  // marca status='parsing' + agenda el trabajo pesado con after(); corre dentro de
+  // la maxDuration de /imports/new (subida a 300s). Best-effort: si falla el
+  // schedule, el import queda 'uploaded' y se puede parsear a mano — no rompe la subida.
+  try {
+    await parseImport(importId);
+  } catch {
+    console.error('[imports] auto-parse on upload failed to schedule', { importId });
+  }
 
   revalidatePath('/imports');
   return { ok: true, importId };
