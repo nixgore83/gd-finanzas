@@ -19,3 +19,5 @@ coverage/
 test-results/
 playwright-report/
 *.tsbuildinfo
+# Local Claude Code agent state (worktrees, transcripts) — never commit
+.claude/

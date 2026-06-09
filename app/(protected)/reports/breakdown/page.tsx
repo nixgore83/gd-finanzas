@@ -206,7 +206,7 @@ export default async function BreakdownReportPage({
                         <div
                           className="h-full"
                           style={{
-                            width: `${row.pct}%`,
+                            width: `${Math.max(0, row.pct)}%`,
                             background: swatch,
                           }}
                           aria-hidden
