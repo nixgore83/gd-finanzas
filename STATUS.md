@@ -37,7 +37,7 @@ Trabajo en worktree aislado (`feat/transfers-match-confirm`), en paralelo con ot
   confirmadas (cada una en 2 pares idénticos) → borrado 1 par por grupo (10 patas). Saldos
   corregidos y verificados (ej. Galicia CA USD 952,16→476,08). 0 duplicados restantes.
 - **Sin migraciones.** Suite 309→**318** (tests puros del matcher/dirección/re-signo).
-- [ ] **Sync PRD Notion:** changelog nueva regla de conciliación de transferencias (§4.3).
+- [x] **Sync PRD Notion:** changelog **v1.8** + regla de conciliación de transferencias en §4.3.
 
 ### Sesión 2026-06-10 — CSV completo de ICBC: carga manual + parser determinístico
 
