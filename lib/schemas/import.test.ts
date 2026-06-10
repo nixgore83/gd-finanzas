@@ -48,9 +48,13 @@ describe('extractExtension', () => {
   it('CSV', () => {
     expect(extractExtension('export.csv')).toBe('csv');
   });
+  it('XLSX (Galicia exporta Excel)', () => {
+    expect(extractExtension('galicia CA ARS.xlsx')).toBe('xlsx');
+    expect(extractExtension('HOJA.XLSX')).toBe('xlsx');
+  });
   it('extensión no soportada', () => {
-    expect(extractExtension('hoja.xlsx')).toBeNull();
     expect(extractExtension('imagen.png')).toBeNull();
+    expect(extractExtension('doc.docx')).toBeNull();
   });
   it('sin extensión', () => {
     expect(extractExtension('archivo')).toBeNull();
@@ -60,6 +64,10 @@ describe('extractExtension', () => {
 describe('contentTypeForExt', () => {
   it('pdf', () => expect(contentTypeForExt('pdf')).toBe('application/pdf'));
   it('csv', () => expect(contentTypeForExt('csv')).toBe('text/csv'));
+  it('xlsx', () =>
+    expect(contentTypeForExt('xlsx')).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ));
   it('fallback octet-stream', () =>
     expect(contentTypeForExt('xxx')).toBe('application/octet-stream'));
 });

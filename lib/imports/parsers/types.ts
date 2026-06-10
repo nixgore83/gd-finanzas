@@ -290,4 +290,10 @@ export type Parser = {
    * matchea el formato esperado (→ fallback a LLM). `ctx.currency` viene de la cuenta.
    */
   parseCsv?: (text: string, ctx: { currency: 'ARS' | 'USD' }) => ParserOutput;
+  /**
+   * Parseo DETERMINÍSTICO de XLSX (sin LLM). Recibe las filas ya extraídas de la hoja
+   * (ver `lib/imports/xlsx.ts` `readXlsxRows`) — sync y testeable con matrices sintéticas.
+   * Debe lanzar `CsvFormatError` si la hoja no matchea el formato esperado.
+   */
+  parseXlsx?: (rows: string[][], ctx: { currency: 'ARS' | 'USD' }) => ParserOutput;
 };

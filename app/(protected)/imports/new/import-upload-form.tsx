@@ -30,7 +30,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   session: 'Sesión expirada — volvé a entrar.',
   no_file: 'Adjuntá un archivo.',
   file_too_large: 'El archivo supera los 20 MB.',
-  unsupported_format: 'Formato no soportado. Usá PDF o CSV.',
+  unsupported_format: 'Formato no soportado. Usá PDF, CSV o XLSX.',
   institution_not_found: 'Institución inválida.',
   storage: 'No se pudo subir el archivo. Reintentá.',
   unknown: 'Algo falló. Reintentá.',
@@ -188,13 +188,13 @@ export function ImportUploadForm({
     <div className="space-y-4">
       {/* File picker */}
       <div className="space-y-1.5 rounded-md border bg-card p-4">
-        <Label htmlFor="file">Archivos (PDF o CSV, hasta 20 MB c/u)</Label>
+        <Label htmlFor="file">Archivos (PDF, CSV o XLSX, hasta 20 MB c/u)</Label>
         <Input
           ref={fileRef}
           id="file"
           name="file"
           type="file"
-          accept=".pdf,.csv"
+          accept=".pdf,.csv,.xlsx"
           multiple
           onChange={(e) => {
             if (e.target.files && e.target.files.length > 0) {

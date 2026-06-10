@@ -1,5 +1,6 @@
 import type { ImportType } from '@/lib/schemas/import';
 import { galiciaTcParser } from './galicia-tc';
+import { galiciaBancoParser } from './galicia-banco';
 import { icbcMastercardTcParser } from './icbc-mastercard-tc';
 import { icbcTcParser } from './icbc-tc';
 import { icbcBancoParser } from './icbc-banco';
@@ -14,6 +15,7 @@ import type { Parser } from './types';
 // Order matters: more specific parsers (with accountMatch) go before generic ones.
 const PARSERS: Parser[] = [
   galiciaTcParser,
+  galiciaBancoParser,
   icbcMastercardTcParser, // before generic icbc-tc — accountMatch narrows it
   icbcTcParser,
   icbcBancoParser,
