@@ -8,8 +8,9 @@ describe('resolveParser', () => {
     expect(resolveParser('  Galicia  ', 'tc')).not.toBeNull();
   });
 
-  it('Galicia banco → todavía no implementado', () => {
-    expect(resolveParser('Galicia', 'banco')).toBeNull();
+  it('Galicia banco encontrado', () => {
+    expect(resolveParser('Galicia', 'banco')?.id).toBe('galicia-banco-v1');
+    expect(resolveParser('  galicia  ', 'banco')?.id).toBe('galicia-banco-v1');
   });
 
   it('ICBC TC sin cuenta → parser genérico (Visa)', () => {
@@ -54,6 +55,7 @@ describe('listParsers', () => {
   it('listado incluye los parsers actuales', () => {
     const ids = listParsers().map((p) => p.id);
     expect(ids).toContain('galicia-tc-v1');
+    expect(ids).toContain('galicia-banco-v1');
     expect(ids).toContain('icbc-mastercard-tc-v1');
     expect(ids).toContain('icbc-tc-v2');
     expect(ids).toContain('icbc-banco-v1');

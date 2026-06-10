@@ -10,7 +10,7 @@ export const IMPORT_TYPE_LABELS: Record<ImportType, string> = {
 };
 
 export const MAX_IMPORT_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_EXTS = ['pdf', 'csv'] as const;
+const ALLOWED_EXTS = ['pdf', 'csv', 'xlsx'] as const;
 
 export const importCreateMetaSchema = z.object({
   type: z.enum(IMPORT_TYPES),
@@ -40,5 +40,8 @@ export function extractExtension(filename: string): string | null {
 export function contentTypeForExt(ext: string): string {
   if (ext === 'pdf') return 'application/pdf';
   if (ext === 'csv') return 'text/csv';
+  if (ext === 'xlsx') {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
   return 'application/octet-stream';
 }

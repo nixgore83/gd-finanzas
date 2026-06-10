@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions, transactions } from '@/db/schema';
 import { downloadImportFile } from '@/lib/imports/storage';
+import { readXlsxRows } from '@/lib/imports/xlsx';
 import { resolveParser } from '@/lib/imports/parsers/registry';
 import { runParser, LlmError } from '@/lib/imports/llm';
 import { CsvFormatError, type ParsedTxLine, type ParserOutput } from '@/lib/imports/parsers/types';
@@ -50,6 +51,7 @@ export async function parseImportInternal(
       accountId: imports.accountId,
       accountName: accounts.name,
       accountCurrency: accounts.currencyDefault,
+      accountOwnerTag: accounts.ownerTag,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
@@ -105,8 +107,16 @@ export async function parseImportInternal(
     return { ok: false, error: 'unknown' };
   }
 
+  // Tipo de archivo (por extensión del path en Storage).
+  const lowerUrl = row.fileUrl.toLowerCase();
+  const ext: 'csv' | 'xlsx' | 'pdf' = lowerUrl.endsWith('.csv')
+    ? 'csv'
+    : lowerUrl.endsWith('.xlsx')
+      ? 'xlsx'
+      : 'pdf';
+
   // Unlock protected PDF
-  const isPdf = !row.fileUrl.toLowerCase().endsWith('.csv');
+  const isPdf = ext === 'pdf';
   const pdfPassword = customPassword || row.accountPdfPassword || row.pdfPassword;
   if (isPdf && pdfPassword) {
     try {
@@ -160,7 +170,8 @@ export async function parseImportInternal(
   const categoryBlock = buildCategoryPromptBlock(tree);
   const enrichedSystemPrompt = parser.systemPrompt + '\n\n' + categoryBlock;
 
-  const isCsv = !isPdf;
+  const isCsv = ext === 'csv';
+  const isXlsx = ext === 'xlsx';
   const currency: 'ARS' | 'USD' = row.accountCurrency === 'USD' ? 'USD' : 'ARS';
 
   let result: { data: ParserOutput; model: string } | undefined;
@@ -176,6 +187,14 @@ export async function parseImportInternal(
       } catch (e) {
         if (!(e instanceof CsvFormatError)) throw e;
       }
+    }
+    // Parseo DETERMINÍSTICO de XLSX (binario, sin fallback LLM): requiere parseXlsx.
+    if (isXlsx) {
+      if (!parser.parseXlsx) {
+        throw new CsvFormatError('no hay parser determinístico de XLSX para esta institución');
+      }
+      const rows = await readXlsxRows(bytes);
+      result = { data: parser.parseXlsx(rows, { currency }), model: 'deterministic-xlsx' };
     }
     if (!result) {
       const llm = isCsv
@@ -197,12 +216,14 @@ export async function parseImportInternal(
     }
   } catch (err) {
     const msg =
-      err instanceof LlmError
-        ? `LLM ${err.code}: ${err.message.slice(0, 240)}`
-        : 'LLM falló';
-    console.error('[imports] llm failed', {
+      err instanceof CsvFormatError
+        ? `Formato no reconocido: ${err.message.slice(0, 200)}`
+        : err instanceof LlmError
+          ? `LLM ${err.code}: ${err.message.slice(0, 240)}`
+          : 'Parseo falló';
+    console.error('[imports] parse failed', {
       importId,
-      code: err instanceof LlmError ? err.code : 'unknown',
+      code: err instanceof LlmError ? err.code : err instanceof CsvFormatError ? 'csv_format' : 'unknown',
     });
     await db
       .update(imports)
@@ -218,19 +239,31 @@ export async function parseImportInternal(
   const allLines = result.data.lines as (ParsedTxLine & { suggestedCategory?: string })[];
 
   // Hints de cuenta contraparte de los parsers determinísticos (ej. FCI → "ICBC
-  // Inversiones", pago tarjeta → "ICBC Visa") → resolver a `transferAccountId` por nombre
-  // y BORRAR el hint para que no quede en parsed_data. Si no matchea ninguna cuenta, la
-  // línea queda como transferencia sin contraparte (el usuario la elige en la revisión).
+  // Inversiones", pago tarjeta → "Galicia Visa") → resolver a `transferAccountId` por nombre
+  // y BORRAR el hint para que no quede en parsed_data. OWNER-AWARE: Galicia tiene cuentas con
+  // nombre duplicado por dueño (Visa/Master/Inversiones de Nico y de Pau); se prefiere la
+  // cuenta cuyo `owner_tag` coincide con el de la cuenta del import. Si queda ambiguo o sin
+  // match, la línea queda como transferencia sin contraparte (el usuario la elige en revisión).
   if (allLines.some((l) => l.transferAccountName)) {
     const accs = await db
-      .select({ id: accounts.id, name: accounts.name })
+      .select({ id: accounts.id, name: accounts.name, ownerTag: accounts.ownerTag })
       .from(accounts)
       .where(eq(accounts.householdId, householdId));
-    const accByName = new Map(accs.map((a) => [a.name.trim().toLowerCase(), a.id]));
+    const byName = new Map<string, { id: string; ownerTag: string | null }[]>();
+    for (const a of accs) {
+      const k = a.name.trim().toLowerCase();
+      const list = byName.get(k) ?? [];
+      list.push({ id: a.id, ownerTag: a.ownerTag });
+      byName.set(k, list);
+    }
+    const importOwner = row.accountOwnerTag;
     for (const l of allLines) {
       if (l.transferAccountName) {
-        const accId = accByName.get(l.transferAccountName.trim().toLowerCase());
-        if (accId) l.transferAccountId = accId;
+        const cands = byName.get(l.transferAccountName.trim().toLowerCase()) ?? [];
+        const sameOwner = importOwner ? cands.filter((c) => c.ownerTag === importOwner) : [];
+        const chosen =
+          sameOwner.length === 1 ? sameOwner[0] : cands.length === 1 ? cands[0] : undefined;
+        if (chosen) l.transferAccountId = chosen.id;
         delete l.transferAccountName;
       }
     }
