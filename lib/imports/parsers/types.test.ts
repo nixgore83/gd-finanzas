@@ -134,6 +134,30 @@ describe('parsedTxLineSchema preprocess (alias + coerce)', () => {
     if (out.success) expect(out.data.amountOriginal).toBe('1234.56');
   });
 
+  it('expande notación científica ("1.4090103E7" → "14090103.00")', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-06-01',
+      description: 'TRANS PAG SUEL',
+      amountOriginal: '1.4090103E7',
+      currencyOriginal: 'ARS',
+      kind: 'income',
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.amountOriginal).toBe('14090103.00');
+  });
+
+  it('expande notación científica corta ("1.8E7" → "18000000.00")', () => {
+    const out = parsedTxLineSchema.safeParse({
+      date: '2026-05-04',
+      description: 'DEB SUSCR FCI',
+      amountOriginal: '1.8E7',
+      currencyOriginal: 'ARS',
+      kind: 'expense',
+    });
+    expect(out.success).toBe(true);
+    if (out.success) expect(out.data.amountOriginal).toBe('18000000.00');
+  });
+
   it('kind crédito → income', () => {
     const out = parsedTxLineSchema.safeParse({
       date: '2026-05-20',

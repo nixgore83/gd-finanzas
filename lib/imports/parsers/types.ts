@@ -114,6 +114,17 @@ export const parsedTxLineSchema = z.preprocess((val) => {
     out.amountOriginal = String(out.amountOriginal);
   }
 
+  // Notación científica → decimal plano. Algunos exports (ej. ICBC homebanking)
+  // escriben los montos grandes en notación Java/científica ("1.4090103E7"), que
+  // el regex del schema rechaza. Se expande a "14090103.00" (dominio = dinero, 2 dec).
+  if (
+    typeof out.amountOriginal === 'string' &&
+    /^-?\d+(\.\d+)?[eE][+-]?\d+$/.test(out.amountOriginal)
+  ) {
+    const n = Number(out.amountOriginal);
+    if (Number.isFinite(n)) out.amountOriginal = n.toFixed(2);
+  }
+
   // Signo negativo → flip + asumir expense si no hay kind explícito
   if (typeof out.amountOriginal === 'string' && out.amountOriginal.startsWith('-')) {
     out.amountOriginal = out.amountOriginal.slice(1);
