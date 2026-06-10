@@ -41,9 +41,25 @@ líneas → al usuario le faltaban movimientos (impuestos, comisiones, FCI, pago
   `after()`, `drainUploadedImports`, reaper, `reparseable` con `'parsing'`); el checkout local
   estaba viejo. El gap real era el timeout del LLM en archivos grandes, que el parser
   determinístico de CSV resuelve para bancos conocidos.
+- [x] **Galicia: carga manual del xlsx + parser determinístico (#42).** Galicia exporta la caja
+  de ahorro como **`.xlsx`** (el importador no lo aceptaba). (1) **Carga manual** (import
+  `e36d50d2`, cuenta `Galicia Caja de Ahorro` de Nico): 104 movimientos feb–jun 2026, checksum
+  `44.694.540,60`, contraparte (CUIT/CBU/nombre) extraída del campo Movimiento multilínea, 6
+  duplicados auto-rechazados. **Regla nueva confirmada con Nico**: transferencias hacia/desde
+  cuentas de **Nico Y Pau** (por CUIT, DNIs `30555106`/`28864311`) = transfer; FIMA = transfer a
+  inversión; pago de tarjeta = transfer. (2) Se **creó cuenta `Galicia Inversiones · Nico`**
+  (`72fb8a5a`) y se asociaron los 8 movimientos FIMA. (3) **#42**: el importador acepta `.xlsx`
+  (helper `lib/imports/xlsx.ts` con `jszip`, sin paquete nuevo); hook `Parser.parseXlsx`; parser
+  Galicia banco; `parse-internal` con rama xlsx + resolución `transferAccountName` **owner-aware**
+  (cuentas con nombre duplicado por dueño Nico/Pau → se elige la del mismo `owner_tag`). Suite
+  309→**324**. **A partir de ahora el xlsx de Galicia entra solo, sin LLM.**
+- **Cuentas Galicia duplicadas = OK** (no son dups): una de Nico y otra de Pau (Caja Ahorro,
+  Visa, Master). **No tocar.**
+- **Limitación conocida:** los DNIs del household están como constante en el parser Galicia
+  (`HOUSEHOLD_DNIS`); mejora futura = moverlos a config/DB.
 - **Sin migraciones.** Todo jsonb / columnas existentes.
-- [x] **Sync PRD Notion:** changelog **v1.7** (parser determinístico de CSV; ICBC banco primer
-  caso) + nota en §5.2 + bump de "Última actualización".
+- [x] **Sync PRD Notion:** changelog **v1.7** (CSV ICBC) + **v1.8** (xlsx + Galicia banco) + notas
+  en §5.2 + bump de "Última actualización".
 
 ### Sesión 2026-06-09 — Contrapartes editables + UX de revisión de imports (en paralelo con otro agente)
 
