@@ -70,6 +70,10 @@ const STATUS_LABEL: Record<string, string> = {
   edited: 'Editada',
 };
 
+const PAGE_SIZE = 50;
+
+type FilterStatus = 'all' | 'pending' | 'accepted' | 'edited' | 'rejected';
+
 export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -90,6 +94,14 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [bulkCurrency, setBulkCurrency] = useState<'ARS' | 'USD' | ''>('');
+
+  // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
+  // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
+  const [textFilter, setTextFilter] = useState('');
+  const [catFilter, setCatFilter] = useState<'all' | 'uncat' | 'categorized' | 'transfer'>('all');
+  const [kindFilter, setKindFilter] = useState<'all' | 'expense' | 'income'>('all');
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
+  const [page, setPage] = useState(0);
 
   const lineSummary = useMemo(() => {
     const c = { pending: 0, accepted: 0, rejected: 0, edited: 0 };
@@ -125,6 +137,52 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     [tree, uniformKind],
   );
 
+  // Lista filtrada (texto + categoría/transfer + tipo + estado) y luego ordenada.
+  const filteredLines = useMemo(() => {
+    const q = textFilter.trim().toLowerCase();
+    return lines.filter((l) => {
+      const p = l.parsedData;
+      if (q) {
+        const hay = `${p.description ?? ''} ${p.counterparty?.label ?? ''} ${p.counterparty?.name ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (kindFilter !== 'all' && p.kind !== kindFilter) return false;
+      if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+      if (catFilter === 'uncat' && (l.proposedCategoryId !== null || p.isTransfer)) return false;
+      if (catFilter === 'categorized' && l.proposedCategoryId === null) return false;
+      if (catFilter === 'transfer' && !p.isTransfer) return false;
+      return true;
+    });
+  }, [lines, textFilter, kindFilter, statusFilter, catFilter]);
+
+  const sortedFiltered = useMemo(
+    () => sortLines(filteredLines, sortField, sortDir, tree),
+    [filteredLines, sortField, sortDir, tree],
+  );
+
+  const filtersActive =
+    textFilter.trim() !== '' || catFilter !== 'all' || kindFilter !== 'all' || statusFilter !== 'all';
+
+  // Paginación client-side: mantiene ≤PAGE_SIZE filas en el DOM (367+ filas sin lag).
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
+  const pageClamped = Math.min(page, totalPages - 1);
+  const pageLines = sortedFiltered.slice(pageClamped * PAGE_SIZE, pageClamped * PAGE_SIZE + PAGE_SIZE);
+
+  // Cada cambio de filtro vuelve a la página 1 (evita quedar en una página vacía).
+  // Se hace en los setters (no en un effect) para no disparar renders en cascada.
+  function applyTextFilter(v: string) { setTextFilter(v); setPage(0); }
+  function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); }
+  function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); }
+  function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); }
+
+  function clearFilters() {
+    setTextFilter('');
+    setCatFilter('all');
+    setKindFilter('all');
+    setStatusFilter('all');
+    setPage(0);
+  }
+
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -134,11 +192,18 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }
 
-  function toggleAllPending() {
-    const pendingIds = lines.filter((l) => l.status !== 'rejected').map((l) => l.id);
-    const allSelected =
-      pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id));
-    setSelectedIds(allSelected ? new Set() : new Set(pendingIds));
+  // Selecciona/deselecciona TODAS las filas filtradas (no solo la página visible),
+  // excluyendo las rechazadas. Combinado con el filtro, es el atajo para
+  // categorizar en lote un grupo homogéneo.
+  const selectableFilteredIds = useMemo(
+    () => filteredLines.filter((l) => l.status !== 'rejected').map((l) => l.id),
+    [filteredLines],
+  );
+  const allFilteredSelected =
+    selectableFilteredIds.length > 0 && selectableFilteredIds.every((id) => selectedIds.has(id));
+
+  function toggleAllFiltered() {
+    setSelectedIds(allFilteredSelected ? new Set() : new Set(selectableFilteredIds));
   }
 
   function doBulkCategory() {
@@ -294,6 +359,61 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
         </div>
       </div>
 
+      {/* Barra de filtros: aísla un subconjunto homogéneo para revisar/categorizar. */}
+      <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={textFilter}
+            onChange={(e) => applyTextFilter(e.target.value)}
+            placeholder="Buscar en descripción / contraparte…"
+            className="h-9 w-full max-w-xs"
+          />
+          <span className="text-xs text-muted-foreground">
+            Mostrando <span className="font-medium tabular-nums">{filteredLines.length}</span> de{' '}
+            <span className="tabular-nums">{lines.length}</span>
+          </span>
+          {filtersActive && (
+            <Button type="button" size="sm" variant="ghost" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <FilterGroup label="Categoría">
+            <FilterChip active={catFilter === 'all'} onClick={() => applyCatFilter('all')}>Todas</FilterChip>
+            <FilterChip active={catFilter === 'uncat'} onClick={() => applyCatFilter('uncat')}>Sin categorizar</FilterChip>
+            <FilterChip active={catFilter === 'categorized'} onClick={() => applyCatFilter('categorized')}>Categorizadas</FilterChip>
+            <FilterChip active={catFilter === 'transfer'} onClick={() => applyCatFilter('transfer')}>Transfers</FilterChip>
+          </FilterGroup>
+          <FilterGroup label="Tipo">
+            <FilterChip active={kindFilter === 'all'} onClick={() => applyKindFilter('all')}>Todos</FilterChip>
+            <FilterChip active={kindFilter === 'expense'} onClick={() => applyKindFilter('expense')}>Gasto</FilterChip>
+            <FilterChip active={kindFilter === 'income'} onClick={() => applyKindFilter('income')}>Ingreso</FilterChip>
+          </FilterGroup>
+          <FilterGroup label="Estado">
+            <FilterChip active={statusFilter === 'all'} onClick={() => applyStatusFilter('all')}>Todos</FilterChip>
+            <FilterChip active={statusFilter === 'pending'} onClick={() => applyStatusFilter('pending')}>Pending</FilterChip>
+            <FilterChip active={statusFilter === 'accepted'} onClick={() => applyStatusFilter('accepted')}>Aceptadas</FilterChip>
+            <FilterChip active={statusFilter === 'edited'} onClick={() => applyStatusFilter('edited')}>Editadas</FilterChip>
+            <FilterChip active={statusFilter === 'rejected'} onClick={() => applyStatusFilter('rejected')}>Rechazadas</FilterChip>
+          </FilterGroup>
+        </div>
+        {!readOnly && selectableFilteredIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+            <Button type="button" size="sm" variant="outline" onClick={toggleAllFiltered}>
+              {allFilteredSelected
+                ? 'Deseleccionar filtradas'
+                : `Seleccionar las ${selectableFilteredIds.length} filtradas`}
+            </Button>
+            {filtersActive && (
+              <span className="text-xs text-muted-foreground">
+                Filtrá un grupo homogéneo y asignale categoría/transfer en lote desde la barra azul.
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       {!readOnly && (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -425,14 +545,9 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 <th className="px-2 py-2 w-8">
                   <input
                     type="checkbox"
-                    aria-label="Seleccionar todas"
-                    checked={
-                      lines.filter((l) => l.status !== 'rejected').length > 0 &&
-                      lines
-                        .filter((l) => l.status !== 'rejected')
-                        .every((l) => selectedIds.has(l.id))
-                    }
-                    onChange={toggleAllPending}
+                    aria-label="Seleccionar todas las filtradas"
+                    checked={allFilteredSelected}
+                    onChange={toggleAllFiltered}
                     className="size-4 rounded border-input"
                   />
                 </th>
@@ -448,29 +563,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             </tr>
           </thead>
           <tbody>
-            {[...lines].sort((a, b) => {
-              const aP = a.parsedData as ParsedTxLine;
-              const bP = b.parsedData as ParsedTxLine;
-              const catMap = new Map(tree.map((c) => [c.id, c.name]));
-              let cmp = 0;
-              switch (sortField) {
-                case 'date': cmp = (aP.date ?? '').localeCompare(bP.date ?? ''); break;
-                case 'description': cmp = (aP.description ?? '').localeCompare(bP.description ?? '', 'es'); break;
-                case 'amount': cmp = parseFloat(aP.amountOriginal ?? '0') - parseFloat(bP.amountOriginal ?? '0'); break;
-                case 'status': cmp = (a.status ?? '').localeCompare(b.status ?? ''); break;
-                case 'category': {
-                  const aCat = a.proposedCategoryId ? (catMap.get(a.proposedCategoryId) ?? '') : '';
-                  const bCat = b.proposedCategoryId ? (catMap.get(b.proposedCategoryId) ?? '') : '';
-                  // Sin categoría siempre arriba
-                  if (!aCat && bCat) return -1;
-                  if (aCat && !bCat) return 1;
-                  cmp = aCat.localeCompare(bCat, 'es');
-                  break;
-                }
-                default: cmp = 0;
-              }
-              return sortDir === 'desc' ? -cmp : cmp;
-            }).map((l) => (
+            {pageLines.map((l) => (
               <LineRowEditor
                 key={l.id}
                 line={l}
@@ -495,9 +588,54 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 </td>
               </tr>
             )}
+            {lines.length > 0 && filteredLines.length === 0 && (
+              <tr>
+                <td
+                  colSpan={readOnly ? 7 : 9}
+                  className="px-3 py-6 text-center text-muted-foreground"
+                >
+                  Ninguna línea coincide con los filtros.{' '}
+                  <button type="button" onClick={clearFilters} className="text-primary hover:underline">
+                    Limpiar filtros
+                  </button>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {pageClamped * PAGE_SIZE + 1}–{Math.min((pageClamped + 1) * PAGE_SIZE, sortedFiltered.length)} de{' '}
+            {sortedFiltered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={pageClamped === 0}
+            >
+              ← Anterior
+            </Button>
+            <span className="text-xs tabular-nums">
+              Página {pageClamped + 1} / {totalPages}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={pageClamped >= totalPages - 1}
+            >
+              Siguiente →
+            </Button>
+          </div>
+        </div>
+      )}
 
       {totals.length > 0 && (
         <div className="rounded-md border bg-muted/20 p-3">
@@ -726,6 +864,21 @@ function LineRowEditor({
     setCategoryId(line.proposedCategoryId);
   }
 
+  // Asignación rápida de categoría desde la celda, sin abrir el editor completo.
+  // Reusa `bulkSetCategory` (valida kind, desmarca transfer) con un solo lineId.
+  function quickCategory(catId: string) {
+    setCategoryId(catId || null);
+    startTransition(async () => {
+      const res = await bulkSetCategory({ importId, lineIds: [line.id], categoryId: catId });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        setCategoryId(line.proposedCategoryId);
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
   const colCount = readOnly ? 7 : 9;
   const counterpart = accounts.find((a) => a.id === line.parsedData.transferAccountId);
 
@@ -796,8 +949,17 @@ function LineRowEditor({
           ) : (
             <span className="text-muted-foreground">Sin contraparte</span>
           )
-        ) : (
+        ) : readOnly || line.transactionId || editing ? (
           categoryName ?? <span className="text-muted-foreground">—</span>
+        ) : (
+          // Combobox inline: categorizar un gasto/ingreso suelto en un clic.
+          <CategoryCombobox
+            options={categoriesForKind}
+            value={categoryId ?? ''}
+            onChange={quickCategory}
+            disabled={isPending}
+            placeholder="Categoría…"
+          />
         )}
       </td>
       <td className="px-2 py-1.5">
@@ -1117,6 +1279,40 @@ function Badge({
   );
 }
 
+function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}:</span>
+      <div className="flex flex-wrap gap-1">{children}</div>
+    </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+        active
+          ? 'border-primary bg-primary text-primary-foreground'
+          : 'border-input bg-background text-foreground hover:bg-accent',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 type CurrencyTotals = {
   currency: 'ARS' | 'USD';
   count: number;
@@ -1150,6 +1346,38 @@ function computeTotalsByCurrency(lines: LineRow[]): CurrencyTotals[] {
     });
   }
   return out;
+}
+
+/** Ordena una copia de `rows` según el campo/dirección elegidos en los headers. */
+function sortLines(
+  rows: LineRow[],
+  sortField: string,
+  sortDir: 'asc' | 'desc',
+  tree: CategoryNode[],
+): LineRow[] {
+  const catMap = new Map(tree.map((c) => [c.id, c.name]));
+  return [...rows].sort((a, b) => {
+    const aP = a.parsedData;
+    const bP = b.parsedData;
+    let cmp = 0;
+    switch (sortField) {
+      case 'date': cmp = (aP.date ?? '').localeCompare(bP.date ?? ''); break;
+      case 'description': cmp = (aP.description ?? '').localeCompare(bP.description ?? '', 'es'); break;
+      case 'amount': cmp = parseFloat(aP.amountOriginal ?? '0') - parseFloat(bP.amountOriginal ?? '0'); break;
+      case 'status': cmp = (a.status ?? '').localeCompare(b.status ?? ''); break;
+      case 'category': {
+        const aCat = a.proposedCategoryId ? (catMap.get(a.proposedCategoryId) ?? '') : '';
+        const bCat = b.proposedCategoryId ? (catMap.get(b.proposedCategoryId) ?? '') : '';
+        // Sin categoría siempre arriba
+        if (!aCat && bCat) return -1;
+        if (aCat && !bCat) return 1;
+        cmp = aCat.localeCompare(bCat, 'es');
+        break;
+      }
+      default: cmp = 0;
+    }
+    return sortDir === 'desc' ? -cmp : cmp;
+  });
 }
 
 type ComboOption = { id: string; label: string; indent?: boolean };
