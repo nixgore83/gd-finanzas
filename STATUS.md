@@ -3,12 +3,47 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-06-09 por Claude
+**Última actualización:** 2026-06-10 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-06-10 — CSV completo de ICBC: carga manual + parser determinístico
+
+El CSV de **movimientos completos** de ICBC homebanking (caja de ahorro ARS, todo 2026)
+nunca entraba: se mandaba al LLM y un archivo grande se pasaba del límite de la función /
+truncaba por `max_tokens`. Los PDFs de movimientos (`EXT.DE.MOVIMIENTOS`) parseaban a 0
+líneas → al usuario le faltaban movimientos (impuestos, comisiones, FCI, pagos de tarjeta).
+
+- [x] **Carga manual del CSV (import `347a6ae9`)** — Parseo determinístico ad-hoc por script
+  local (sin secretos: solo lee el archivo) + carga por SQL (MCP). 367 movimientos
+  2026-01-02→06-09, verificados por checksum de montos (suma abs `428.777.231,16`). Dedup
+  contra transferencias ya importadas (110 marcadas duplicadas; **falso positivo** de un dedup
+  por date+monto sobre montos redondos → se corrigió recuperando 5 líneas FCI/QR). Pase de
+  **categorización/transferencia** (yo como LLM, sin API): FCI→transferencia a `ICBC
+  Inversiones`, pago tarjeta→transferencia a la tarjeta, + categorías sistemáticas (Gastos
+  bancarios / Intereses / Otros ingresos / Sueldo / Supermercado). Todo como **sugerencia** en
+  `pending` (revisión humana intacta). Decisiones de negocio confirmadas con Nico (FCI y pago
+  de tarjeta = transferencias, no gasto).
+- [x] **#37 — Notación científica en montos del parser.** ICBC exporta montos grandes como
+  `1.4090103E7`; el regex de `amountOriginal` los rechazaba → fallaba el parseo entero. El
+  preprocess de `parsedTxLineSchema` ahora los expande a decimal plano. +2 tests.
+- [x] **#38 — Parser determinístico de CSV (ICBC banco).** Campo opcional `parseCsv?` en el
+  tipo `Parser`; implementado para ICBC banco (`MM/DD/YY`→ISO, débito/crédito→kind, expande
+  científica, + inteligencia de conceptos FCI/tarjeta→transferencia y categorías). `parse-internal`
+  lo usa si existe y el formato matchea; si no (`CsvFormatError`) cae al LLM. Hint transitorio
+  `transferAccountName`→`transferAccountId` resuelto por nombre de cuenta. **A partir de ahora
+  el CSV de ICBC se parsea solo, sin LLM, sin timeout, sin costo.** Nuevo `icbc-banco.test.ts`
+  (9 casos, filas sintéticas). Suite 300→**309**.
+- **Confirmado:** el "fix #2 async parse" que se iba a hacer **ya estaba en `main`** (parseo en
+  `after()`, `drainUploadedImports`, reaper, `reparseable` con `'parsing'`); el checkout local
+  estaba viejo. El gap real era el timeout del LLM en archivos grandes, que el parser
+  determinístico de CSV resuelve para bancos conocidos.
+- **Sin migraciones.** Todo jsonb / columnas existentes.
+- [ ] **Pendiente sync PRD Notion:** changelog (parser determinístico de CSV; ICBC banco primer
+  caso) — hacer en esta sesión si el MCP está disponible.
 
 ### Sesión 2026-06-09 — Contrapartes editables + UX de revisión de imports (en paralelo con otro agente)
 
