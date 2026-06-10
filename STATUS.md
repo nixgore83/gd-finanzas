@@ -42,8 +42,8 @@ líneas → al usuario le faltaban movimientos (impuestos, comisiones, FCI, pago
   estaba viejo. El gap real era el timeout del LLM en archivos grandes, que el parser
   determinístico de CSV resuelve para bancos conocidos.
 - **Sin migraciones.** Todo jsonb / columnas existentes.
-- [ ] **Pendiente sync PRD Notion:** changelog (parser determinístico de CSV; ICBC banco primer
-  caso) — hacer en esta sesión si el MCP está disponible.
+- [x] **Sync PRD Notion:** changelog **v1.7** (parser determinístico de CSV; ICBC banco primer
+  caso) + nota en §5.2 + bump de "Última actualización".
 
 ### Sesión 2026-06-09 — Contrapartes editables + UX de revisión de imports (en paralelo con otro agente)
 
