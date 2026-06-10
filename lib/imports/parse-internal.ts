@@ -5,7 +5,7 @@ import { accounts, imports, importLines, institutions, transactions } from '@/db
 import { downloadImportFile } from '@/lib/imports/storage';
 import { resolveParser } from '@/lib/imports/parsers/registry';
 import { runParser, LlmError } from '@/lib/imports/llm';
-import type { ParsedTxLine } from '@/lib/imports/parsers/types';
+import { CsvFormatError, type ParsedTxLine, type ParserOutput } from '@/lib/imports/parsers/types';
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
 import {
   counterpartyHasIdentity,
@@ -49,6 +49,7 @@ export async function parseImportInternal(
       accountPdfPassword: accounts.pdfPassword,
       accountId: imports.accountId,
       accountName: accounts.name,
+      accountCurrency: accounts.currencyDefault,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
@@ -160,25 +161,39 @@ export async function parseImportInternal(
   const enrichedSystemPrompt = parser.systemPrompt + '\n\n' + categoryBlock;
 
   const isCsv = !isPdf;
+  const currency: 'ARS' | 'USD' = row.accountCurrency === 'USD' ? 'USD' : 'ARS';
 
-  let result;
+  let result: { data: ParserOutput; model: string } | undefined;
   try {
-    if (isCsv) {
-      result = await runParser({
-        modelId,
-        systemPrompt: enrichedSystemPrompt,
-        userPrompt: parser.userPrompt,
-        file: { kind: 'text', text: new TextDecoder().decode(bytes) },
-        outputSchema: parser.schema,
-      });
-    } else {
-      result = await runParser({
-        modelId,
-        systemPrompt: enrichedSystemPrompt,
-        userPrompt: parser.userPrompt,
-        file: { kind: 'pdf', base64: Buffer.from(bytes).toString('base64') },
-        outputSchema: parser.schema,
-      });
+    // Parseo DETERMINÍSTICO de CSV (sin LLM) si el parser lo soporta y el texto matchea
+    // su formato. Si lanza CsvFormatError, el formato no aplica → caemos al LLM.
+    if (isCsv && parser.parseCsv) {
+      try {
+        result = {
+          data: parser.parseCsv(new TextDecoder().decode(bytes), { currency }),
+          model: 'deterministic-csv',
+        };
+      } catch (e) {
+        if (!(e instanceof CsvFormatError)) throw e;
+      }
+    }
+    if (!result) {
+      const llm = isCsv
+        ? await runParser({
+            modelId,
+            systemPrompt: enrichedSystemPrompt,
+            userPrompt: parser.userPrompt,
+            file: { kind: 'text', text: new TextDecoder().decode(bytes) },
+            outputSchema: parser.schema,
+          })
+        : await runParser({
+            modelId,
+            systemPrompt: enrichedSystemPrompt,
+            userPrompt: parser.userPrompt,
+            file: { kind: 'pdf', base64: Buffer.from(bytes).toString('base64') },
+            outputSchema: parser.schema,
+          });
+      result = { data: llm.data as ParserOutput, model: llm.model };
     }
   } catch (err) {
     const msg =
@@ -196,7 +211,30 @@ export async function parseImportInternal(
     return { ok: false, error: 'llm', message: msg };
   }
 
+  // Inalcanzable (parseCsv setea result o lanza; el LLM setea result o lanza→catch).
+  // Guard para el control de tipos.
+  if (!result) return { ok: false, error: 'unknown' };
+
   const allLines = result.data.lines as (ParsedTxLine & { suggestedCategory?: string })[];
+
+  // Hints de cuenta contraparte de los parsers determinísticos (ej. FCI → "ICBC
+  // Inversiones", pago tarjeta → "ICBC Visa") → resolver a `transferAccountId` por nombre
+  // y BORRAR el hint para que no quede en parsed_data. Si no matchea ninguna cuenta, la
+  // línea queda como transferencia sin contraparte (el usuario la elige en la revisión).
+  if (allLines.some((l) => l.transferAccountName)) {
+    const accs = await db
+      .select({ id: accounts.id, name: accounts.name })
+      .from(accounts)
+      .where(eq(accounts.householdId, householdId));
+    const accByName = new Map(accs.map((a) => [a.name.trim().toLowerCase(), a.id]));
+    for (const l of allLines) {
+      if (l.transferAccountName) {
+        const accId = accByName.get(l.transferAccountName.trim().toLowerCase());
+        if (accId) l.transferAccountId = accId;
+        delete l.transferAccountName;
+      }
+    }
+  }
 
   // Dedup: confirmed lines in same import
   const confirmedRows = await db

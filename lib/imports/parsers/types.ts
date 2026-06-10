@@ -54,6 +54,11 @@ const parsedTxLineStrictSchema = z.object({
    * la revisión; al confirmar, el monto se persiste NEGADO (gasto negativo en la
    * misma categoría). Ver regla de reembolsos en el PRD §4.3. */
   isRefund: z.boolean().optional().default(false),
+  /** Hint TRANSITORIO de los parsers determinísticos de CSV: nombre de la cuenta
+   * contraparte de una transferencia (ej. "ICBC Inversiones"). `parse-internal` lo
+   * resuelve a `transferAccountId` y lo BORRA antes de persistir — no debe quedar en
+   * `parsed_data`. El LLM no lo usa. */
+  transferAccountName: z.string().max(120).optional(),
 });
 
 /**
@@ -258,6 +263,18 @@ export type ParserOutput = {
   statementAccount?: { number?: string; holder?: string };
 };
 
+/**
+ * Error que lanza un `parseCsv` cuando el texto NO tiene el formato esperado por ese
+ * parser (ej. un CSV de otro layout). `parse-internal` lo trata como "no aplica" y cae
+ * al parseo por LLM, en vez de marcar el import como `error`.
+ */
+export class CsvFormatError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CsvFormatError';
+  }
+}
+
 export type Parser = {
   id: string;
   institutionMatch: (institutionName: string) => boolean;
@@ -267,4 +284,10 @@ export type Parser = {
   systemPrompt: string;
   userPrompt: string;
   schema: typeof parserOutputSchema;
+  /**
+   * Parseo DETERMINÍSTICO de CSV (sin LLM). Si está definido y el import es CSV,
+   * `parse-internal` lo usa en vez del LLM. Debe lanzar `CsvFormatError` si el texto no
+   * matchea el formato esperado (→ fallback a LLM). `ctx.currency` viene de la cuenta.
+   */
+  parseCsv?: (text: string, ctx: { currency: 'ARS' | 'USD' }) => ParserOutput;
 };
