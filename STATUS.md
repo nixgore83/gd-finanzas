@@ -10,6 +10,35 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-10 — Transferencias de doble lado: match-al-confirmar + linkeo manual + UI de review
+
+Trabajo en worktree aislado (`feat/transfers-match-confirm`), en paralelo con otro agente
+(branch galicia-xlsx). Dos features + una corrección de datos.
+
+- [x] **Review de imports usable con cientos de filas** (PR #41, branch `feat/imports-review-filter-bulk`):
+  filtros client-side (texto + chips categoría/tipo/estado), "seleccionar todo lo filtrado",
+  paginación (50/pág) y categoría inline por fila. Disparado por el import ICBC CA ARS (367 líneas).
+- [x] **Pre-categorización del import ICBC CA ARS (`347a6ae9`)** por SQL: 94 líneas FCI/pago-TC
+  marcadas transfer con contraparte (FCI→ICBC Inversiones, pagos→ICBC Visa/Master); ICBC CC
+  (`0905/02100757/27`) reconocida (era cuenta existente) y 6 traspasos CA↔CC marcados transfer.
+- [x] **Match-al-confirmar (transferencias de doble lado).** Problema: `confirmImport` creaba
+  **siempre las 2 patas**, pero casi todas las cuentas se importan → la misma transferencia
+  quedaba 2 veces (infla saldo/net worth). Nuevo flujo en `confirm.ts` (rama transfer):
+  crea solo la pata propia y, si la contraparte ya tiene una pata-transfer sin parear
+  same-currency (monto+fecha, 1 sola) → **parea** en vez de duplicar; same-ccy sin match →
+  crea ambas (FCI/cash/pago-TC, el otro lado no se importa); **cross-currency** → pata propia
+  sin parear (no se puede matchear por monto). Helpers puros nuevos en `_build-transfer.ts`
+  (`buildSingleTransferLeg`, `transferDirection`, `resignAmount`, `selectSameCurrencyTransferMatch`).
+- [x] **Linkeo manual** (`linkAsTransfer` + `_transfer-candidates` + `TransferLinker` en el
+  detalle de transacción): para cross-currency/ambiguos, lista candidatos de otra cuenta en
+  sentido opuesto (±7 días) y los parea conservando moneda/monto de cada pata (compra de USD).
+  El detalle de una pata sin parear ya no redirige: ofrece linkearla.
+- [x] **Limpieza one-time:** 5 transferencias USD que ya estaban duplicadas en `transactions`
+  confirmadas (cada una en 2 pares idénticos) → borrado 1 par por grupo (10 patas). Saldos
+  corregidos y verificados (ej. Galicia CA USD 952,16→476,08). 0 duplicados restantes.
+- **Sin migraciones.** Suite 309→**318** (tests puros del matcher/dirección/re-signo).
+- [x] **Sync PRD Notion:** changelog **v1.8** + regla de conciliación de transferencias en §4.3.
+
 ### Sesión 2026-06-10 — CSV completo de ICBC: carga manual + parser determinístico
 
 El CSV de **movimientos completos** de ICBC homebanking (caja de ahorro ARS, todo 2026)

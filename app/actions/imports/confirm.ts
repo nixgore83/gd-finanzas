@@ -1,14 +1,26 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
-import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
-import { buildTransferFields } from '@/app/actions/transactions/_build-transfer';
+import {
+  buildTransferFields,
+  buildSingleTransferLeg,
+  selectSameCurrencyTransferMatch,
+} from '@/app/actions/transactions/_build-transfer';
+import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
 import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
+
+/** Suma `days` (puede ser negativo) a una fecha ISO 'YYYY-MM-DD'. */
+function shiftIsoDate(iso: string, days: number): string {
+  const ms = Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
 
 export type ConfirmImportResult =
   | {
@@ -163,6 +175,15 @@ export async function confirmImport(input: {
           : {};
 
         // ===== TRANSFER BRANCH =====
+        // Estrategia "match-or-create": el otro extracto puede estar importado
+        // (el otro lado ya existe como transacción). Para no duplicar, intentamos
+        // PAREAR la pata propia con una pata-transfer sin parear de la contraparte
+        // en vez de crear las dos patas siempre.
+        //  - 1 candidato same-currency (monto+fecha) → parear (no crear sintética).
+        //  - same-currency sin candidato → crear ambas patas (FCI, pago TC, cash:
+        //    el otro lado no se importa). Comportamiento histórico.
+        //  - cross-currency o ambiguo → crear SOLO la pata propia sin parear;
+        //    se linkea a mano (no se puede matchear cross-ccy por monto).
         if (parsed.data.isTransfer) {
           const transferAccountId = parsed.data.transferAccountId;
           if (!transferAccountId) {
@@ -170,79 +191,181 @@ export async function confirmImport(input: {
             continue;
           }
 
-          // Determine from/to based on kind (from the perspective of the import account)
           const isOutgoing = parsed.data.kind === 'expense';
-          const accountFromId = isOutgoing ? input.accountId : transferAccountId;
-          const accountToId = isOutgoing ? transferAccountId : input.accountId;
+          const ownDirection: 'out' | 'in' = isOutgoing ? 'out' : 'in';
 
-          const transferResult = await buildTransferFields(
-            {
-              date: parsed.data.date,
-              accountFromId,
-              accountToId,
-              amountFrom: parsed.data.amountOriginal,
-              amountTo: parsed.data.amountOriginal,
-              description: parsed.data.description,
-              notes: parsed.data.notes ?? null,
-              fxRateOverride: null,
-              tagIds: [],
-            },
-            session.householdId,
-          );
-
-          if (!transferResult.ok) {
-            lineErrors.push({
-              lineId: line.id,
-              reason: Object.values(transferResult.fields).join('; '),
-            });
-            continue;
-          }
-
-          // Insert both legs
-          const [fromRow] = await tx
-            .insert(transactions)
-            .values({
-              ...transferResult.fromLeg,
-              householdId: session.householdId,
-              source: 'import',
-              importBatchId: input.importId,
-              transactionSubtype: 'standard',
-              deducibleGanancias: false,
-              meta: cpMeta,
-              createdBy: session.userId,
-            })
-            .returning({ id: transactions.id });
-
-          const [toRow] = await tx
-            .insert(transactions)
-            .values({
-              ...transferResult.toLeg,
-              householdId: session.householdId,
-              source: 'import',
-              importBatchId: input.importId,
-              transactionSubtype: 'standard',
-              deducibleGanancias: false,
-              meta: cpMeta,
-              createdBy: session.userId,
-            })
-            .returning({ id: transactions.id });
-
-          if (!fromRow || !toRow) {
-            lineErrors.push({ lineId: line.id, reason: 'insert transfer sin row' });
-            continue;
-          }
-
-          // Link the import line to the "main" leg (the one matching the import account)
-          const mainTxId = isOutgoing ? fromRow.id : toRow.id;
-          await tx
-            .update(importLines)
-            .set({ transactionId: mainTxId })
-            .where(
-              and(
-                eq(importLines.id, line.id),
-                eq(importLines.importId, input.importId),
-              ),
+          // Inserta la pata propia (cuenta del import) con el pairId dado (o null
+          // si queda sin parear), la linkea a la import_line y devuelve su id.
+          const insertOwnLeg = async (transferPairId: string | null): Promise<string | null> => {
+            const own = await buildSingleTransferLeg(
+              {
+                date: parsed.data.date,
+                accountId: input.accountId,
+                amount: parsed.data.amountOriginal,
+                direction: ownDirection,
+                description: parsed.data.description,
+                notes: parsed.data.notes ?? null,
+                fxRateOverride: null,
+                transferPairId,
+              },
+              session.householdId,
             );
+            if (!own.ok) {
+              lineErrors.push({
+                lineId: line.id,
+                reason: own.error === 'fx_unavailable' ? 'sin cotización FX' : 'cuenta inválida',
+              });
+              return null;
+            }
+            const [ownRow] = await tx
+              .insert(transactions)
+              .values({
+                ...own.leg,
+                householdId: session.householdId,
+                source: 'import',
+                importBatchId: input.importId,
+                transactionSubtype: 'standard',
+                deducibleGanancias: false,
+                meta: cpMeta,
+                createdBy: session.userId,
+              })
+              .returning({ id: transactions.id });
+            if (!ownRow) {
+              lineErrors.push({ lineId: line.id, reason: 'insert transfer sin row' });
+              return null;
+            }
+            await tx
+              .update(importLines)
+              .set({ transactionId: ownRow.id })
+              .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
+            return ownRow.id;
+          };
+
+          // Moneda de la cuenta contraparte (same-ccy vs cross-ccy).
+          const [cpAcc] = await tx
+            .select({ currency: accounts.currencyDefault })
+            .from(accounts)
+            .where(
+              and(eq(accounts.householdId, session.householdId), eq(accounts.id, transferAccountId)),
+            )
+            .limit(1);
+          if (!cpAcc) {
+            lineErrors.push({ lineId: line.id, reason: 'cuenta contraparte inválida' });
+            continue;
+          }
+          const sameCurrency = cpAcc.currency === parsed.data.currencyOriginal;
+
+          // Buscar candidato a parear en la contraparte (solo same-currency).
+          // La query trae patas-transfer sin parear de la contraparte en la ventana
+          // de fechas; el filtro de dirección/monto y la decisión (1 solo match) es
+          // lógica pura testeable (`selectSameCurrencyTransferMatch`).
+          let matchedCandidateId: string | null = null;
+          if (sameCurrency) {
+            const candidates = await tx
+              .select({ id: transactions.id, amountOriginal: transactions.amountOriginal })
+              .from(transactions)
+              .where(
+                and(
+                  eq(transactions.householdId, session.householdId),
+                  eq(transactions.accountId, transferAccountId),
+                  eq(transactions.kind, 'transfer'),
+                  isNull(transactions.transferPairId),
+                  gte(transactions.date, shiftIsoDate(parsed.data.date, -MATCH_DATE_WINDOW_DAYS)),
+                  lte(transactions.date, shiftIsoDate(parsed.data.date, MATCH_DATE_WINDOW_DAYS)),
+                ),
+              );
+            matchedCandidateId = selectSameCurrencyTransferMatch(
+              candidates,
+              parsed.data.amountOriginal,
+              isOutgoing,
+            );
+          }
+
+          if (matchedCandidateId) {
+            // PAREAR: solo pata propia + setear el pair id compartido en el candidato.
+            const pairId = randomUUID();
+            const ownId = await insertOwnLeg(pairId);
+            if (!ownId) continue;
+            await tx
+              .update(transactions)
+              .set({ transferPairId: pairId })
+              .where(
+                and(
+                  eq(transactions.id, matchedCandidateId),
+                  eq(transactions.householdId, session.householdId),
+                ),
+              );
+            createdCount += 1;
+            continue;
+          }
+
+          if (sameCurrency) {
+            // Sin match y misma moneda → crear ambas patas (el otro lado no se importa).
+            const accountFromId = isOutgoing ? input.accountId : transferAccountId;
+            const accountToId = isOutgoing ? transferAccountId : input.accountId;
+            const transferResult = await buildTransferFields(
+              {
+                date: parsed.data.date,
+                accountFromId,
+                accountToId,
+                amountFrom: parsed.data.amountOriginal,
+                amountTo: parsed.data.amountOriginal,
+                description: parsed.data.description,
+                notes: parsed.data.notes ?? null,
+                fxRateOverride: null,
+                tagIds: [],
+              },
+              session.householdId,
+            );
+            if (!transferResult.ok) {
+              lineErrors.push({
+                lineId: line.id,
+                reason: Object.values(transferResult.fields).join('; '),
+              });
+              continue;
+            }
+            const [fromRow] = await tx
+              .insert(transactions)
+              .values({
+                ...transferResult.fromLeg,
+                householdId: session.householdId,
+                source: 'import',
+                importBatchId: input.importId,
+                transactionSubtype: 'standard',
+                deducibleGanancias: false,
+                meta: cpMeta,
+                createdBy: session.userId,
+              })
+              .returning({ id: transactions.id });
+            const [toRow] = await tx
+              .insert(transactions)
+              .values({
+                ...transferResult.toLeg,
+                householdId: session.householdId,
+                source: 'import',
+                importBatchId: input.importId,
+                transactionSubtype: 'standard',
+                deducibleGanancias: false,
+                meta: cpMeta,
+                createdBy: session.userId,
+              })
+              .returning({ id: transactions.id });
+            if (!fromRow || !toRow) {
+              lineErrors.push({ lineId: line.id, reason: 'insert transfer sin row' });
+              continue;
+            }
+            const mainTxId = isOutgoing ? fromRow.id : toRow.id;
+            await tx
+              .update(importLines)
+              .set({ transactionId: mainTxId })
+              .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
+            createdCount += 1;
+            continue;
+          }
+
+          // Cross-currency sin match → solo pata propia, sin parear (linkeo manual).
+          const ownId = await insertOwnLeg(null);
+          if (!ownId) continue;
           createdCount += 1;
           continue;
         }

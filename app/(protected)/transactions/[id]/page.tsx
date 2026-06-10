@@ -11,11 +11,13 @@ import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { updateTransaction } from '@/app/actions/transactions/update';
 import { updateTransfer } from '@/app/actions/transactions/update-transfer';
 import { findMatchCandidates } from '@/app/actions/forecasts/_candidates';
+import { findTransferLinkCandidates } from '@/app/actions/transactions/_transfer-candidates';
 import { forecasts as forecastsTable, recurrences } from '@/db/schema';
 import { TransactionForm } from '../transaction-form';
 import { TransferForm } from '../transfer-form';
 import { DeleteTransactionButton } from '../delete-button';
 import { ForecastMatcher } from '../forecast-matcher';
+import { TransferLinker } from '../transfer-linker';
 
 export const metadata = {
   title: 'Editar transacción · gd-finanzas',
@@ -74,7 +76,60 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
   ).map((r) => r.tagId);
 
   if (tx.kind === 'transfer') {
-    if (!tx.transferPairId) redirect('/transactions');
+    // Pata sin parear (la dejó el confirm en casos cross-currency / ambiguos):
+    // en vez de redirigir, ofrecemos linkearla con su contraparte.
+    if (!tx.transferPairId) {
+      const candidates = await findTransferLinkCandidates(tx.id, session.householdId);
+      const ownAccount = accountRows.find((a) => a.id === tx.accountId);
+      const fmt = new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: tx.currencyOriginal,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return (
+        <div className="mx-auto max-w-xl space-y-4">
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+            <h1 className="text-base font-semibold text-amber-900 dark:text-amber-200">
+              Transferencia sin parear
+            </h1>
+            <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">
+              &ldquo;{tx.description}&rdquo; · {tx.date} ·{' '}
+              {fmt.format(Number.parseFloat(tx.amountOriginal) || 0)}
+              {ownAccount ? ` · ${ownAccount.name}` : ''}
+            </p>
+            <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/70">
+              Esta pata espera su contraparte (ej. el lado en USD de una compra de dólares).
+              Linkeala con el movimiento del otro extracto para que no cuente doble.
+            </p>
+          </div>
+
+          <TransferLinker
+            transactionId={tx.id}
+            candidates={candidates.map((c) => ({
+              id: c.id,
+              date: c.date,
+              accountName: c.accountName,
+              amountOriginal: c.amountOriginal,
+              currencyOriginal: c.currencyOriginal,
+              description: c.description,
+            }))}
+          />
+
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Borrar pata</p>
+                <p className="text-xs text-muted-foreground">
+                  Borra solo esta pata (no tiene par). Hard delete.
+                </p>
+              </div>
+              <DeleteTransactionButton id={tx.id} variant="destructive" size="default" />
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     const legs = await db
       .select({ id: transactions.id, accountId: transactions.accountId, amountOriginal: transactions.amountOriginal })
