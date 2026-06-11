@@ -16,6 +16,8 @@ import {
 import { cn } from '@/lib/utils';
 import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { SortableHeader } from '@/components/ui/sortable-header';
+import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
+import { makeReviewComparator, type ReviewSortField } from '@/lib/imports/review-sort';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
@@ -79,9 +81,11 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
-  const [sortField, setSortField] = useState<string>('category');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const handleSort = (field: string, dir: 'asc' | 'desc') => { setSortField(field); setSortDir(dir); };
+  const [sortCriteria, setSortCriteria] = useState<SortCriterion<ReviewSortField>[]>([
+    { field: 'category', dir: 'asc' },
+  ]);
+  const handleSort = (field: ReviewSortField, additive: boolean) =>
+    setSortCriteria((prev) => applySortClick(prev, field, { append: additive }));
   // Preferencia de cuenta destino: cuenta sugerida por nº de extracto > la del
   // import > la de la institución > la primera.
   const defaultAccount = (suggestedAccountId
@@ -156,9 +160,10 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }, [lines, textFilter, kindFilter, statusFilter, catFilter]);
 
+  const catNameById = useMemo(() => new Map(tree.map((c) => [c.id, c.name])), [tree]);
   const sortedFiltered = useMemo(
-    () => sortLines(filteredLines, sortField, sortDir, tree),
-    [filteredLines, sortField, sortDir, tree],
+    () => [...filteredLines].sort(makeReviewComparator(sortCriteria, catNameById)),
+    [filteredLines, sortCriteria, catNameById],
   );
 
   const filtersActive =
@@ -553,13 +558,13 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                   />
                 </th>
               )}
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Fecha" field="date" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Descripción" field="description" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Fecha" field="date" criteria={sortCriteria} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Descripción" field="description" criteria={sortCriteria} onSort={handleSort} /></th>
               <th className="px-2 py-2 font-medium">Tipo</th>
-              <th className="px-2 py-2 text-right font-medium"><SortableHeader label="Monto" field="amount" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
+              <th className="px-2 py-2 text-right font-medium"><SortableHeader label="Monto" field="amount" criteria={sortCriteria} onSort={handleSort} /></th>
               <th className="px-2 py-2 font-medium">Mon.</th>
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Categoría" field="category" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Estado" field="status" currentSort={sortField} currentDir={sortDir} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Categoría" field="category" criteria={sortCriteria} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium"><SortableHeader label="Estado" field="status" criteria={sortCriteria} onSort={handleSort} /></th>
               {!readOnly && <th className="px-2 py-2 font-medium">Acciones</th>}
             </tr>
           </thead>
@@ -1347,38 +1352,6 @@ function computeTotalsByCurrency(lines: LineRow[]): CurrencyTotals[] {
     });
   }
   return out;
-}
-
-/** Ordena una copia de `rows` según el campo/dirección elegidos en los headers. */
-function sortLines(
-  rows: LineRow[],
-  sortField: string,
-  sortDir: 'asc' | 'desc',
-  tree: CategoryNode[],
-): LineRow[] {
-  const catMap = new Map(tree.map((c) => [c.id, c.name]));
-  return [...rows].sort((a, b) => {
-    const aP = a.parsedData;
-    const bP = b.parsedData;
-    let cmp = 0;
-    switch (sortField) {
-      case 'date': cmp = (aP.date ?? '').localeCompare(bP.date ?? ''); break;
-      case 'description': cmp = (aP.description ?? '').localeCompare(bP.description ?? '', 'es'); break;
-      case 'amount': cmp = parseFloat(aP.amountOriginal ?? '0') - parseFloat(bP.amountOriginal ?? '0'); break;
-      case 'status': cmp = (a.status ?? '').localeCompare(b.status ?? ''); break;
-      case 'category': {
-        const aCat = a.proposedCategoryId ? (catMap.get(a.proposedCategoryId) ?? '') : '';
-        const bCat = b.proposedCategoryId ? (catMap.get(b.proposedCategoryId) ?? '') : '';
-        // Sin categoría siempre arriba
-        if (!aCat && bCat) return -1;
-        if (aCat && !bCat) return 1;
-        cmp = aCat.localeCompare(bCat, 'es');
-        break;
-      }
-      default: cmp = 0;
-    }
-    return sortDir === 'desc' ? -cmp : cmp;
-  });
 }
 
 type ComboOption = { id: string; label: string; indent?: boolean };
