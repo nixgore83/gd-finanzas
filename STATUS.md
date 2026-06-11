@@ -55,6 +55,46 @@ el TAG es el clasificador.
   negocio nuevos: captura fiscal en review, tag-clasificador en transfers, cobertura de
   gaps por período, link de previsión en review.
 
+### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
+
+Pedido de Nico: poder ordenar por varios criterios a la vez (ej. nombre primario + fecha
+secundaria). Decidido: **click reemplaza** (la "limpieza" es automática), **Shift+click
+acumula** (orden de click = prioridad, máx. 3), click en columna activa invierte su
+dirección. Indicador: flecha + superíndice de prioridad. Aplica a las **4 tablas**.
+
+- [x] **Núcleo compartido `lib/sorting/`** (nuevo): `criteria.ts` (`SortCriterion`,
+  `applySortClick` puro), `url.ts` (`sort=date:desc,amount:asc` en un solo param, con
+  retrocompat de links viejos `?sort=x&dir=y`), `compare.ts` (comparador encadenado con
+  factories por campo — permite reglas que no se invierten con la dirección). 22 tests.
+- [x] **`SortableHeader` v2** (firma nueva `criteria`/`onSort(field, additive)`, genérico,
+  shift detection, superíndices, `select-none`). Migrados los 4 call sites de una.
+- [x] **Server-side** (`/transactions`, `/imports`): `parseSortParam` reemplaza los `z.enum`,
+  `orderBy` por mapa de columnas + spread (tiebreaker `createdAt desc` se mantiene al final),
+  `sort-config.ts` por ruta. El param `dir` legacy se lee pero ya no se escribe.
+- [x] **Client-side**: review de import → `lib/imports/review-sort.ts` (conserva la regla
+  "sin categoría siempre arriba" en ambas direcciones); budget → `lib/budgets/sort.ts`
+  (multi-sort dentro de cada nivel, jerarquía padre/hijos intacta, des-duplica el sort viejo).
+- **Suite 346→375** (+29). Typecheck, lint y `next build` verdes. Sin migraciones.
+- PRD: no se toca (mejora de UX de implementación, no regla de negocio).
+
+### Sesión 2026-06-11 — Transfers no detectados en import ICBC manual + regla DEBIN→MP (PR #47)
+
+Nico reportó que "TRANSF. ACC.B." (transfer a Galicia) no venía marcada como transfer en el
+import `347a6ae9`. Causa: ese import fue la **carga manual ad-hoc por SQL** (sesión
+2026-06-10), que nunca pasó por `parse-internal` → `detectTransfers()` no corrió (el pipeline
+real sí la habría marcado: `\bTRANSF\b` matchea).
+
+- [x] **Corrección de datos (SQL vía MCP):** 80 líneas `pending` del import marcadas
+  `isTransfer: true` aplicando los mismos patrones de `detect-transfers.ts` (TRANSF. MOBILE
+  ×30, E/BCOS-ONLINE ×22, DEBIN ×13, ACC.B. ×11, PUSH ×3, TRF.DATANET ×1). Las `edited`
+  (marcas manuales de Nico) no se tocaron.
+- [x] **Regla de negocio nueva (confirmada con Nico):** `DEB PREA DEBIN 30703088534` (CUIT
+  Mercado Libre) = fondeo de la billetera propia → transfer a **Mercado Pago**. Las 13 líneas
+  ya tienen `transferAccountId` asignado por SQL; **PR #47** codifica la regla en
+  `classifyIcbcConcept` (hint `transferAccountName: 'Mercado Pago'`) + test. Suite 346 verde.
+- **Pendiente (Nico, en la UI de review):** asignar cuenta destino a las otras 67 líneas
+  transfer (ACC.B. → Galicia, etc.) con filtro Transfers + bulk, y confirmar.
+
 ### Sesión 2026-06-10 — Naming/display de cuentas estructurado + helper único (branch `feat/account-naming`)
 
 El campo `accounts.name` venía metiendo a mano institución + tipo + dueño (ya campos

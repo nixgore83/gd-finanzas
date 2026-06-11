@@ -8,6 +8,8 @@ import type { CategoryNode } from '@/lib/categories/tree';
 import { setBudget } from '@/app/actions/budgets/set';
 import { clearBudget } from '@/app/actions/budgets/clear';
 import { SortableHeader } from '@/components/ui/sortable-header';
+import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
+import { sortBudgetCategories, type BudgetSortField } from '@/lib/budgets/sort';
 import { Num } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 
@@ -47,12 +49,9 @@ function formatCompact(amount: number): string {
 export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [sortField, setSortField] = useState<string>('default');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const handleSort = (field: string, dir: 'asc' | 'desc') => {
-    setSortField(field);
-    setSortDir(dir);
-  };
+  const [sortCriteria, setSortCriteria] = useState<SortCriterion<BudgetSortField>[]>([]);
+  const handleSort = (field: BudgetSortField, additive: boolean) =>
+    setSortCriteria((prev) => applySortClick(prev, field, { append: additive }));
 
   // Map id_mes → string value (entero USD, no decimales).
   const [values, setValues] = useState<Map<string, string>>(() => {
@@ -177,47 +176,15 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
     }
   }
 
-  // Sorted categories: sort parent groups by year total or name, keeping children under their parent
-  const sortedCategories = useMemo(() => {
-    if (sortField === 'default') return categories;
-
-    // Group: parents (depth 0) with their children
-    const parents = categories.filter((c) => c.parentId === null);
-    const groups = parents.map((p) => ({
-      parent: p,
-      children: childrenByParent.get(p.id) ?? [],
-    }));
-
-    groups.sort((a, b) => {
-      let cmp = 0;
-      if (sortField === 'name') {
-        cmp = a.parent.name.localeCompare(b.parent.name, 'es');
-      } else if (sortField === 'total') {
-        cmp = rowYearTotal(a.parent.id).minus(rowYearTotal(b.parent.id)).toNumber();
-      }
-      return sortDir === 'desc' ? -cmp : cmp;
-    });
-
-    const result: CategoryNode[] = [];
-    for (const g of groups) {
-      result.push(g.parent);
-      const sortedChildren = [...g.children];
-      if (sortField === 'total') {
-        sortedChildren.sort((a, b) => {
-          const cmp = rowYearTotal(a.id).minus(rowYearTotal(b.id)).toNumber();
-          return sortDir === 'desc' ? -cmp : cmp;
-        });
-      } else if (sortField === 'name') {
-        sortedChildren.sort((a, b) => {
-          const cmp = a.name.localeCompare(b.name, 'es');
-          return sortDir === 'desc' ? -cmp : cmp;
-        });
-      }
-      result.push(...sortedChildren);
-    }
-    return result;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, childrenByParent, sortField, sortDir, values]);
+  // Orden multi-criterio manteniendo la jerarquía (hijos debajo de su padre).
+  const sortedCategories = useMemo(
+    () =>
+      sortBudgetCategories(categories, childrenByParent, sortCriteria, (id) =>
+        rowYearTotal(id).toNumber(),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categories, childrenByParent, sortCriteria, values],
+  );
 
   // Year totals for footer
   const yearTotalsBy = (kind: 'income' | 'expense') =>
@@ -237,7 +204,7 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                 scope="col"
                 className="sticky left-0 z-10 bg-background px-4 py-3 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
               >
-                <SortableHeader label="Categoría" field="name" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Categoría" field="name" criteria={sortCriteria} onSort={handleSort} />
               </th>
               {MONTH_LABELS.map((m, i) => {
                 const monthNum = i + 1;
@@ -261,7 +228,7 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                 scope="col"
                 className="px-4 py-3 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
               >
-                <SortableHeader label="Año" field="total" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Año" field="total" criteria={sortCriteria} onSort={handleSort} />
               </th>
             </tr>
           </thead>

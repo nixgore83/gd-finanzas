@@ -7,6 +7,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label, Num } from '@/components/ui/typography';
 import { SortableHeader } from '@/components/ui/sortable-header';
+import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
+import { serializeSort } from '@/lib/sorting/url';
+import { IMPORTS_DEFAULT_SORT, type ImportsSortField } from './sort-config';
 import { cn } from '@/lib/utils';
 import { IMPORT_TYPE_LABELS, type ImportType } from '@/lib/schemas/import';
 import {
@@ -72,11 +75,10 @@ function periodLabel(start: string | null, end: string | null): string {
 
 type Props = {
   rows: ImportRow[];
-  sort: string;
-  dir: 'asc' | 'desc';
+  criteria: readonly SortCriterion<ImportsSortField>[];
 };
 
-export function ImportsTable({ rows, sort, dir }: Props) {
+export function ImportsTable({ rows, criteria }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -87,10 +89,13 @@ export function ImportsTable({ rows, sort, dir }: Props) {
     [rows],
   );
 
-  function handleSort(field: string, newDir: 'asc' | 'desc') {
+  function handleSort(field: ImportsSortField, additive: boolean) {
+    const next = applySortClick(criteria, field, { append: additive });
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set('sort', field);
-    sp.set('dir', newDir);
+    sp.delete('dir'); // limpiar el param del formato viejo si venía en la URL
+    const serialized = serializeSort(next);
+    if (serialized === serializeSort(IMPORTS_DEFAULT_SORT)) sp.delete('sort');
+    else sp.set('sort', serialized);
     sp.delete('page');
     router.push(`/imports?${sp.toString()}`);
   }
@@ -199,12 +204,12 @@ export function ImportsTable({ rows, sort, dir }: Props) {
                     key={field}
                     className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
                   >
-                    <SortableHeader label={label} field={field} currentSort={sort} currentDir={dir} onSort={handleSort} />
+                    <SortableHeader label={label} field={field} criteria={criteria} onSort={handleSort} />
                   </th>
                 ),
               )}
               <th className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                <SortableHeader label="Txns" field="txns" currentSort={sort} currentDir={dir} onSort={handleSort} className="justify-end" />
+                <SortableHeader label="Txns" field="txns" criteria={criteria} onSort={handleSort} className="justify-end" />
               </th>
               <th className="px-3 py-2.5" />
             </tr>

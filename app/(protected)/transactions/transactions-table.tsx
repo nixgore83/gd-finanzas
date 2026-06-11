@@ -16,6 +16,9 @@ import { Label, Num } from '@/components/ui/typography';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { SortableHeader } from '@/components/ui/sortable-header';
+import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
+import { serializeSort } from '@/lib/sorting/url';
+import { TX_DEFAULT_SORT, type TxSortField } from './sort-config';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import type { CategoryNode } from '@/lib/categories/tree';
 import { bulkDeleteTransactions } from '@/app/actions/transactions/bulk-delete';
@@ -68,19 +71,21 @@ const TYPE_VAR: Record<TxRow['kind'], string> = {
 type Props = {
   rows: TxRow[];
   categories: CategoryNode[];
-  sort: string;
-  dir: 'asc' | 'desc';
+  criteria: readonly SortCriterion<TxSortField>[];
 };
 
-export function TransactionsTable({ rows, categories, sort, dir }: Props) {
+export function TransactionsTable({ rows, categories, criteria }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  function handleSort(field: string, newDir: 'asc' | 'desc') {
+  function handleSort(field: TxSortField, additive: boolean) {
+    const next = applySortClick(criteria, field, { append: additive });
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set('sort', field);
-    sp.set('dir', newDir);
+    sp.delete('dir'); // limpiar el param del formato viejo si venía en la URL
+    const serialized = serializeSort(next);
+    if (serialized === serializeSort(TX_DEFAULT_SORT)) sp.delete('sort');
+    else sp.set('sort', serialized);
     sp.delete('page'); // reset to page 1
     router.push(`/transactions?${sp.toString()}`);
   }
@@ -255,7 +260,7 @@ export function TransactionsTable({ rows, categories, sort, dir }: Props) {
                   key={field}
                   className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
                 >
-                  <SortableHeader label={label} field={field} currentSort={sort} currentDir={dir} onSort={handleSort} />
+                  <SortableHeader label={label} field={field} criteria={criteria} onSort={handleSort} />
                 </th>
               ))}
               {([['Monto', 'amount']] as const).map(([label, field]) => (
@@ -263,14 +268,14 @@ export function TransactionsTable({ rows, categories, sort, dir }: Props) {
                   key={field}
                   className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
                 >
-                  <SortableHeader label={label} field={field} currentSort={sort} currentDir={dir} onSort={handleSort} />
+                  <SortableHeader label={label} field={field} criteria={criteria} onSort={handleSort} />
                 </th>
               ))}
               <th className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 USD
               </th>
               <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                <SortableHeader label="Concepto" field="description" currentSort={sort} currentDir={dir} onSort={handleSort} />
+                <SortableHeader label="Concepto" field="description" criteria={criteria} onSort={handleSort} />
               </th>
               <th className="px-3 py-2.5" />
             </tr>
