@@ -22,6 +22,7 @@ import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { sameCounterpartyIdentity } from '@/lib/imports/counterparty-identity';
+import { mergeCounterpartyLabels } from '@/lib/imports/counterparty-labels';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
@@ -64,6 +65,8 @@ type Props = {
   lines: LineRow[];
   tree: CategoryNode[];
   tags: TagOption[];
+  /** Etiquetas de contraparte ya usadas en transacciones del household. */
+  knownCounterpartyLabels: string[];
   accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
@@ -93,7 +96,7 @@ const PAGE_SIZE = 50;
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'edited' | 'rejected';
 
-export function ImportReview({ importId, status, lines, tree, tags, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
+export function ImportReview({ importId, status, lines, tree, tags, knownCounterpartyLabels, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
@@ -119,6 +122,7 @@ export function ImportReview({ importId, status, lines, tree, tags, accounts, im
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [bulkCurrency, setBulkCurrency] = useState<'ARS' | 'USD' | ''>('');
   const [bulkTagIds, setBulkTagIds] = useState<Set<string>>(new Set());
+  const [bulkCounterpartyLabel, setBulkCounterpartyLabel] = useState('');
 
   // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
   // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
@@ -160,6 +164,17 @@ export function ImportReview({ importId, status, lines, tree, tags, accounts, im
   const bulkCategoryOptions = useMemo(
     () => (uniformKind ? tree.filter((c) => c.kind === uniformKind) : []),
     [tree, uniformKind],
+  );
+
+  // Etiquetas para el combobox de contraparte: historial primero (su casing es
+  // el canónico), después las de este import.
+  const counterpartyLabelOptions = useMemo<ComboOption[]>(
+    () =>
+      mergeCounterpartyLabels(
+        knownCounterpartyLabels,
+        lines.map((l) => l.parsedData.counterparty?.label),
+      ).map((label) => ({ id: label, label })),
+    [knownCounterpartyLabels, lines],
   );
 
   // Predicado de filtro (texto + categoría/transfer + tipo + estado). Se reusa
@@ -379,6 +394,32 @@ export function ImportReview({ importId, status, lines, tree, tags, accounts, im
         toast.success(`Tags aplicados a ${res.updated} líneas`);
         setSelectedIds(new Set());
         setBulkTagIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Contraparte en lote: setea la etiqueta en las seleccionadas, creando
+  // counterparty {label} en las que no tienen (sin inventar identificadores).
+  function doBulkCounterpartyLabel() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    const label = bulkCounterpartyLabel.trim();
+    if (!label) {
+      toast.error('Elegí o escribí una etiqueta');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await bulkSetCounterpartyLabel({ importId, lineIds: [...selectedIds], label });
+      if (res.ok) {
+        toast.success(`Etiqueta aplicada a ${res.updated} líneas`);
+        setSelectedIds(new Set());
+        setBulkCounterpartyLabel('');
         router.refresh();
       } else {
         toast.error(`Error: ${res.error}`);
@@ -823,6 +864,28 @@ export function ImportReview({ importId, status, lines, tree, tags, accounts, im
               </Button>
             </div>
           )}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Contraparte</label>
+              <Combobox
+                options={counterpartyLabelOptions}
+                value={bulkCounterpartyLabel}
+                onChange={setBulkCounterpartyLabel}
+                allowFreeText
+                disabled={isPending}
+                placeholder="Etiqueta…"
+                widthClassName="w-48"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={doBulkCounterpartyLabel}
+              disabled={isPending || !bulkCounterpartyLabel.trim()}
+            >
+              Aplicar etiqueta
+            </Button>
+          </div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
               <label className="block text-xs font-medium text-blue-900">Estado</label>
@@ -1586,21 +1649,24 @@ function LineRowEditor({
                   className="h-8 w-full"
                 />
               </Field>
-              {draft.counterparty && (
-                <Field label="Etiqueta contraparte" className="min-w-[180px]">
-                  <Input
-                    value={draft.counterparty.label ?? ''}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        counterparty: { ...draft.counterparty, label: e.target.value || undefined },
-                      })
-                    }
-                    placeholder="ej. Niñera, Alquiler…"
-                    className="h-8 w-48"
-                  />
-                </Field>
-              )}
+              {/* Siempre visible: si la línea no tiene counterparty, al guardar se
+                  crea {label} (el preprocess del schema lo omite si queda vacío). */}
+              <Field label="Etiqueta contraparte" className="min-w-[180px]">
+                <Input
+                  value={draft.counterparty?.label ?? ''}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      counterparty: {
+                        ...(draft.counterparty ?? {}),
+                        label: e.target.value || undefined,
+                      },
+                    })
+                  }
+                  placeholder="ej. Niñera, Alquiler…"
+                  className="h-8 w-48"
+                />
+              </Field>
               {/* Categoría y transfer son mutuamente excluyentes: si es transfer no se
                   muestra el selector de categoría (antes quedaba clickeable e invitaba
                   a un estado contradictorio). */}
@@ -2036,6 +2102,7 @@ function Combobox({
   disabled,
   placeholder,
   widthClassName = 'w-64',
+  allowFreeText = false,
 }: {
   options: ComboOption[];
   value: string;
@@ -2043,6 +2110,8 @@ function Combobox({
   disabled?: boolean;
   placeholder?: string;
   widthClassName?: string;
+  /** Permite confirmar el texto buscado como valor aunque no sea una opción. */
+  allowFreeText?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -2078,8 +2147,10 @@ function Combobox({
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         )}
       >
-        <span className={cn('truncate', selected ? '' : 'text-muted-foreground')}>
-          {selected ? (selected.indent ? `↳ ${selected.label}` : selected.label) : (placeholder ?? 'Elegí…')}
+        <span className={cn('truncate', selected || (allowFreeText && value) ? '' : 'text-muted-foreground')}>
+          {selected
+            ? (selected.indent ? `↳ ${selected.label}` : selected.label)
+            : (allowFreeText && value ? value : (placeholder ?? 'Elegí…'))}
         </span>
         <svg className="ml-1 h-4 w-4 shrink-0 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
       </button>
@@ -2096,7 +2167,18 @@ function Combobox({
             />
           </div>
           <div className="max-h-56 overflow-y-auto p-1">
-            {filtered.length === 0 && (
+            {allowFreeText &&
+              search.trim() !== '' &&
+              !options.some((o) => o.label.toLowerCase() === search.trim().toLowerCase()) && (
+                <button
+                  type="button"
+                  onClick={() => { onChange(search.trim()); setOpen(false); setSearch(''); }}
+                  className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                >
+                  Usar «{search.trim()}»
+                </button>
+              )}
+            {filtered.length === 0 && !(allowFreeText && search.trim() !== '') && (
               <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin resultados</p>
             )}
             {filtered.map((o) => (
