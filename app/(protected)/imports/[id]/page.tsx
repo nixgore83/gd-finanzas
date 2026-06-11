@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, institutions } from '@/db/schema';
+import { accounts, imports, importLines, institutions, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
@@ -99,6 +99,11 @@ export default async function ImportDetailPage({
     .orderBy(asc(importLines.createdAt));
 
   const tree = await loadCategoryTree(session.householdId);
+  const tagRows = await db
+    .select({ id: tags.id, name: tags.name })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId))
+    .orderBy(asc(tags.name));
   const accountRows = await db
     .select({
       id: accounts.id,
@@ -280,6 +285,7 @@ export default async function ImportDetailPage({
             transactionId: l.transactionId,
           }))}
           tree={tree}
+          tags={tagRows}
           accounts={accountRows}
           importInstitutionId={row.institutionId}
           importAccountId={row.accountId}

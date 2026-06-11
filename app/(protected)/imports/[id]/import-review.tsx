@@ -26,6 +26,8 @@ import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
 import { bulkSetCounterpartyLabel } from '@/app/actions/imports/bulk-set-counterparty-label';
 import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
 import { bulkSetTransfer } from '@/app/actions/imports/bulk-set-transfer';
+import { bulkSetDeducible } from '@/app/actions/imports/bulk-set-deducible';
+import { bulkSetTags } from '@/app/actions/imports/bulk-set-tags';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
@@ -43,11 +45,14 @@ type ImportSummary = {
   currency?: string;
 } | null;
 
+type TagOption = { id: string; name: string };
+
 type Props = {
   importId: string;
   status: string;
   lines: LineRow[];
   tree: CategoryNode[];
+  tags: TagOption[];
   accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
@@ -77,7 +82,7 @@ const PAGE_SIZE = 50;
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'edited' | 'rejected';
 
-export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
+export function ImportReview({ importId, status, lines, tree, tags, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
@@ -102,6 +107,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [bulkCurrency, setBulkCurrency] = useState<'ARS' | 'USD' | ''>('');
+  const [bulkTagIds, setBulkTagIds] = useState<Set<string>>(new Set());
 
   // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
   // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
@@ -315,6 +321,52 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           `${res.updated} ${res.updated === 1 ? 'línea marcada' : 'líneas marcadas'} como ${isTransfer ? 'transferencia' : 'no transferencia'}`,
         );
         setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Deducible Ganancias en lote (solo gastos no-transfer; el action saltea el resto).
+  function doBulkDeducible(deducible: boolean) {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await bulkSetDeducible({ importId, lineIds: [...selectedIds], deducible });
+      if (res.ok) {
+        const skippedMsg = res.skipped > 0 ? ` · ${res.skipped} saltadas (no son gasto)` : '';
+        toast.success(
+          `${res.updated} ${res.updated === 1 ? 'línea' : 'líneas'} ${deducible ? 'marcadas deducible' : 'sin deducible'}${skippedMsg}`,
+        );
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Tags en lote: reemplaza el set de tags de las líneas seleccionadas.
+  function doBulkTags() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    if (bulkTagIds.size === 0) {
+      toast.error('Elegí al menos un tag');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await bulkSetTags({ importId, lineIds: [...selectedIds], tagIds: [...bulkTagIds] });
+      if (res.ok) {
+        toast.success(`Tags aplicados a ${res.updated} líneas`);
+        setSelectedIds(new Set());
+        setBulkTagIds(new Set());
         router.refresh();
       } else {
         toast.error(`Error: ${res.error}`);
@@ -676,6 +728,66 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Deducible</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkDeducible(true)}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  Marcar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkDeducible(false)}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  Quitar
+                </Button>
+              </div>
+            </div>
+          </div>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-blue-900">Tags</label>
+                <div className="flex flex-wrap items-center gap-1">
+                  {tags.map((t) => (
+                    <FilterChip
+                      key={t.id}
+                      active={bulkTagIds.has(t.id)}
+                      onClick={() =>
+                        setBulkTagIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(t.id)) next.delete(t.id);
+                          else next.add(t.id);
+                          return next;
+                        })
+                      }
+                    >
+                      {t.name}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={doBulkTags}
+                disabled={isPending || bulkTagIds.size === 0}
+              >
+                Aplicar tags
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
               <label className="block text-xs font-medium text-blue-900">Estado</label>
               <Button
                 type="button"
@@ -732,6 +844,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 line={l}
                 importId={importId}
                 tree={tree}
+                tags={tags}
                 accounts={accounts}
                 currentAccountId={accountId}
                 readOnly={readOnly}
@@ -973,6 +1086,7 @@ function LineRowEditor({
   line,
   importId,
   tree,
+  tags,
   accounts,
   currentAccountId,
   readOnly,
@@ -988,6 +1102,7 @@ function LineRowEditor({
   line: LineRow;
   importId: string;
   tree: CategoryNode[];
+  tags: TagOption[];
   accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
   currentAccountId: string;
   readOnly: boolean;
@@ -1020,6 +1135,22 @@ function LineRowEditor({
   }, [tree, categoryId, line.proposedCategoryId]);
 
   function save() {
+    // Validación temprana del sub-form doméstico (el server lo rechazaría con un
+    // "invalid_input" genérico).
+    if (draft.domesticService) {
+      if (!draft.domesticService.empleado_nombre.trim()) {
+        toast.error('Servicio doméstico: falta el nombre del empleado/a');
+        return;
+      }
+      if (!/^\d{2}-\d{8}-\d{1}$/.test(draft.domesticService.empleado_cuil)) {
+        toast.error('Servicio doméstico: CUIL inválido (formato ##-########-#)');
+        return;
+      }
+      if (!/^\d{4}-\d{2}$/.test(draft.domesticService.periodo)) {
+        toast.error('Servicio doméstico: período inválido (YYYY-MM)');
+        return;
+      }
+    }
     onMutate();
     startTransition(async () => {
       const res = await updateImportLine({
@@ -1125,6 +1256,27 @@ function LineRowEditor({
               Devolución
             </span>
           )}
+          {line.parsedData.deducibleGanancias && (
+            <span className="inline-block rounded-full border border-violet-300 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800">
+              Deducible
+            </span>
+          )}
+          {line.parsedData.domesticService && (
+            <span className="inline-block rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
+              Doméstico
+            </span>
+          )}
+          {(line.parsedData.tagIds ?? []).map((tid) => {
+            const t = tags.find((x) => x.id === tid);
+            return t ? (
+              <span
+                key={tid}
+                className="inline-block rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+              >
+                #{t.name}
+              </span>
+            ) : null;
+          })}
         </div>
       </td>
       <td className="px-2 py-1.5 text-right tabular-nums">
@@ -1415,6 +1567,146 @@ function LineRowEditor({
                   </span>
                 </span>
               </label>
+            )}
+            {/* Tags: disponibles en cualquier línea — en transferencias son el
+                clasificador (no llevan categoría). */}
+            {tags.length > 0 && (
+              <Field label="Tags">
+                <div className="flex flex-wrap gap-1">
+                  {tags.map((t) => {
+                    const active = (draft.tagIds ?? []).includes(t.id);
+                    return (
+                      <FilterChip
+                        key={t.id}
+                        active={active}
+                        onClick={() => {
+                          const current = draft.tagIds ?? [];
+                          setDraft({
+                            ...draft,
+                            tagIds: active
+                              ? current.filter((id) => id !== t.id)
+                              : [...current, t.id],
+                          });
+                        }}
+                      >
+                        {t.name}
+                      </FilterChip>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+            {!draft.isTransfer && draft.kind === 'expense' && (
+              <div className="space-y-2">
+                <label className="flex max-w-xl items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={draft.deducibleGanancias ?? false}
+                    onChange={(e) => setDraft({ ...draft, deducibleGanancias: e.target.checked })}
+                    className="mt-0.5 size-4 rounded border-input"
+                  />
+                  <span>
+                    <span className="font-medium">Deducible Ganancias</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Entra al CSV de deducibles del export contador.
+                    </span>
+                  </span>
+                </label>
+                {!draft.isRefund && (
+                  <label className="flex max-w-xl items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!!draft.domesticService}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          domesticService: e.target.checked
+                            ? {
+                                empleado_nombre: draft.domesticService?.empleado_nombre ?? '',
+                                empleado_cuil: draft.domesticService?.empleado_cuil ?? '',
+                                concepto: draft.domesticService?.concepto ?? 'sueldo',
+                                periodo: draft.domesticService?.periodo ?? draft.date.slice(0, 7),
+                              }
+                            : undefined,
+                        })
+                      }
+                      className="mt-0.5 size-4 rounded border-input"
+                    />
+                    <span>
+                      <span className="font-medium">Servicio doméstico</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Alimenta el CSV 03 (por empleado/mes) del export contador.
+                      </span>
+                    </span>
+                  </label>
+                )}
+                {draft.domesticService && (
+                  <div className="flex flex-wrap items-end gap-3 rounded-md border border-sky-200 bg-sky-50/50 p-2">
+                    <Field label="Empleado/a">
+                      <Input
+                        value={draft.domesticService.empleado_nombre}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: { ...draft.domesticService!, empleado_nombre: e.target.value },
+                          })
+                        }
+                        placeholder="Nombre y apellido"
+                        className="h-8 w-48"
+                      />
+                    </Field>
+                    <Field label="CUIL">
+                      <Input
+                        value={draft.domesticService.empleado_cuil}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: { ...draft.domesticService!, empleado_cuil: e.target.value },
+                          })
+                        }
+                        placeholder="27-12345678-9"
+                        className="h-8 w-36"
+                      />
+                    </Field>
+                    <Field label="Concepto">
+                      <Select
+                        value={draft.domesticService.concepto}
+                        onValueChange={(v) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: {
+                              ...draft.domesticService!,
+                              concepto: v as 'sueldo' | 'aporte' | 'aguinaldo',
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sueldo">Sueldo</SelectItem>
+                          <SelectItem value="aporte">Aporte</SelectItem>
+                          <SelectItem value="aguinaldo">Aguinaldo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Período">
+                      <Input
+                        value={draft.domesticService.periodo}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: { ...draft.domesticService!, periodo: e.target.value },
+                          })
+                        }
+                        placeholder="YYYY-MM"
+                        className="h-8 w-28"
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
             )}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" type="button" onClick={save} disabled={isPending}>

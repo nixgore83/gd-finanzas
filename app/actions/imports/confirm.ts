@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, transactions } from '@/db/schema';
+import { accounts, imports, importLines, tags, transactions, transactionTags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
@@ -158,6 +158,14 @@ export async function confirmImport(input: {
   let autoMatchCount = 0;
   const autoMatchEnabled = await getAutoMatchEnabled(session.householdId);
 
+  // Tags válidos del household, una sola vez: los tagIds de cada línea se
+  // filtran contra este set (defensa ante ids ajenos/borrados).
+  const householdTagRows = await db
+    .select({ id: tags.id })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId));
+  const householdTagIds = new Set(householdTagRows.map((r) => r.id));
+
   try {
     await db.transaction(async (tx) => {
       for (const line of linesToProcess) {
@@ -173,6 +181,17 @@ export async function confirmImport(input: {
         const cpMeta: Record<string, unknown> = parsed.data.counterparty
           ? { counterparty: parsed.data.counterparty }
           : {};
+
+        // Tags capturados en la review (válidos del household). Se aplican también
+        // a transferencias: ahí el tag es el clasificador (no llevan categoría).
+        const lineTagIds = (parsed.data.tagIds ?? []).filter((id) => householdTagIds.has(id));
+        const insertLineTags = async (transactionId: string) => {
+          if (lineTagIds.length === 0) return;
+          await tx
+            .insert(transactionTags)
+            .values(lineTagIds.map((tagId) => ({ transactionId, tagId })))
+            .onConflictDoNothing();
+        };
 
         // ===== TRANSFER BRANCH =====
         // Estrategia "match-or-create": el otro extracto puede estar importado
@@ -238,6 +257,7 @@ export async function confirmImport(input: {
               .update(importLines)
               .set({ transactionId: ownRow.id })
               .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
+            await insertLineTags(ownRow.id);
             return ownRow.id;
           };
 
@@ -359,6 +379,7 @@ export async function confirmImport(input: {
               .update(importLines)
               .set({ transactionId: mainTxId })
               .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
+            await insertLineTags(mainTxId);
             createdCount += 1;
             continue;
           }
@@ -393,10 +414,18 @@ export async function confirmImport(input: {
             description: parsed.data.description,
             notes: parsed.data.notes ?? null,
             fxRateOverride: null,
-            tagIds: [],
-            transactionSubtype: 'standard',
-            deducibleGanancias: false,
-            meta: null,
+            // Captura fiscal de la review (antes hardcodeado a []/standard/false —
+            // el export contador salía vacío de lo que importa).
+            tagIds: lineTagIds,
+            transactionSubtype:
+              parsed.data.domesticService && parsed.data.kind === 'expense' && !parsed.data.isRefund
+                ? 'domestic_service'
+                : 'standard',
+            deducibleGanancias: parsed.data.deducibleGanancias ?? false,
+            meta:
+              parsed.data.domesticService && parsed.data.kind === 'expense' && !parsed.data.isRefund
+                ? parsed.data.domesticService
+                : null,
           },
           session.householdId,
         );
@@ -435,6 +464,7 @@ export async function confirmImport(input: {
               eq(importLines.importId, input.importId),
             ),
           );
+        await insertLineTags(txRow.id);
         createdCount += 1;
 
         if (autoMatchEnabled) {

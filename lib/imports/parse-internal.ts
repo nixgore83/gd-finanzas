@@ -10,7 +10,9 @@ import { CsvFormatError, type ParsedTxLine, type ParserOutput } from '@/lib/impo
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
 import {
   counterpartyHasIdentity,
+  enrichLineWithHistory,
   lookupCounterpartyHistory,
+  type CounterpartyHistory,
 } from '@/lib/imports/counterparty-suggest';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
@@ -339,11 +341,12 @@ export async function parseImportInternal(
 
   const lineRows = await Promise.all(
     lines.map(async (line) => {
-      // Historial por contraparte (categoría + etiqueta) si la línea trae una con identidad.
-      const cpHistory =
+      // Historial por contraparte (categoría, etiqueta, deducible, tags, doméstico)
+      // si la línea trae una con identidad.
+      const cpHistory: CounterpartyHistory =
         line.counterparty && counterpartyHasIdentity(line.counterparty)
           ? await lookupCounterpartyHistory(householdId, line.counterparty)
-          : { categoryId: null, label: null };
+          : { categoryId: null, label: null, deducible: null, tagIds: [], domesticService: null };
 
       // Categoría: contraparte (señal fuerte para pagos recurrentes a terceros) →
       // descripción histórica → sugerencia del LLM. Las transferencias entre cuentas
@@ -356,14 +359,9 @@ export async function parseImportInternal(
         proposedCategoryId = catByName.get(line.suggestedCategory.toLowerCase()) ?? null;
       }
 
-      // Etiqueta: precargar desde el historial si la contraparte no trae una.
-      let lineData: ParsedTxLine = line;
-      if (cpHistory.label && line.counterparty && !line.counterparty.label?.trim()) {
-        lineData = {
-          ...line,
-          counterparty: { ...line.counterparty, label: cpHistory.label },
-        };
-      }
+      // Etiqueta/tags/deducible/doméstico: precargar lo aprendido sin pisar lo
+      // que la línea ya trae (en transfers solo etiqueta+tags).
+      const lineData: ParsedTxLine = enrichLineWithHistory(line, cpHistory);
 
       const lineKey = `${line.date}|${line.description.toLowerCase()}|${line.amountOriginal}`;
       const isDuplicate = existingTxKeys.has(lineKey);

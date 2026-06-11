@@ -1,10 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { categories, imports, importLines } from '@/db/schema';
+import { categories, imports, importLines, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { computeImportPeriod } from '@/lib/imports/period';
@@ -80,6 +80,35 @@ export async function updateImportLine(input: {
   // Si sigue siendo transfer (no se eligió categoría), no lleva categoría.
   if (parsed.data.parsed.isTransfer) {
     parsed.data.proposedCategoryId = null;
+  }
+
+  // Deducible y servicio doméstico solo aplican a GASTOS no-transfer; doméstico
+  // además excluye reembolsos. Los tags valen en cualquier línea (en transfers
+  // son el clasificador).
+  if (parsed.data.parsed.isTransfer || parsed.data.parsed.kind !== 'expense') {
+    parsed.data.parsed = {
+      ...parsed.data.parsed,
+      deducibleGanancias: false,
+      domesticService: undefined,
+    };
+  }
+  if (parsed.data.parsed.isRefund && parsed.data.parsed.domesticService) {
+    parsed.data.parsed = { ...parsed.data.parsed, domesticService: undefined };
+  }
+
+  // tagIds: filtrar contra los tags del household (defensa ante ids ajenos).
+  if (parsed.data.parsed.tagIds && parsed.data.parsed.tagIds.length > 0) {
+    const validTags = await db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(
+        and(eq(tags.householdId, session.householdId), inArray(tags.id, parsed.data.parsed.tagIds)),
+      );
+    const validIds = new Set(validTags.map((t) => t.id));
+    parsed.data.parsed = {
+      ...parsed.data.parsed,
+      tagIds: parsed.data.parsed.tagIds.filter((id) => validIds.has(id)),
+    };
   }
 
   try {
