@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   counterpartyBankRefs,
+  counterpartyHasIdentity,
   matchAccountByRefs,
   normalizeBankRef,
   normalizeCounterpartyName,
@@ -58,6 +59,15 @@ describe('sameCounterpartyIdentity', () => {
     expect(sameCounterpartyIdentity({ name: 'x' }, undefined)).toBe(false);
     expect(sameCounterpartyIdentity({}, {})).toBe(false);
     expect(sameCounterpartyIdentity({ name: ' ' }, { name: ' ' })).toBe(false);
+  });
+
+  it('solo-label no es identidad: el bulk de etiqueta no crea matching', () => {
+    // El bulk "Contraparte" de la review crea counterparty {label} en líneas
+    // sin contraparte parseada; ese objeto no debe participar del matching.
+    expect(counterpartyHasIdentity({ label: 'Niñera' })).toBe(false);
+    expect(
+      sameCounterpartyIdentity({ label: 'Niñera' }, { label: 'Niñera' }),
+    ).toBe(false);
   });
 });
 

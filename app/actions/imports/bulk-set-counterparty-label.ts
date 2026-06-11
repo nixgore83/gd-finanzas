@@ -19,10 +19,12 @@ export type BulkSetCounterpartyLabelResult =
 
 /**
  * Setea la etiqueta amigable (`parsed_data.counterparty.label`) en bloque.
- * Usado por la propagación intra-import: tras etiquetar una línea, aplicar la
- * misma etiqueta a las hermanas con la misma contraparte. Solo toca líneas que
- * YA tienen counterparty (no inventa identidades) y no cambia el status (es
- * metadata de display, no requiere re-revisión).
+ * Callers: la propagación intra-import (tras etiquetar una línea, aplicar a las
+ * hermanas con la misma contraparte) y el bulk "Contraparte" de la barra de
+ * selección. Si la línea no tiene counterparty crea `{label}` — sin inventar
+ * identificadores: un counterparty solo-label no tiene identidad y no participa
+ * del matching ni de las sugerencias (ver counterparty-identity.ts). No cambia
+ * el status (es metadata de display, no requiere re-revisión).
  */
 export async function bulkSetCounterpartyLabel(input: {
   importId: string;
@@ -55,13 +57,17 @@ export async function bulkSetCounterpartyLabel(input: {
     const updated = await db
       .update(importLines)
       .set({
-        parsedData: sql`jsonb_set(${importLines.parsedData}, '{counterparty,label}', to_jsonb(${parsed.data.label}::text))`,
+        parsedData: sql`jsonb_set(
+          ${importLines.parsedData},
+          '{counterparty}',
+          coalesce(${importLines.parsedData} -> 'counterparty', '{}'::jsonb)
+            || jsonb_build_object('label', ${parsed.data.label}::text)
+        )`,
       })
       .where(
         and(
           eq(importLines.importId, parsed.data.importId),
           inArray(importLines.id, parsed.data.lineIds),
-          sql`${importLines.parsedData} -> 'counterparty' IS NOT NULL`,
         ),
       )
       .returning({ id: importLines.id });

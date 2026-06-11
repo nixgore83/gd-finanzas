@@ -55,6 +55,19 @@ el TAG es el clasificador.
   negocio nuevos: captura fiscal en review, tag-clasificador en transfers, cobertura de
   gaps por período, link de previsión en review.
 
+### Sesión 2026-06-11 (bis) — Bulk de contraparte en la review (branch `feat/bulk-counterparty`)
+
+- [x] Barra azul: bloque "Contraparte" — combobox con etiquetas conocidas (historial de
+  transacciones + las del import) con texto libre, aplica `counterparty.label` a las
+  seleccionadas. **Crea `{label}` en líneas sin counterparty parseado** (decisión Nico:
+  sin inventar identificadores — solo-label no entra al matching, test que lo fija).
+  `bulkSetCounterpartyLabel` ahora hace coalesce-create; no cambia status (metadata).
+- [x] Editor inline: campo "Etiqueta contraparte" siempre visible (antes oculto si el
+  parser no extrajo contraparte); el preprocess del schema ya limpiaba el caso vacío.
+- [x] Helper puro `mergeCounterpartyLabels` + 5 tests (381 verdes). Typecheck + lint OK.
+- [ ] **Pendiente:** smoke manual en prod: bulk sobre líneas sin contraparte de un
+  resumen TC.
+
 ### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
 
 Pedido de Nico: poder ordenar por varios criterios a la vez (ej. nombre primario + fecha
