@@ -3,7 +3,7 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-06-10 por Claude
+**Última actualización:** 2026-06-11 por Claude
 
 ---
 
@@ -48,8 +48,12 @@ label distinto** (no había un formateador único). Rearmado completo, decidido 
   **Verificado: las 28 cuentas dan display único.** Decisiones Nico: brokers muestran
   "Inversiones" (no chocan con CA/CC); Master Meli → `Mercado Pago Master`.
 - **Validación:** typecheck + lint + **345 tests** verdes. **Sin migraciones nuevas además de 0015.**
-- [ ] **Pendiente:** smoke visual en prod tras deploy + **sync PRD Notion** (changelog v1.9 +
-  nota fáctica del campo `card_brand` y la convención de naming en §4/§5).
+- [x] **Cierre (2026-06-11):** PR **#45** mergeado y deployado a prod (commit `c31833c`, deploy
+  READY). Smoke HTTP OK (login 200, rutas protegidas 307→/login, sin 5xx). **Sync PRD Notion
+  hecho como changelog v1.10** (v1.9 ya lo había tomado la sesión de transferencias): §4.1
+  con `card_brand` + `name`=rótulo opcional + nota de la convención de display.
+- [ ] **Pendiente (Nico):** smoke visual en prod con sesión (ver `Galicia Visa · Nico · ARS`
+  en listas/forms/imports).
 
 ### Sesión 2026-06-10 — Transferencias de doble lado: match-al-confirmar + linkeo manual + UI de review
 
