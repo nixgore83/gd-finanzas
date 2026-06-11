@@ -81,7 +81,12 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
   const [sortField, setSortField] = useState<string>('category');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const handleSort = (field: string, dir: 'asc' | 'desc') => { setSortField(field); setSortDir(dir); };
+  const handleSort = (field: string, dir: 'asc' | 'desc') => {
+    setSortField(field);
+    setSortDir(dir);
+    // Reordenar es acción explícita → descongela la lista estable.
+    setPinnedIds(null);
+  };
   // Preferencia de cuenta destino: cuenta sugerida por nº de extracto > la del
   // import > la de la institución > la primera.
   const defaultAccount = (suggestedAccountId
@@ -138,10 +143,12 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     [tree, uniformKind],
   );
 
-  // Lista filtrada (texto + categoría/transfer + tipo + estado) y luego ordenada.
-  const filteredLines = useMemo(() => {
+  // Predicado de filtro (texto + categoría/transfer + tipo + estado). Se reusa
+  // para derivar la lista en vivo y para atenuar filas que dejaron de matchear
+  // cuando la lista está congelada.
+  const matchesFilter = useMemo(() => {
     const q = textFilter.trim().toLowerCase();
-    return lines.filter((l) => {
+    return (l: LineRow): boolean => {
       const p = l.parsedData;
       if (q) {
         const hay = `${p.description ?? ''} ${p.counterparty?.label ?? ''} ${p.counterparty?.name ?? ''}`.toLowerCase();
@@ -153,28 +160,51 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       if (catFilter === 'categorized' && l.proposedCategoryId === null) return false;
       if (catFilter === 'transfer' && !p.isTransfer) return false;
       return true;
-    });
-  }, [lines, textFilter, kindFilter, statusFilter, catFilter]);
+    };
+  }, [textFilter, kindFilter, statusFilter, catFilter]);
+
+  const filteredLines = useMemo(() => lines.filter(matchesFilter), [lines, matchesFilter]);
 
   const sortedFiltered = useMemo(
     () => sortLines(filteredLines, sortField, sortDir, tree),
     [filteredLines, sortField, sortDir, tree],
   );
 
+  // Lista ESTABLE: al primer cambio (categorizar, aceptar, etc.) se congela el
+  // conjunto visible (ids + orden). Las ediciones actualizan el contenido de la
+  // fila in-place pero no la sacan ni reordenan — revisar en lote sin que la
+  // lista "se mueva bajo los dedos". Cambiar filtro/orden o "Recargar" recomputa.
+  const [pinnedIds, setPinnedIds] = useState<string[] | null>(null);
+  const lineById = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
+  const visibleLines = useMemo(() => {
+    if (pinnedIds === null) return sortedFiltered;
+    return pinnedIds.map((id) => lineById.get(id)).filter((l): l is LineRow => l !== undefined);
+  }, [pinnedIds, lineById, sortedFiltered]);
+
+  /** Congela la lista visible actual antes de la primera mutación. */
+  function pinList() {
+    if (pinnedIds === null) setPinnedIds(sortedFiltered.map((l) => l.id));
+  }
+
+  function unpinList() {
+    setPinnedIds(null);
+  }
+
   const filtersActive =
     textFilter.trim() !== '' || catFilter !== 'all' || kindFilter !== 'all' || statusFilter !== 'all';
 
   // Paginación client-side: mantiene ≤PAGE_SIZE filas en el DOM (367+ filas sin lag).
-  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(visibleLines.length / PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages - 1);
-  const pageLines = sortedFiltered.slice(pageClamped * PAGE_SIZE, pageClamped * PAGE_SIZE + PAGE_SIZE);
+  const pageLines = visibleLines.slice(pageClamped * PAGE_SIZE, pageClamped * PAGE_SIZE + PAGE_SIZE);
 
-  // Cada cambio de filtro vuelve a la página 1 (evita quedar en una página vacía).
+  // Cada cambio de filtro vuelve a la página 1 (evita quedar en una página vacía)
+  // y descongela la lista (el cambio de filtro es una acción explícita del usuario).
   // Se hace en los setters (no en un effect) para no disparar renders en cascada.
-  function applyTextFilter(v: string) { setTextFilter(v); setPage(0); }
-  function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); }
-  function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); }
-  function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); }
+  function applyTextFilter(v: string) { setTextFilter(v); setPage(0); setPinnedIds(null); }
+  function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); setPinnedIds(null); }
+  function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); setPinnedIds(null); }
+  function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); setPinnedIds(null); }
 
   function clearFilters() {
     setTextFilter('');
@@ -182,6 +212,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     setKindFilter('all');
     setStatusFilter('all');
     setPage(0);
+    setPinnedIds(null);
   }
 
   function toggleOne(id: string) {
@@ -219,6 +250,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('Las líneas seleccionadas son de tipos distintos (ingreso y gasto). Filtrá por tipo antes.');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await bulkSetCategory({
         importId,
@@ -246,6 +278,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('Elegí una moneda');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await bulkSetCurrency({
         importId,
@@ -268,6 +301,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('No hay líneas seleccionadas');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await bulkSetTransfer({
         importId,
@@ -294,6 +328,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('No hay líneas seleccionadas');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await setLineStatus({ importId, lineIds: [...selectedIds], status: 'pending' });
       if (res.ok) {
@@ -312,6 +347,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.info('No hay líneas pendientes');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await setLineStatus({ importId, lineIds: ids, status });
       if (res.ok) {
@@ -324,6 +360,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   }
 
   function doSetStatus(lineId: string, next: 'accepted' | 'rejected' | 'pending') {
+    pinList();
     startTransition(async () => {
       const res = await setLineStatus({ importId, lineIds: [lineId], status: next });
       if (res.ok) router.refresh();
@@ -389,13 +426,23 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             className="h-9 w-full max-w-xs"
           />
           <span className="text-xs text-muted-foreground">
-            Mostrando <span className="font-medium tabular-nums">{filteredLines.length}</span> de{' '}
+            Mostrando <span className="font-medium tabular-nums">{visibleLines.length}</span> de{' '}
             <span className="tabular-nums">{lines.length}</span>
           </span>
           {filtersActive && (
             <Button type="button" size="sm" variant="ghost" onClick={clearFilters}>
               Limpiar filtros
             </Button>
+          )}
+          {pinnedIds !== null && (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                Lista congelada — tus cambios no la reordenan
+              </span>
+              <Button type="button" size="sm" variant="outline" onClick={unpinList}>
+                Recargar lista
+              </Button>
+            </span>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -611,6 +658,8 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 onSetStatus={doSetStatus}
                 isSelected={selectedIds.has(l.id)}
                 onToggleSelect={() => toggleOne(l.id)}
+                onMutate={pinList}
+                dimmed={pinnedIds !== null && !matchesFilter(l)}
               />
             ))}
             {lines.length === 0 && (
@@ -643,8 +692,8 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-2 text-sm">
           <span className="text-xs text-muted-foreground tabular-nums">
-            {pageClamped * PAGE_SIZE + 1}–{Math.min((pageClamped + 1) * PAGE_SIZE, sortedFiltered.length)} de{' '}
-            {sortedFiltered.length}
+            {pageClamped * PAGE_SIZE + 1}–{Math.min((pageClamped + 1) * PAGE_SIZE, visibleLines.length)} de{' '}
+            {visibleLines.length}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -848,6 +897,8 @@ function LineRowEditor({
   onSetStatus,
   isSelected,
   onToggleSelect,
+  onMutate,
+  dimmed,
 }: {
   line: LineRow;
   importId: string;
@@ -859,6 +910,10 @@ function LineRowEditor({
   onSetStatus: (id: string, status: 'accepted' | 'rejected' | 'pending') => void;
   isSelected: boolean;
   onToggleSelect: () => void;
+  /** Congela la lista estable antes de mutar (ver pinList en el padre). */
+  onMutate: () => void;
+  /** La fila ya no matchea el filtro pero sigue visible (lista congelada). */
+  dimmed: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -876,6 +931,7 @@ function LineRowEditor({
   }, [tree, categoryId, line.proposedCategoryId]);
 
   function save() {
+    onMutate();
     startTransition(async () => {
       const res = await updateImportLine({
         lineId: line.id,
@@ -903,6 +959,7 @@ function LineRowEditor({
   // Reusa `bulkSetCategory` (valida kind, desmarca transfer) con un solo lineId.
   function quickCategory(catId: string) {
     setCategoryId(catId || null);
+    onMutate();
     startTransition(async () => {
       const res = await bulkSetCategory({ importId, lineIds: [line.id], categoryId: catId });
       if (res.ok) {
@@ -925,6 +982,7 @@ function LineRowEditor({
         isSelected && !readOnly && 'bg-blue-50/50',
         editing && !readOnly && 'bg-blue-50/40',
         line.status === 'rejected' && 'opacity-70',
+        dimmed && 'opacity-50',
         !readOnly && !editing && 'cursor-pointer',
       )}
       onClick={(e) => {
