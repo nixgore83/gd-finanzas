@@ -50,10 +50,18 @@ el TAG es el clasificador.
   el aprendizaje SOLO sobre líneas pending (no pisa ediciones) → los imports en curso
   (ICBC `347a6ae9`, Galicia `e36d50d2`) se benefician sin re-parsear.
 - **Validación:** typecheck + lint + build + **375 tests** verdes (345→375).
-- [ ] **Pendiente:** merge PR + smoke en prod (revisar un import en curso end-to-end con
-  los campos nuevos) + **sync PRD Notion (changelog v1.11)** — los puntos de regla de
-  negocio nuevos: captura fiscal en review, tag-clasificador en transfers, cobertura de
-  gaps por período, link de previsión en review.
+- [x] **Merge PR #50** — mergeado a `main` (commit `0db0dcd`).
+- [x] **Sync PRD Notion (changelog v1.11 + v1.12)** hecho (2026-06-11): el header del
+  changelog ya tenía v1.11/v1.12; además se corrigieron las **divergencias fácticas del
+  cuerpo** — §4.1 (agregado `accounts.transfer_refs` jsonb de la migración 0016 +
+  `account_number`), §5.2.1 (captura fiscal aprendida por contraparte: deducible/tags/
+  `domestic_service`; tag-clasificador en transfers), §5.3 (candidatos de previsión
+  siempre visibles en la review; el toggle solo gobierna el auto-match al confirmar).
+  La regla de cobertura de gaps por período queda en el changelog v1.11 (sin sección de
+  cuerpo propia en el PRD).
+- [ ] **Pendiente (Nico):** smoke en prod end-to-end — revisar un import en curso
+  (ICBC `347a6ae9` / Galicia `e36d50d2`) con los campos nuevos (captura fiscal, candidatos
+  de previsión, match con tx existente, refs de cuenta destino).
 
 ### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
 
