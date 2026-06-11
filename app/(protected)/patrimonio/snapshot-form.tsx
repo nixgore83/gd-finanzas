@@ -9,15 +9,33 @@ import { updateSnapshot } from '@/app/actions/patrimonio/update-snapshot';
 import { fetchPrices } from '@/app/actions/patrimonio/fetch-prices';
 import type { SnapshotDetail, SnapshotBalance, SnapshotHolding } from '@/lib/patrimonio/load-snapshot-detail';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/account';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { Hair, Label, Display, Body, Num } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 
 interface AccountInfo {
   id: string;
   name: string;
-  type: string;
-  currencyDefault: string;
+  type: AccountForDisplay['type'];
+  cardBrand: AccountForDisplay['cardBrand'];
+  institutionName: string | null;
+  currencyDefault: 'ARS' | 'USD';
   ownerTag: string;
+}
+
+/** Nombre legible de una cuenta de patrimonio. */
+function accountLabel(a: AccountInfo, opts?: { withInstitution?: boolean; withOwner?: boolean; withCurrency?: boolean }): string {
+  return formatAccount(
+    {
+      institutionName: a.institutionName,
+      type: a.type,
+      cardBrand: a.cardBrand,
+      name: a.name,
+      ownerTag: a.ownerTag,
+      currency: a.currencyDefault,
+    },
+    opts,
+  );
 }
 
 interface BalanceRow {
@@ -321,7 +339,9 @@ export function SnapshotForm({
                       className="grid grid-cols-[1fr_120px_100px_80px] items-center gap-3 border-b border-border/30 pb-2"
                     >
                       <div>
-                        <span className="font-display text-sm text-foreground">{acc.name}</span>
+                        <span className="font-display text-sm text-foreground">
+                          {accountLabel(acc, { withOwner: false, withCurrency: false })}
+                        </span>
                         <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
                           {acc.ownerTag} · {acc.currencyDefault}
                         </span>
@@ -440,7 +460,7 @@ export function SnapshotForm({
                         className="border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                       >
                         {brokerAccounts.map((a) => (
-                          <option key={a.id} value={a.id}>{a.name}</option>
+                          <option key={a.id} value={a.id}>{accountLabel(a)}</option>
                         ))}
                       </select>
                       {/* Remove */}

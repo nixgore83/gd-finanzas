@@ -1,6 +1,7 @@
 import { and, eq, gte, lte, ne, isNull } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, transactions } from '@/db/schema';
+import { accounts, institutions, transactions } from '@/db/schema';
+import { formatAccount } from '@/lib/accounts/format';
 import { transferDirection } from './_build-transfer';
 
 const WINDOW_DAYS = 7;
@@ -60,10 +61,16 @@ export async function findTransferLinkCandidates(
       currencyOriginal: transactions.currencyOriginal,
       kind: transactions.kind,
       description: transactions.description,
-      accountName: accounts.name,
+      accName: accounts.name,
+      accType: accounts.type,
+      accCardBrand: accounts.cardBrand,
+      accOwnerTag: accounts.ownerTag,
+      accCurrency: accounts.currencyDefault,
+      accInstitutionName: institutions.name,
     })
     .from(transactions)
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+    .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
     .where(
       and(
         eq(transactions.householdId, householdId),
@@ -78,5 +85,21 @@ export async function findTransferLinkCandidates(
   return rows
     .filter((r) => transferDirection(r.kind, r.amountOriginal) === wantDir)
     .sort((a, b) => daysBetween(a.date, tx.date) - daysBetween(b.date, tx.date))
-    .slice(0, 20);
+    .slice(0, 20)
+    .map((r) => ({
+      id: r.id,
+      date: r.date,
+      amountOriginal: r.amountOriginal,
+      currencyOriginal: r.currencyOriginal,
+      kind: r.kind,
+      description: r.description,
+      accountName: formatAccount({
+        institutionName: r.accInstitutionName,
+        type: r.accType,
+        cardBrand: r.accCardBrand,
+        name: r.accName,
+        ownerTag: r.accOwnerTag,
+        currency: r.accCurrency,
+      }),
+    }));
 }

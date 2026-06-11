@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories, households, transactions } from '@/db/schema';
+import { accounts, categories, households, institutions, transactions } from '@/db/schema';
+import { formatAccount } from '@/lib/accounts/format';
 import type { ExportAccount, ExportCategory, ExportTx } from './types';
 
 export type GananciasData = {
@@ -73,11 +74,36 @@ export async function loadGananciasData(
   }));
 
   const accRows = await db
-    .select({ id: accounts.id, name: accounts.name, type: accounts.type })
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      ownerTag: accounts.ownerTag,
+      currencyDefault: accounts.currencyDefault,
+      institutionName: institutions.name,
+    })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(eq(accounts.householdId, householdId));
   const accountsById = new Map<string, ExportAccount>(
-    accRows.map((a) => [a.id, { id: a.id, name: a.name, type: a.type }]),
+    accRows.map((a) => [
+      a.id,
+      {
+        id: a.id,
+        // Nombre legible para el contador (institución + producto + dueño + moneda),
+        // ya que `accounts.name` solo guarda el rótulo opcional.
+        name: formatAccount({
+          institutionName: a.institutionName,
+          type: a.type,
+          cardBrand: a.cardBrand,
+          name: a.name,
+          ownerTag: a.ownerTag,
+          currency: a.currencyDefault,
+        }),
+        type: a.type,
+      },
+    ]),
   );
 
   const catRows = await db

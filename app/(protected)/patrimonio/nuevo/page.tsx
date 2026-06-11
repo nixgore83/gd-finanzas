@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { eq, and } from 'drizzle-orm';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { getDb } from '@/lib/db/client';
-import { accounts } from '@/db/schema';
+import { accounts, institutions } from '@/db/schema';
 import { loadSnapshots } from '@/lib/patrimonio/load-snapshots';
 import { loadSnapshotDetail } from '@/lib/patrimonio/load-snapshot-detail';
 import { getFxRate } from '@/lib/fx/get-fx-rate';
@@ -28,10 +28,13 @@ export default async function NuevoSnapshotPage() {
       id: accounts.id,
       name: accounts.name,
       type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      institutionName: institutions.name,
       currencyDefault: accounts.currencyDefault,
       ownerTag: accounts.ownerTag,
     })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(
       and(
         eq(accounts.householdId, session.householdId),

@@ -16,10 +16,11 @@ import {
 } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
+import { accounts, categories, institutions, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { counterpartyFromMeta } from '@/lib/imports/parsers/types';
+import { formatAccount } from '@/lib/accounts/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
@@ -120,11 +121,31 @@ export default async function TransactionsPage({
   const db = getDb();
 
   // Cargar listas para los Selects de filtro.
-  const accountOptions = await db
-    .select({ id: accounts.id, name: accounts.name, ownerTag: accounts.ownerTag })
+  const accountOptionRows = await db
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      institutionName: institutions.name,
+      currencyDefault: accounts.currencyDefault,
+      ownerTag: accounts.ownerTag,
+    })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(eq(accounts.householdId, session.householdId))
-    .orderBy(asc(accounts.name));
+    .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
+  const accountOptions = accountOptionRows.map((a) => ({
+    id: a.id,
+    label: formatAccount({
+      institutionName: a.institutionName,
+      type: a.type,
+      cardBrand: a.cardBrand,
+      name: a.name,
+      ownerTag: a.ownerTag,
+      currency: a.currencyDefault,
+    }),
+  }));
 
   const categoryOptions = await loadCategoryTree(session.householdId);
 
@@ -151,6 +172,7 @@ export default async function TransactionsPage({
     const orClause = or(
       ilike(transactions.description, pattern),
       ilike(accounts.name, pattern),
+      ilike(institutions.name, pattern),
       ilike(categories.name, pattern),
     );
     if (orClause) conditions.push(orClause);
@@ -162,6 +184,7 @@ export default async function TransactionsPage({
     .select({ total: count() })
     .from(transactions)
     .leftJoin(accounts, eq(accounts.id, transactions.accountId))
+    .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .where(whereClause);
   const total = totalRows[0]?.total ?? 0;
@@ -180,11 +203,17 @@ export default async function TransactionsPage({
       amountUsd: transactions.amountUsd,
       description: transactions.description,
       meta: transactions.meta,
-      accountName: accounts.name,
+      accName: accounts.name,
+      accType: accounts.type,
+      accCardBrand: accounts.cardBrand,
+      accOwnerTag: accounts.ownerTag,
+      accCurrency: accounts.currencyDefault,
+      accInstitutionName: institutions.name,
       categoryName: categories.name,
     })
     .from(transactions)
     .leftJoin(accounts, eq(accounts.id, transactions.accountId))
+    .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .where(whereClause)
     .orderBy(
@@ -193,7 +222,7 @@ export default async function TransactionsPage({
         switch (filters.sort) {
           case 'description': return d(transactions.description);
           case 'amount': return d(transactions.amountOriginal);
-          case 'account': return d(accounts.name);
+          case 'account': return d(institutions.name);
           case 'category': return d(categories.name);
           case 'kind': return d(transactions.kind);
           default: return d(transactions.date);
@@ -251,7 +280,7 @@ export default async function TransactionsPage({
   }
   if (filters.accountId) {
     const acc = accountOptions.find((a) => a.id === filters.accountId);
-    activeChips.push({ label: 'Cuenta', value: acc?.name ?? '—' });
+    activeChips.push({ label: 'Cuenta', value: acc?.label ?? '—' });
   }
   if (filters.categoryId) {
     const cat = categoryOptions.find((c) => c.id === filters.categoryId);
@@ -407,7 +436,7 @@ export default async function TransactionsPage({
                     <option value="">Todas</option>
                     {accountOptions.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name}{a.ownerTag ? ` (${a.ownerTag})` : ''}
+                        {a.label}
                       </option>
                     ))}
                   </select>
@@ -482,7 +511,16 @@ export default async function TransactionsPage({
                   amountUsd: row.amountUsd,
                   description: row.description,
                   counterparty: counterpartyFromMeta(row.meta),
-                  accountName: row.accountName,
+                  accountName: row.accType
+                    ? formatAccount({
+                        institutionName: row.accInstitutionName,
+                        type: row.accType,
+                        cardBrand: row.accCardBrand,
+                        name: row.accName,
+                        ownerTag: row.accOwnerTag ?? '',
+                        currency: row.accCurrency ?? 'ARS',
+                      })
+                    : '—',
                   categoryName: row.categoryName,
                   tags: tagsByTx.get(row.id) ?? [],
                 }));

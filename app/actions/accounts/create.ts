@@ -43,6 +43,7 @@ export async function createAccount(formData: FormData): Promise<CreateAccountRe
         householdId: session.householdId,
         name: parsed.data.name,
         type: parsed.data.type,
+        cardBrand: parsed.data.cardBrand,
         currencyDefault: parsed.data.currencyDefault,
         institutionId: parsed.data.institutionId,
         ownerTag: parsed.data.ownerTag,

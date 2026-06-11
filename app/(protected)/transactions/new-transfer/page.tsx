@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, tags } from '@/db/schema';
+import { accounts, institutions, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { createTransfer } from '@/app/actions/transactions/create-transfer';
 import { Button } from '@/components/ui/button';
@@ -26,12 +26,16 @@ export default async function NewTransferPage() {
     .select({
       id: accounts.id,
       name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      institutionName: institutions.name,
       currencyDefault: accounts.currencyDefault,
       ownerTag: accounts.ownerTag,
     })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
-    .orderBy(asc(accounts.name));
+    .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
 
   const tagRows = await db
     .select({ id: tags.id, name: tags.name, color: tags.color })

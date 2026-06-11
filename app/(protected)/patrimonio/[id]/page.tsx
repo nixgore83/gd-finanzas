@@ -6,7 +6,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadSnapshotDetail } from '@/lib/patrimonio/load-snapshot-detail';
 import { loadSnapshots } from '@/lib/patrimonio/load-snapshots';
 import { getDb } from '@/lib/db/client';
-import { accounts } from '@/db/schema';
+import { accounts, institutions } from '@/db/schema';
 import { getFxRate } from '@/lib/fx/get-fx-rate';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/account';
 import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
@@ -66,17 +66,20 @@ export default async function SnapshotDetailPage({
         id: accounts.id,
         name: accounts.name,
         type: accounts.type,
+        cardBrand: accounts.cardBrand,
+        institutionName: institutions.name,
         currencyDefault: accounts.currencyDefault,
         ownerTag: accounts.ownerTag,
       })
       .from(accounts)
+      .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
       .where(
         and(
           eq(accounts.householdId, session.householdId),
           eq(accounts.archived, false),
         ),
       )
-      .orderBy(accounts.name);
+      .orderBy(institutions.name, accounts.type, accounts.name);
 
     const allSnapshots = await loadSnapshots(session.householdId);
     const previousId = allSnapshots.find((s) => s.date < detail.date)?.id;

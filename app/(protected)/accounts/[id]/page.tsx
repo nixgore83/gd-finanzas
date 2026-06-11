@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db/client';
 import { accounts, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { updateAccount } from '@/app/actions/accounts/update';
+import { formatAccount } from '@/lib/accounts/format';
 import { AccountForm } from '../account-form';
 
 export const metadata = {
@@ -43,6 +44,15 @@ export default async function EditAccountPage({ params }: { params: RouteParams 
     .where(eq(institutions.archived, false))
     .orderBy(asc(institutions.name));
 
+  const displayName = formatAccount({
+    institutionName: list.find((i) => i.id === account.institutionId)?.name ?? null,
+    type: account.type,
+    cardBrand: account.cardBrand,
+    name: account.name,
+    ownerTag: account.ownerTag,
+    currency: account.currencyDefault,
+  });
+
   return (
     <div className="mx-auto max-w-xl">
       <AccountForm
@@ -52,6 +62,7 @@ export default async function EditAccountPage({ params }: { params: RouteParams 
         initial={{
           name: account.name,
           type: account.type,
+          cardBrand: account.cardBrand,
           currencyDefault: account.currencyDefault,
           institutionId: account.institutionId,
           ownerTag: account.ownerTag as 'Nico' | 'Pau' | 'Hogar',
@@ -60,7 +71,7 @@ export default async function EditAccountPage({ params }: { params: RouteParams 
         }}
         submitLabel="Guardar cambios"
         title="Editar cuenta"
-        description={`Editando "${account.name}". Los campos quedan inmutables solo si la app cambia, no por la base de datos.`}
+        description={`Editando ${displayName}.`}
       />
     </div>
   );

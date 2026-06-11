@@ -16,6 +16,7 @@ import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
 import { computeImportPeriod } from '@/lib/imports/period';
+import { formatAccount } from '@/lib/accounts/format';
 import { getServerEnv } from '@/lib/env';
 
 export type ParseImportInternalResult =
@@ -246,12 +247,36 @@ export async function parseImportInternal(
   // match, la línea queda como transferencia sin contraparte (el usuario la elige en revisión).
   if (allLines.some((l) => l.transferAccountName)) {
     const accs = await db
-      .select({ id: accounts.id, name: accounts.name, ownerTag: accounts.ownerTag })
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        type: accounts.type,
+        cardBrand: accounts.cardBrand,
+        ownerTag: accounts.ownerTag,
+        currencyDefault: accounts.currencyDefault,
+        institutionName: institutions.name,
+      })
       .from(accounts)
+      .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
       .where(eq(accounts.householdId, householdId));
+    // Los hints de los parsers son "Institución Producto" (ej. "ICBC Inversiones",
+    // "Galicia Visa") → la misma forma que `formatAccount` sin dueño/moneda. Keyamos por
+    // ahí (case-insensitive) en vez de por el `name` crudo, que ahora es solo el rótulo.
     const byName = new Map<string, { id: string; ownerTag: string | null }[]>();
     for (const a of accs) {
-      const k = a.name.trim().toLowerCase();
+      const k = formatAccount(
+        {
+          institutionName: a.institutionName,
+          type: a.type,
+          cardBrand: a.cardBrand,
+          name: a.name,
+          ownerTag: a.ownerTag,
+          currency: a.currencyDefault,
+        },
+        { withOwner: false, withCurrency: false },
+      )
+        .trim()
+        .toLowerCase();
       const list = byName.get(k) ?? [];
       list.push({ id: a.id, ownerTag: a.ownerTag });
       byName.set(k, list);

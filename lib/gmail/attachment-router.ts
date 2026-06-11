@@ -1,12 +1,14 @@
-import type { ACCOUNT_TYPES, CURRENCIES } from '@/lib/schemas/account';
+import type { ACCOUNT_TYPES, CARD_BRANDS, CURRENCIES } from '@/lib/schemas/account';
 
 type AccountType = (typeof ACCOUNT_TYPES)[number];
 type Currency = (typeof CURRENCIES)[number];
+type CardBrand = (typeof CARD_BRANDS)[number];
 
 export interface RoutableAccount {
   id: string;
   name: string;
   type: AccountType;
+  cardBrand: CardBrand | null;
   currencyDefault: Currency;
   institutionId: string | null;
   pdfPassword: string | null;
@@ -64,13 +66,14 @@ export async function routeAttachment(
   // Find the matching account.
   // For TC (credit_card) there may be multiple accounts with same type+currency
   // (e.g. ICBC Visa + ICBC Mastercard, both credit_card ARS). In that case
-  // we use the accountNamePattern to disambiguate via account name.
+  // we use the accountNamePattern to disambiguate por marca (`card_brand`) — antes
+  // se matcheaba contra `name`, que ya no embebe la marca — con fallback al rótulo.
   const target = match.accountNamePattern
     ? accounts.find(
         (a) =>
           a.type === match.type &&
           a.currencyDefault === match.currency &&
-          match.accountNamePattern!.test(a.name),
+          match.accountNamePattern!.test(`${a.cardBrand ?? ''} ${a.name}`),
       ) ??
       // Fallback: if no name match, try type+currency only
       accounts.find(

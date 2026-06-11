@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CURRENCIES } from '@/lib/schemas/account';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import {
   DOMESTIC_SERVICE_CONCEPTOS,
   TRANSACTION_KINDS,
@@ -36,7 +37,27 @@ import {
 import { cn } from '@/lib/utils';
 import { TagMultiSelect, type TagOption } from './tag-multi-select';
 
-type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD'; ownerTag: string };
+type AccountOption = {
+  id: string;
+  name: string;
+  type: AccountForDisplay['type'];
+  cardBrand: AccountForDisplay['cardBrand'];
+  institutionName: string | null;
+  currencyDefault: 'ARS' | 'USD';
+  ownerTag: string;
+};
+
+/** Adapta una `AccountOption` (campo `currencyDefault`) al shape de `formatAccount`. */
+function accountLabel(a: AccountOption): string {
+  return formatAccount({
+    institutionName: a.institutionName,
+    type: a.type,
+    cardBrand: a.cardBrand,
+    name: a.name,
+    ownerTag: a.ownerTag,
+    currency: a.currencyDefault,
+  });
+}
 type CategoryOption = { id: string; name: string; kind: 'income' | 'expense'; depth: 0 | 1 };
 
 type ActionResult =
@@ -290,7 +311,7 @@ export function TransactionForm({
               <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.name} ({a.ownerTag}) ({a.currencyDefault})
+                    {accountLabel(a)}
                   </SelectItem>
                 ))}
               </SelectContent>

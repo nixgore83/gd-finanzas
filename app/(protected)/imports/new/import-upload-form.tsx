@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { IMPORT_TYPES, IMPORT_TYPE_LABELS, type ImportType } from '@/lib/schemas/import';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { createImport } from '@/app/actions/imports/create';
 
 type Institution = { id: string; name: string };
@@ -22,7 +23,10 @@ type Account = {
   name: string;
   ownerTag: string | null;
   institutionId: string | null;
-  type: string;
+  institutionName: string | null;
+  type: AccountForDisplay['type'];
+  cardBrand: AccountForDisplay['cardBrand'];
+  currencyDefault: 'ARS' | 'USD';
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -285,7 +289,17 @@ export function ImportUploadForm({
                         <SelectItem value="_none">Sin especificar</SelectItem>
                         {filteredAccounts.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
-                            {a.name}{a.ownerTag ? ` (${a.ownerTag})` : ''}
+                            {formatAccount(
+                              {
+                                institutionName: a.institutionName,
+                                type: a.type,
+                                cardBrand: a.cardBrand,
+                                name: a.name,
+                                ownerTag: a.ownerTag ?? '',
+                                currency: a.currencyDefault,
+                              },
+                              { withInstitution: false },
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>

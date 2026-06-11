@@ -3,10 +3,11 @@ import { and, asc, eq } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { accounts, tags, transactionTags, transactions } from '@/db/schema';
+import { accounts, institutions, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { counterpartyFromMeta } from '@/lib/imports/parsers/types';
+import { formatAccount } from '@/lib/accounts/format';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { updateTransaction } from '@/app/actions/transactions/update';
 import { updateTransfer } from '@/app/actions/transactions/update-transfer';
@@ -55,12 +56,16 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     .select({
       id: accounts.id,
       name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      institutionName: institutions.name,
       currencyDefault: accounts.currencyDefault,
       ownerTag: accounts.ownerTag,
     })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
-    .orderBy(asc(accounts.name));
+    .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
 
   const tagRows = await db
     .select({ id: tags.id, name: tags.name, color: tags.color })
@@ -96,7 +101,16 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
             <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">
               &ldquo;{tx.description}&rdquo; · {tx.date} ·{' '}
               {fmt.format(Number.parseFloat(tx.amountOriginal) || 0)}
-              {ownAccount ? ` · ${ownAccount.name}` : ''}
+              {ownAccount
+                ? ` · ${formatAccount({
+                    institutionName: ownAccount.institutionName,
+                    type: ownAccount.type,
+                    cardBrand: ownAccount.cardBrand,
+                    name: ownAccount.name,
+                    ownerTag: ownAccount.ownerTag,
+                    currency: ownAccount.currencyDefault,
+                  })}`
+                : ''}
             </p>
             <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/70">
               Esta pata espera su contraparte (ej. el lado en USD de una compra de dólares).

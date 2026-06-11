@@ -101,14 +101,18 @@ export default async function ImportDetailPage({
     .select({
       id: accounts.id,
       name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
       currency: accounts.currencyDefault,
       institutionId: accounts.institutionId,
+      institutionName: institutions.name,
       ownerTag: accounts.ownerTag,
       accountNumber: accounts.accountNumber,
     })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
-    .orderBy(asc(accounts.name));
+    .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
 
   // Auto-sugerencia de cuenta destino: si el parser extrajo el nº de cuenta del
   // extracto y matchea una cuenta ya "aprendida", la preseleccionamos.

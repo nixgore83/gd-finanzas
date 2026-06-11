@@ -22,9 +22,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { TagMultiSelect, type TagOption } from './tag-multi-select';
 
-type AccountOption = { id: string; name: string; currencyDefault: 'ARS' | 'USD'; ownerTag: string };
+type AccountOption = {
+  id: string;
+  name: string;
+  type: AccountForDisplay['type'];
+  cardBrand: AccountForDisplay['cardBrand'];
+  institutionName: string | null;
+  currencyDefault: 'ARS' | 'USD';
+  ownerTag: string;
+};
+
+function accountLabel(a: AccountOption): string {
+  return formatAccount({
+    institutionName: a.institutionName,
+    type: a.type,
+    cardBrand: a.cardBrand,
+    name: a.name,
+    ownerTag: a.ownerTag,
+    currency: a.currencyDefault,
+  });
+}
 
 type ActionResult =
   | { ok: true; pairId?: string }
@@ -192,7 +212,7 @@ export function TransferForm({
                 <SelectContent>
                   {accounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.ownerTag}) ({a.currencyDefault})
+                      {accountLabel(a)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -218,7 +238,7 @@ export function TransferForm({
                 <SelectContent>
                   {accounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.ownerTag}) ({a.currencyDefault})
+                      {accountLabel(a)}
                     </SelectItem>
                   ))}
                 </SelectContent>

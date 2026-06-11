@@ -55,6 +55,7 @@ export async function updateAccount(formData: FormData): Promise<UpdateAccountRe
       .set({
         name: parsed.data.name,
         type: parsed.data.type,
+        cardBrand: parsed.data.cardBrand,
         currencyDefault: parsed.data.currencyDefault,
         institutionId: parsed.data.institutionId,
         ownerTag: parsed.data.ownerTag,

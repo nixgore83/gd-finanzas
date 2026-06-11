@@ -4,7 +4,8 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, institutions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
-import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/account';
+import { ACCOUNT_TYPE_LABELS, type CARD_BRANDS } from '@/lib/schemas/account';
+import { formatAccount } from '@/lib/accounts/format';
 import { Button } from '@/components/ui/button';
 import { Display, Label, Body, Hair } from '@/components/ui/typography';
 import { setAccountArchived } from '@/app/actions/accounts/archive';
@@ -25,12 +26,32 @@ type AccountRow = {
   id: string;
   name: string;
   type: keyof typeof ACCOUNT_TYPE_LABELS;
+  cardBrand: (typeof CARD_BRANDS)[number] | null;
   currencyDefault: 'ARS' | 'USD';
   institutionName: string | null;
   ownerTag: string;
   archived: boolean;
   expectsMonthlyImport: boolean;
 };
+
+/**
+ * Título de la fila dentro de su sección (la institución ya es el header):
+ * el producto + rótulo. Para ewallet/other no hay producto → cae al tipo.
+ */
+function rowTitle(row: AccountRow): string {
+  const product = formatAccount(
+    {
+      institutionName: row.institutionName,
+      type: row.type,
+      cardBrand: row.cardBrand,
+      name: row.name,
+      ownerTag: row.ownerTag,
+      currency: row.currencyDefault,
+    },
+    { withInstitution: false, withOwner: false, withCurrency: false },
+  );
+  return product === '—' ? ACCOUNT_TYPE_LABELS[row.type] : product;
+}
 
 /** Bullet color by account type — keeps the page scannable at a glance. */
 function dotVarFor(type: AccountRow['type']): string {
@@ -58,6 +79,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
       id: accounts.id,
       name: accounts.name,
       type: accounts.type,
+      cardBrand: accounts.cardBrand,
       currencyDefault: accounts.currencyDefault,
       institutionName: institutions.name,
       ownerTag: accounts.ownerTag,
@@ -71,7 +93,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
         ? eq(accounts.householdId, session.householdId)
         : and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)),
     )
-    .orderBy(asc(accounts.name));
+    .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
 
   // Group by institution (null → "Sin institución" bucket, useful for Cash).
   const byBank = new Map<string, AccountRow[]>();
@@ -227,7 +249,7 @@ function BankSection({
                 href={`/accounts/${row.id}`}
                 className="block font-display text-lg text-foreground hover:text-primary"
               >
-                {row.name}
+                {rowTitle(row)}
                 {row.expectsMonthlyImport && (
                   <span className="ml-2 inline-block align-middle rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                     Import mensual
