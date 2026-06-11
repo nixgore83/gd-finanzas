@@ -1,0 +1,1 @@
+ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "transfer_refs" jsonb;

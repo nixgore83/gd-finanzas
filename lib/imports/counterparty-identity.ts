@@ -48,3 +48,43 @@ export function sameCounterpartyIdentity(
   if (na && nb && normalizeCounterpartyName(na) === normalizeCounterpartyName(nb)) return true;
   return false;
 }
+
+/**
+ * Normaliza una ref bancaria (CBU/CUIT/nro de cuenta/alias) para comparación y
+ * almacenamiento en `accounts.transfer_refs`. CUIT "20-30555106-7" y
+ * "20305551067" deben matchear: si lo esencial son dígitos (≥6), se comparan
+ * solo los dígitos; un alias queda lower+trim.
+ */
+export function normalizeBankRef(ref: string): string {
+  const trimmed = ref.trim().toLowerCase();
+  const digits = trimmed.replace(/[^0-9]/g, '');
+  return digits.length >= 6 ? digits : trimmed;
+}
+
+/** Refs bancarias normalizadas presentes en una contraparte (sin el nombre). */
+export function counterpartyBankRefs(cp: Counterparty | null | undefined): string[] {
+  if (!cp) return [];
+  const out: string[] = [];
+  for (const field of STRONG_ID_FIELDS) {
+    const v = cp[field]?.trim();
+    if (v) out.push(normalizeBankRef(v));
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * Resuelve a qué cuenta PROPIA refiere una contraparte, comparando sus refs
+ * (CBU/CUIT/alias/nro) contra `accounts.transfer_refs` aprendidas. Devuelve el
+ * id solo si matchea EXACTAMENTE una cuenta (ambigüedad ⇒ null, queda manual).
+ */
+export function matchAccountByRefs(
+  cp: Counterparty | null | undefined,
+  accounts: ReadonlyArray<{ id: string; transferRefs: string[] | null }>,
+): string | null {
+  const cpRefs = new Set(counterpartyBankRefs(cp));
+  if (cpRefs.size === 0) return null;
+  const matches = accounts.filter((a) =>
+    (a.transferRefs ?? []).some((r) => cpRefs.has(normalizeBankRef(r))),
+  );
+  return matches.length === 1 ? matches[0]!.id : null;
+}

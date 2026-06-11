@@ -32,6 +32,10 @@ import {
   findLineForecastCandidates,
   type LineForecastCandidate,
 } from '@/app/actions/imports/line-forecast-candidates';
+import {
+  findLineTransferMatch,
+  type LineTransferMatch,
+} from '@/app/actions/imports/line-transfer-match';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
@@ -1150,6 +1154,34 @@ function LineRowEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
+  // Item 14: para líneas transfer, buscar si matchea una transacción YA existente
+  // (la pata del otro extracto). Si hay match, se informa y se pre-carga la cuenta
+  // destino; el pareo real lo hace el match-al-confirmar (#44).
+  const [transferMatch, setTransferMatch] = useState<LineTransferMatch | null | undefined>(undefined);
+  useEffect(() => {
+    if (!editing || transferMatch !== undefined || !draft.isTransfer || !currentAccountId) return;
+    let cancelled = false;
+    findLineTransferMatch({
+      importAccountId: currentAccountId,
+      date: line.parsedData.date,
+      kind: line.parsedData.kind,
+      amount: line.parsedData.amountOriginal,
+      currency: line.parsedData.currencyOriginal,
+    }).then((res) => {
+      if (cancelled) return;
+      const match = res.ok ? res.match : null;
+      setTransferMatch(match);
+      // Pre-cargar la cuenta destino si todavía no hay una elegida.
+      if (match && !draft.transferAccountId) {
+        setDraft((d) => ({ ...d, transferAccountId: match.accountId }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, draft.isTransfer]);
+
   const categoriesForKind = useMemo(
     () => tree.filter((c) => c.kind === draft.kind),
     [tree, draft.kind],
@@ -1597,6 +1629,27 @@ function LineRowEditor({
                   </span>
                 </span>
               </label>
+            )}
+            {/* Item 14: aviso de match con una transacción existente (pata del otro
+                extracto ya importada). El pareo lo concreta el confirm. */}
+            {draft.isTransfer && transferMatch && (
+              <div className="max-w-xl rounded-md border border-emerald-300 bg-emerald-50/70 p-2 text-sm text-emerald-900">
+                ✓ Matchea con una transferencia existente en{' '}
+                <span className="font-medium">{transferMatch.accountLabel}</span>{' '}
+                ({transferMatch.date} · {transferMatch.amountOriginal}).
+                <span className="block text-xs text-emerald-800">
+                  Cuenta destino pre-cargada — al confirmar, ambas patas se parean en vez de
+                  duplicarse.{' '}
+                  <a
+                    href={`/transactions/${transferMatch.transactionId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    Ver transacción ↗
+                  </a>
+                </span>
+              </div>
             )}
             {/* Previsión: linkear la línea a un forecast pendiente (1-click, regla
                 PRD §5.3). Siempre visible — el toggle de auto-match solo gobierna

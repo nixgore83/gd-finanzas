@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, boolean, timestamp, index, jsonb } from 'drizzle-orm/pg-core';
 import { households } from './households';
 import { institutions } from './institutions';
 import { accountTypeEnum, cardBrandEnum, currencyEnum } from './enums';
@@ -32,6 +32,11 @@ export const accounts = pgTable(
     // nº del PDF y el usuario lo mapea a esta cuenta, se guarda acá para
     // auto-sugerir la cuenta destino en imports futuros.
     accountNumber: text('account_number'),
+    // Refs bancarias de ESTA cuenta (CBU, CUIT del titular, alias, nros de cuenta
+    // alternativos), normalizadas con `normalizeBankRef`. Se APRENDEN al confirmar
+    // transfers cuya contraparte el usuario asignó a esta cuenta; permiten
+    // auto-resolver la cuenta destino de futuras líneas transfer por CBU/CUIT.
+    transferRefs: jsonb('transfer_refs').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

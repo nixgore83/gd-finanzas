@@ -17,6 +17,7 @@ import {
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
+import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
 import { formatAccount } from '@/lib/accounts/format';
 import { getServerEnv } from '@/lib/env';
@@ -309,6 +310,23 @@ export async function parseImportInternal(
 
   // Auto-detect transfers for banco imports
   const lines = row.type === 'banco' ? detectTransfers(filteredLines) : filteredLines;
+
+  // Auto-resolución de cuenta destino por refs bancarias aprendidas (item 8):
+  // si una línea transfer trae CBU/CUIT/alias de contraparte que matchea
+  // EXACTAMENTE una cuenta propia (por `accounts.transfer_refs`), se asigna sola.
+  if (lines.some((l) => l.isTransfer && !l.transferAccountId && l.counterparty)) {
+    const refAccounts = await db
+      .select({ id: accounts.id, transferRefs: accounts.transferRefs })
+      .from(accounts)
+      .where(and(eq(accounts.householdId, householdId), eq(accounts.archived, false)));
+    const candidates = refAccounts.filter((a) => a.id !== row.accountId);
+    for (const l of lines) {
+      if (l.isTransfer && !l.transferAccountId && l.counterparty) {
+        const matched = matchAccountByRefs(l.counterparty, candidates);
+        if (matched) l.transferAccountId = matched;
+      }
+    }
+  }
 
   // Cross-import dedup
   const accountId = row.accountId;

@@ -15,6 +15,7 @@ import {
 } from '@/app/actions/transactions/_build-transfer';
 import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
 import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
+import { counterpartyBankRefs } from '@/lib/imports/counterparty-identity';
 
 /** Suma `days` (puede ser negativo) a una fecha ISO 'YYYY-MM-DD'. */
 function shiftIsoDate(iso: string, days: number): string {
@@ -261,9 +262,9 @@ export async function confirmImport(input: {
             return ownRow.id;
           };
 
-          // Moneda de la cuenta contraparte (same-ccy vs cross-ccy).
+          // Moneda de la cuenta contraparte (same-ccy vs cross-ccy) + sus refs.
           const [cpAcc] = await tx
-            .select({ currency: accounts.currencyDefault })
+            .select({ currency: accounts.currencyDefault, transferRefs: accounts.transferRefs })
             .from(accounts)
             .where(
               and(eq(accounts.householdId, session.householdId), eq(accounts.id, transferAccountId)),
@@ -274,6 +275,20 @@ export async function confirmImport(input: {
             continue;
           }
           const sameCurrency = cpAcc.currency === parsed.data.currencyOriginal;
+
+          // APRENDER: la contraparte (CBU/CUIT/alias) de esta línea refiere a la
+          // cuenta destino elegida → guardar sus refs para auto-resolver la cuenta
+          // en futuros imports (item 8 del backlog).
+          const newRefs = counterpartyBankRefs(parsed.data.counterparty);
+          if (newRefs.length > 0) {
+            const merged = [...new Set([...(cpAcc.transferRefs ?? []), ...newRefs])];
+            if (merged.length !== (cpAcc.transferRefs ?? []).length) {
+              await tx
+                .update(accounts)
+                .set({ transferRefs: merged })
+                .where(eq(accounts.id, transferAccountId));
+            }
+          }
 
           // Buscar candidato a parear en la contraparte (solo same-currency).
           // La query trae patas-transfer sin parear de la contraparte en la ventana
