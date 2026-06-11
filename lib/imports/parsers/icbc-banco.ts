@@ -72,6 +72,10 @@ function classifyIcbcConcept(desc: string): {
     return { isTransfer: true, transferAccountName: 'ICBC Master' };
   if (/^PAGO (TARJETA )?VISA/.test(d))
     return { isTransfer: true, transferAccountName: 'ICBC Visa' };
+  // DEBIN preacordado contra el CUIT de Mercado Libre = fondeo de la billetera propia
+  // (decisión Nico 2026-06-11)
+  if (/^DEB\.? ?PREA\.? ?DEBIN\s*30703088534/.test(d))
+    return { isTransfer: true, transferAccountName: 'Mercado Pago' };
   // Categorías sistemáticas
   if (/^IVA COM\. CUST\.|^COMISION CUSTODIA|^COM\. RECHAZO|^IMPUESTO AL VALOR AGREGADO/.test(d))
     return { suggestedCategory: 'Gastos bancarios' };
