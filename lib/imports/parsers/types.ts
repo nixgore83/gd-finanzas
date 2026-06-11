@@ -73,6 +73,9 @@ const parsedTxLineStrictSchema = z.object({
   /** Datos de servicio doméstico (subtype domestic_service al confirmar). Solo
    * gastos no-transfer. Alimenta el CSV 03 del export Ganancias. */
   domesticService: domesticServiceMetaSchema.optional(),
+  /** Previsión (forecast) elegida en la review para linkear al confirmar. Si al
+   * confirmar ya no está pending (la matcheó otra tx), se ignora sin error. */
+  forecastId: z.string().uuid().optional(),
 });
 
 /**

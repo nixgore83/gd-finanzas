@@ -28,6 +28,10 @@ import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
 import { bulkSetTransfer } from '@/app/actions/imports/bulk-set-transfer';
 import { bulkSetDeducible } from '@/app/actions/imports/bulk-set-deducible';
 import { bulkSetTags } from '@/app/actions/imports/bulk-set-tags';
+import {
+  findLineForecastCandidates,
+  type LineForecastCandidate,
+} from '@/app/actions/imports/line-forecast-candidates';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
@@ -1125,6 +1129,27 @@ function LineRowEditor({
   const [draft, setDraft] = useState<ParsedTxLine>(line.parsedData);
   const [categoryId, setCategoryId] = useState<string | null>(line.proposedCategoryId);
 
+  // Candidatos de previsión para la línea: se buscan al abrir el editor (no por
+  // fila — un import puede tener cientos). null = aún no buscados.
+  const [forecastCands, setForecastCands] = useState<LineForecastCandidate[] | null>(null);
+  useEffect(() => {
+    if (!editing || forecastCands !== null || draft.isTransfer || !currentAccountId) return;
+    let cancelled = false;
+    findLineForecastCandidates({
+      accountId: currentAccountId,
+      date: line.parsedData.date,
+      kind: line.parsedData.kind,
+      amount: line.parsedData.amountOriginal,
+      currency: line.parsedData.currencyOriginal,
+    }).then((res) => {
+      if (!cancelled) setForecastCands(res.ok ? res.candidates : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
   const categoriesForKind = useMemo(
     () => tree.filter((c) => c.kind === draft.kind),
     [tree, draft.kind],
@@ -1264,6 +1289,11 @@ function LineRowEditor({
           {line.parsedData.domesticService && (
             <span className="inline-block rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
               Doméstico
+            </span>
+          )}
+          {line.parsedData.forecastId && (
+            <span className="inline-block rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+              Previsión
             </span>
           )}
           {(line.parsedData.tagIds ?? []).map((tid) => {
@@ -1567,6 +1597,47 @@ function LineRowEditor({
                   </span>
                 </span>
               </label>
+            )}
+            {/* Previsión: linkear la línea a un forecast pendiente (1-click, regla
+                PRD §5.3). Siempre visible — el toggle de auto-match solo gobierna
+                el match automático al confirmar. */}
+            {!draft.isTransfer && (
+              <div className="max-w-xl">
+                {forecastCands === null ? (
+                  <p className="text-xs text-muted-foreground">Buscando previsiones…</p>
+                ) : forecastCands.length === 0 ? (
+                  draft.forecastId ? null : (
+                    <p className="text-xs text-muted-foreground">
+                      Sin previsiones candidatas (±5 días, ±10% del monto).
+                    </p>
+                  )
+                ) : (
+                  <Field label="Linkear a previsión">
+                    <div className="flex items-center gap-2">
+                      <Combobox
+                        options={forecastCands.map((c) => ({
+                          id: c.id,
+                          label: `${c.recurrenceName} · ${c.expectedDate} · ${c.currency} ${c.expectedAmount}`,
+                        }))}
+                        value={draft.forecastId ?? ''}
+                        onChange={(id) => setDraft({ ...draft, forecastId: id || undefined })}
+                        placeholder="Elegí una previsión…"
+                        widthClassName="w-96"
+                      />
+                      {draft.forecastId && (
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setDraft({ ...draft, forecastId: undefined })}
+                        >
+                          Quitar
+                        </Button>
+                      )}
+                    </div>
+                  </Field>
+                )}
+              </div>
             )}
             {/* Tags: disponibles en cualquier línea — en transferencias son el
                 clasificador (no llevan categoría). */}

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, tags, transactions, transactionTags } from '@/db/schema';
+import { accounts, forecasts, imports, importLines, recurrences, tags, transactions, transactionTags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
@@ -467,7 +467,37 @@ export async function confirmImport(input: {
         await insertLineTags(txRow.id);
         createdCount += 1;
 
-        if (autoMatchEnabled) {
+        // Previsión elegida a mano en la review: linkear (forecast→matched +
+        // tx.recurrence_id), solo si sigue pending — si otra tx la matcheó en el
+        // medio, se ignora sin error. Independiente del toggle de auto-match.
+        let manuallyLinked = false;
+        if (parsed.data.forecastId) {
+          const [fcRow] = await tx
+            .select({ id: forecasts.id, recurrenceId: recurrences.id, status: forecasts.status })
+            .from(forecasts)
+            .innerJoin(recurrences, eq(recurrences.id, forecasts.recurrenceId))
+            .where(
+              and(
+                eq(forecasts.id, parsed.data.forecastId),
+                eq(recurrences.householdId, session.householdId),
+              ),
+            )
+            .limit(1);
+          if (fcRow && fcRow.status === 'pending') {
+            await tx
+              .update(forecasts)
+              .set({ status: 'matched', matchedTransactionId: txRow.id })
+              .where(eq(forecasts.id, fcRow.id));
+            await tx
+              .update(transactions)
+              .set({ recurrenceId: fcRow.recurrenceId })
+              .where(eq(transactions.id, txRow.id));
+            autoMatchCount += 1;
+            manuallyLinked = true;
+          }
+        }
+
+        if (autoMatchEnabled && !manuallyLinked) {
           try {
             const match = await tryAutoMatch(tx, txRow.id, session.householdId);
             if (match.matched) autoMatchCount += 1;
