@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, transactions } from '@/db/schema';
+import { accounts, forecasts, imports, importLines, recurrences, tags, transactions, transactionTags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
@@ -15,6 +15,7 @@ import {
 } from '@/app/actions/transactions/_build-transfer';
 import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
 import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
+import { counterpartyBankRefs } from '@/lib/imports/counterparty-identity';
 
 /** Suma `days` (puede ser negativo) a una fecha ISO 'YYYY-MM-DD'. */
 function shiftIsoDate(iso: string, days: number): string {
@@ -158,6 +159,14 @@ export async function confirmImport(input: {
   let autoMatchCount = 0;
   const autoMatchEnabled = await getAutoMatchEnabled(session.householdId);
 
+  // Tags válidos del household, una sola vez: los tagIds de cada línea se
+  // filtran contra este set (defensa ante ids ajenos/borrados).
+  const householdTagRows = await db
+    .select({ id: tags.id })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId));
+  const householdTagIds = new Set(householdTagRows.map((r) => r.id));
+
   try {
     await db.transaction(async (tx) => {
       for (const line of linesToProcess) {
@@ -173,6 +182,17 @@ export async function confirmImport(input: {
         const cpMeta: Record<string, unknown> = parsed.data.counterparty
           ? { counterparty: parsed.data.counterparty }
           : {};
+
+        // Tags capturados en la review (válidos del household). Se aplican también
+        // a transferencias: ahí el tag es el clasificador (no llevan categoría).
+        const lineTagIds = (parsed.data.tagIds ?? []).filter((id) => householdTagIds.has(id));
+        const insertLineTags = async (transactionId: string) => {
+          if (lineTagIds.length === 0) return;
+          await tx
+            .insert(transactionTags)
+            .values(lineTagIds.map((tagId) => ({ transactionId, tagId })))
+            .onConflictDoNothing();
+        };
 
         // ===== TRANSFER BRANCH =====
         // Estrategia "match-or-create": el otro extracto puede estar importado
@@ -238,12 +258,13 @@ export async function confirmImport(input: {
               .update(importLines)
               .set({ transactionId: ownRow.id })
               .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
+            await insertLineTags(ownRow.id);
             return ownRow.id;
           };
 
-          // Moneda de la cuenta contraparte (same-ccy vs cross-ccy).
+          // Moneda de la cuenta contraparte (same-ccy vs cross-ccy) + sus refs.
           const [cpAcc] = await tx
-            .select({ currency: accounts.currencyDefault })
+            .select({ currency: accounts.currencyDefault, transferRefs: accounts.transferRefs })
             .from(accounts)
             .where(
               and(eq(accounts.householdId, session.householdId), eq(accounts.id, transferAccountId)),
@@ -254,6 +275,20 @@ export async function confirmImport(input: {
             continue;
           }
           const sameCurrency = cpAcc.currency === parsed.data.currencyOriginal;
+
+          // APRENDER: la contraparte (CBU/CUIT/alias) de esta línea refiere a la
+          // cuenta destino elegida → guardar sus refs para auto-resolver la cuenta
+          // en futuros imports (item 8 del backlog).
+          const newRefs = counterpartyBankRefs(parsed.data.counterparty);
+          if (newRefs.length > 0) {
+            const merged = [...new Set([...(cpAcc.transferRefs ?? []), ...newRefs])];
+            if (merged.length !== (cpAcc.transferRefs ?? []).length) {
+              await tx
+                .update(accounts)
+                .set({ transferRefs: merged })
+                .where(eq(accounts.id, transferAccountId));
+            }
+          }
 
           // Buscar candidato a parear en la contraparte (solo same-currency).
           // La query trae patas-transfer sin parear de la contraparte en la ventana
@@ -359,6 +394,7 @@ export async function confirmImport(input: {
               .update(importLines)
               .set({ transactionId: mainTxId })
               .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
+            await insertLineTags(mainTxId);
             createdCount += 1;
             continue;
           }
@@ -393,10 +429,18 @@ export async function confirmImport(input: {
             description: parsed.data.description,
             notes: parsed.data.notes ?? null,
             fxRateOverride: null,
-            tagIds: [],
-            transactionSubtype: 'standard',
-            deducibleGanancias: false,
-            meta: null,
+            // Captura fiscal de la review (antes hardcodeado a []/standard/false —
+            // el export contador salía vacío de lo que importa).
+            tagIds: lineTagIds,
+            transactionSubtype:
+              parsed.data.domesticService && parsed.data.kind === 'expense' && !parsed.data.isRefund
+                ? 'domestic_service'
+                : 'standard',
+            deducibleGanancias: parsed.data.deducibleGanancias ?? false,
+            meta:
+              parsed.data.domesticService && parsed.data.kind === 'expense' && !parsed.data.isRefund
+                ? parsed.data.domesticService
+                : null,
           },
           session.householdId,
         );
@@ -435,9 +479,40 @@ export async function confirmImport(input: {
               eq(importLines.importId, input.importId),
             ),
           );
+        await insertLineTags(txRow.id);
         createdCount += 1;
 
-        if (autoMatchEnabled) {
+        // Previsión elegida a mano en la review: linkear (forecast→matched +
+        // tx.recurrence_id), solo si sigue pending — si otra tx la matcheó en el
+        // medio, se ignora sin error. Independiente del toggle de auto-match.
+        let manuallyLinked = false;
+        if (parsed.data.forecastId) {
+          const [fcRow] = await tx
+            .select({ id: forecasts.id, recurrenceId: recurrences.id, status: forecasts.status })
+            .from(forecasts)
+            .innerJoin(recurrences, eq(recurrences.id, forecasts.recurrenceId))
+            .where(
+              and(
+                eq(forecasts.id, parsed.data.forecastId),
+                eq(recurrences.householdId, session.householdId),
+              ),
+            )
+            .limit(1);
+          if (fcRow && fcRow.status === 'pending') {
+            await tx
+              .update(forecasts)
+              .set({ status: 'matched', matchedTransactionId: txRow.id })
+              .where(eq(forecasts.id, fcRow.id));
+            await tx
+              .update(transactions)
+              .set({ recurrenceId: fcRow.recurrenceId })
+              .where(eq(transactions.id, txRow.id));
+            autoMatchCount += 1;
+            manuallyLinked = true;
+          }
+        }
+
+        if (autoMatchEnabled && !manuallyLinked) {
           try {
             const match = await tryAutoMatch(tx, txRow.id, session.householdId);
             if (match.matched) autoMatchCount += 1;

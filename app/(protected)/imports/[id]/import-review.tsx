@@ -21,11 +21,24 @@ import { makeReviewComparator, type ReviewSortField } from '@/lib/imports/review
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
+import { sameCounterpartyIdentity } from '@/lib/imports/counterparty-identity';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
+import { bulkSetCounterpartyLabel } from '@/app/actions/imports/bulk-set-counterparty-label';
 import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
 import { bulkSetTransfer } from '@/app/actions/imports/bulk-set-transfer';
+import { bulkSetDeducible } from '@/app/actions/imports/bulk-set-deducible';
+import { bulkSetTags } from '@/app/actions/imports/bulk-set-tags';
+import {
+  findLineForecastCandidates,
+  type LineForecastCandidate,
+} from '@/app/actions/imports/line-forecast-candidates';
+import {
+  findLineTransferMatch,
+  type LineTransferMatch,
+} from '@/app/actions/imports/line-transfer-match';
+import { resuggestPendingLines } from '@/app/actions/imports/resuggest-pending';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
@@ -43,11 +56,14 @@ type ImportSummary = {
   currency?: string;
 } | null;
 
+type TagOption = { id: string; name: string };
+
 type Props = {
   importId: string;
   status: string;
   lines: LineRow[];
   tree: CategoryNode[];
+  tags: TagOption[];
   accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
@@ -77,15 +93,18 @@ const PAGE_SIZE = 50;
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'edited' | 'rejected';
 
-export function ImportReview({ importId, status, lines, tree, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
+export function ImportReview({ importId, status, lines, tree, tags, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
   const [sortCriteria, setSortCriteria] = useState<SortCriterion<ReviewSortField>[]>([
     { field: 'category', dir: 'asc' },
   ]);
-  const handleSort = (field: ReviewSortField, additive: boolean) =>
+  const handleSort = (field: ReviewSortField, additive: boolean) => {
     setSortCriteria((prev) => applySortClick(prev, field, { append: additive }));
+    // Reordenar es acción explícita → descongela la lista estable.
+    setPinnedIds(null);
+  };
   // Preferencia de cuenta destino: cuenta sugerida por nº de extracto > la del
   // import > la de la institución > la primera.
   const defaultAccount = (suggestedAccountId
@@ -99,6 +118,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [bulkCurrency, setBulkCurrency] = useState<'ARS' | 'USD' | ''>('');
+  const [bulkTagIds, setBulkTagIds] = useState<Set<string>>(new Set());
 
   // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
   // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
@@ -142,10 +162,12 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     [tree, uniformKind],
   );
 
-  // Lista filtrada (texto + categoría/transfer + tipo + estado) y luego ordenada.
-  const filteredLines = useMemo(() => {
+  // Predicado de filtro (texto + categoría/transfer + tipo + estado). Se reusa
+  // para derivar la lista en vivo y para atenuar filas que dejaron de matchear
+  // cuando la lista está congelada.
+  const matchesFilter = useMemo(() => {
     const q = textFilter.trim().toLowerCase();
-    return lines.filter((l) => {
+    return (l: LineRow): boolean => {
       const p = l.parsedData;
       if (q) {
         const hay = `${p.description ?? ''} ${p.counterparty?.label ?? ''} ${p.counterparty?.name ?? ''}`.toLowerCase();
@@ -157,8 +179,10 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       if (catFilter === 'categorized' && l.proposedCategoryId === null) return false;
       if (catFilter === 'transfer' && !p.isTransfer) return false;
       return true;
-    });
-  }, [lines, textFilter, kindFilter, statusFilter, catFilter]);
+    };
+  }, [textFilter, kindFilter, statusFilter, catFilter]);
+
+  const filteredLines = useMemo(() => lines.filter(matchesFilter), [lines, matchesFilter]);
 
   const catNameById = useMemo(() => new Map(tree.map((c) => [c.id, c.name])), [tree]);
   const sortedFiltered = useMemo(
@@ -166,20 +190,41 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     [filteredLines, sortCriteria, catNameById],
   );
 
+  // Lista ESTABLE: al primer cambio (categorizar, aceptar, etc.) se congela el
+  // conjunto visible (ids + orden). Las ediciones actualizan el contenido de la
+  // fila in-place pero no la sacan ni reordenan — revisar en lote sin que la
+  // lista "se mueva bajo los dedos". Cambiar filtro/orden o "Recargar" recomputa.
+  const [pinnedIds, setPinnedIds] = useState<string[] | null>(null);
+  const lineById = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
+  const visibleLines = useMemo(() => {
+    if (pinnedIds === null) return sortedFiltered;
+    return pinnedIds.map((id) => lineById.get(id)).filter((l): l is LineRow => l !== undefined);
+  }, [pinnedIds, lineById, sortedFiltered]);
+
+  /** Congela la lista visible actual antes de la primera mutación. */
+  function pinList() {
+    if (pinnedIds === null) setPinnedIds(sortedFiltered.map((l) => l.id));
+  }
+
+  function unpinList() {
+    setPinnedIds(null);
+  }
+
   const filtersActive =
     textFilter.trim() !== '' || catFilter !== 'all' || kindFilter !== 'all' || statusFilter !== 'all';
 
   // Paginación client-side: mantiene ≤PAGE_SIZE filas en el DOM (367+ filas sin lag).
-  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(visibleLines.length / PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages - 1);
-  const pageLines = sortedFiltered.slice(pageClamped * PAGE_SIZE, pageClamped * PAGE_SIZE + PAGE_SIZE);
+  const pageLines = visibleLines.slice(pageClamped * PAGE_SIZE, pageClamped * PAGE_SIZE + PAGE_SIZE);
 
-  // Cada cambio de filtro vuelve a la página 1 (evita quedar en una página vacía).
+  // Cada cambio de filtro vuelve a la página 1 (evita quedar en una página vacía)
+  // y descongela la lista (el cambio de filtro es una acción explícita del usuario).
   // Se hace en los setters (no en un effect) para no disparar renders en cascada.
-  function applyTextFilter(v: string) { setTextFilter(v); setPage(0); }
-  function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); }
-  function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); }
-  function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); }
+  function applyTextFilter(v: string) { setTextFilter(v); setPage(0); setPinnedIds(null); }
+  function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); setPinnedIds(null); }
+  function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); setPinnedIds(null); }
+  function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); setPinnedIds(null); }
 
   function clearFilters() {
     setTextFilter('');
@@ -187,6 +232,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     setKindFilter('all');
     setStatusFilter('all');
     setPage(0);
+    setPinnedIds(null);
   }
 
   function toggleOne(id: string) {
@@ -198,11 +244,10 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }
 
-  // Selecciona/deselecciona TODAS las filas filtradas (no solo la página visible),
-  // excluyendo las rechazadas. Combinado con el filtro, es el atajo para
-  // categorizar en lote un grupo homogéneo.
+  // Selecciona/deselecciona TODAS las filas filtradas (no solo la página visible).
+  // Incluye rechazadas: hace falta poder seleccionarlas para des-rechazar en lote.
   const selectableFilteredIds = useMemo(
-    () => filteredLines.filter((l) => l.status !== 'rejected').map((l) => l.id),
+    () => filteredLines.filter((l) => l.transactionId === null).map((l) => l.id),
     [filteredLines],
   );
   const allFilteredSelected =
@@ -225,6 +270,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('Las líneas seleccionadas son de tipos distintos (ingreso y gasto). Filtrá por tipo antes.');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await bulkSetCategory({
         importId,
@@ -252,6 +298,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('Elegí una moneda');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await bulkSetCurrency({
         importId,
@@ -274,6 +321,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       toast.error('No hay líneas seleccionadas');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await bulkSetTransfer({
         importId,
@@ -292,12 +340,80 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }
 
+  // Deducible Ganancias en lote (solo gastos no-transfer; el action saltea el resto).
+  function doBulkDeducible(deducible: boolean) {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await bulkSetDeducible({ importId, lineIds: [...selectedIds], deducible });
+      if (res.ok) {
+        const skippedMsg = res.skipped > 0 ? ` · ${res.skipped} saltadas (no son gasto)` : '';
+        toast.success(
+          `${res.updated} ${res.updated === 1 ? 'línea' : 'líneas'} ${deducible ? 'marcadas deducible' : 'sin deducible'}${skippedMsg}`,
+        );
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Tags en lote: reemplaza el set de tags de las líneas seleccionadas.
+  function doBulkTags() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    if (bulkTagIds.size === 0) {
+      toast.error('Elegí al menos un tag');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await bulkSetTags({ importId, lineIds: [...selectedIds], tagIds: [...bulkTagIds] });
+      if (res.ok) {
+        toast.success(`Tags aplicados a ${res.updated} líneas`);
+        setSelectedIds(new Set());
+        setBulkTagIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Deshacer en lote: vuelve la SELECCIÓN a pendiente (aceptadas, editadas o
+  // rechazadas). Sin esto, un "aceptar todas" accidental era irreversible en la
+  // práctica (deshacer era clic por clic).
+  function doBulkBackToPending() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await setLineStatus({ importId, lineIds: [...selectedIds], status: 'pending' });
+      if (res.ok) {
+        toast.success(`${res.updated} ${res.updated === 1 ? 'línea vuelta' : 'líneas vueltas'} a pendiente`);
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
   function doBulk(status: 'accepted' | 'rejected') {
     const ids = lines.filter((l) => l.status === 'pending').map((l) => l.id);
     if (ids.length === 0) {
       toast.info('No hay líneas pendientes');
       return;
     }
+    pinList();
     startTransition(async () => {
       const res = await setLineStatus({ importId, lineIds: ids, status });
       if (res.ok) {
@@ -310,10 +426,90 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
   }
 
   function doSetStatus(lineId: string, next: 'accepted' | 'rejected' | 'pending') {
+    pinList();
     startTransition(async () => {
       const res = await setLineStatus({ importId, lineIds: [lineId], status: next });
       if (res.ok) router.refresh();
       else toast.error(`Error: ${res.error}`);
+    });
+  }
+
+  // Propagación intra-import por contraparte: tras categorizar/etiquetar una
+  // línea, ofrecer aplicar lo mismo a las hermanas PENDING con la misma identidad
+  // (CUIT/CBU/cuenta/alias; fallback nombre normalizado). Complemento intra-import
+  // del aprendizaje inter-import de counterparty-suggest.
+  function offerCategoryPropagation(sourceId: string, categoryId: string) {
+    const source = lineById.get(sourceId);
+    const cp = source?.parsedData.counterparty;
+    if (!source || !cp) return;
+    const siblings = lines.filter(
+      (l) =>
+        l.id !== sourceId &&
+        l.status === 'pending' &&
+        !l.parsedData.isTransfer &&
+        l.proposedCategoryId !== categoryId &&
+        l.parsedData.kind === source.parsedData.kind &&
+        sameCounterpartyIdentity(cp, l.parsedData.counterparty),
+    );
+    if (siblings.length === 0) return;
+    const catName = tree.find((c) => c.id === categoryId)?.name ?? 'la categoría';
+    const who = cp.label || cp.name || 'la misma contraparte';
+    toast(`Hay ${siblings.length} línea${siblings.length === 1 ? '' : 's'} más de ${who}.`, {
+      duration: 12_000,
+      action: {
+        label: `Aplicar ${catName}`,
+        onClick: () => {
+          startTransition(async () => {
+            const res = await bulkSetCategory({
+              importId,
+              lineIds: siblings.map((l) => l.id),
+              categoryId,
+            });
+            if (res.ok) {
+              toast.success(`Categoría aplicada a ${res.updated} líneas más`);
+              router.refresh();
+            } else {
+              toast.error(`Error: ${res.error}`);
+            }
+          });
+        },
+      },
+    });
+  }
+
+  function offerLabelPropagation(sourceId: string, label: string) {
+    const source = lineById.get(sourceId);
+    const cp = source?.parsedData.counterparty;
+    if (!source || !cp || !label.trim()) return;
+    const siblings = lines.filter(
+      (l) =>
+        l.id !== sourceId &&
+        l.status === 'pending' &&
+        l.parsedData.counterparty &&
+        l.parsedData.counterparty.label !== label &&
+        sameCounterpartyIdentity(cp, l.parsedData.counterparty),
+    );
+    if (siblings.length === 0) return;
+    toast(`Hay ${siblings.length} línea${siblings.length === 1 ? '' : 's'} más de la misma contraparte.`, {
+      duration: 12_000,
+      action: {
+        label: `Etiquetar "${label}"`,
+        onClick: () => {
+          startTransition(async () => {
+            const res = await bulkSetCounterpartyLabel({
+              importId,
+              lineIds: siblings.map((l) => l.id),
+              label,
+            });
+            if (res.ok) {
+              toast.success(`Etiqueta aplicada a ${res.updated} líneas más`);
+              router.refresh();
+            } else {
+              toast.error(`Error: ${res.error}`);
+            }
+          });
+        },
+      },
     });
   }
 
@@ -375,13 +571,23 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             className="h-9 w-full max-w-xs"
           />
           <span className="text-xs text-muted-foreground">
-            Mostrando <span className="font-medium tabular-nums">{filteredLines.length}</span> de{' '}
+            Mostrando <span className="font-medium tabular-nums">{visibleLines.length}</span> de{' '}
             <span className="tabular-nums">{lines.length}</span>
           </span>
           {filtersActive && (
             <Button type="button" size="sm" variant="ghost" onClick={clearFilters}>
               Limpiar filtros
             </Button>
+          )}
+          {pinnedIds !== null && (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                Lista congelada — tus cambios no la reordenan
+              </span>
+              <Button type="button" size="sm" variant="outline" onClick={unpinList}>
+                Recargar lista
+              </Button>
+            </span>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -439,6 +645,31 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
             disabled={isPending || lineSummary.pending === 0}
           >
             Rechazar todas las pending
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              pinList();
+              startTransition(async () => {
+                const res = await resuggestPendingLines({ importId });
+                if (res.ok) {
+                  toast.success(
+                    res.updated > 0
+                      ? `${res.updated} de ${res.scanned} pendientes enriquecidas con el historial`
+                      : 'Sin cambios — las pendientes ya estaban al día',
+                  );
+                  router.refresh();
+                } else {
+                  toast.error(`Error: ${res.error}`);
+                }
+              });
+            }}
+            disabled={isPending || lineSummary.pending === 0}
+            title="Re-aplica las sugerencias aprendidas (categoría, tags, deducible, cuenta destino) solo sobre las líneas pendientes, sin pisar tus ediciones"
+          >
+            ↻ Re-sugerir pendientes
           </Button>
         </div>
       )}
@@ -532,6 +763,81 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
               </div>
             </div>
           </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Deducible</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkDeducible(true)}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  Marcar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkDeducible(false)}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  Quitar
+                </Button>
+              </div>
+            </div>
+          </div>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-blue-900">Tags</label>
+                <div className="flex flex-wrap items-center gap-1">
+                  {tags.map((t) => (
+                    <FilterChip
+                      key={t.id}
+                      active={bulkTagIds.has(t.id)}
+                      onClick={() =>
+                        setBulkTagIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(t.id)) next.delete(t.id);
+                          else next.add(t.id);
+                          return next;
+                        })
+                      }
+                    >
+                      {t.name}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={doBulkTags}
+                disabled={isPending || bulkTagIds.size === 0}
+              >
+                Aplicar tags
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Estado</label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={doBulkBackToPending}
+                disabled={isPending}
+                className="bg-background"
+              >
+                Volver a pendiente
+              </Button>
+            </div>
+          </div>
           <Button
             type="button"
             size="sm"
@@ -575,6 +881,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 line={l}
                 importId={importId}
                 tree={tree}
+                tags={tags}
                 accounts={accounts}
                 currentAccountId={accountId}
                 readOnly={readOnly}
@@ -582,6 +889,10 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 onSetStatus={doSetStatus}
                 isSelected={selectedIds.has(l.id)}
                 onToggleSelect={() => toggleOne(l.id)}
+                onMutate={pinList}
+                dimmed={pinnedIds !== null && !matchesFilter(l)}
+                onCategoryApplied={offerCategoryPropagation}
+                onLabelApplied={offerLabelPropagation}
               />
             ))}
             {lines.length === 0 && (
@@ -614,8 +925,8 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-2 text-sm">
           <span className="text-xs text-muted-foreground tabular-nums">
-            {pageClamped * PAGE_SIZE + 1}–{Math.min((pageClamped + 1) * PAGE_SIZE, sortedFiltered.length)} de{' '}
-            {sortedFiltered.length}
+            {pageClamped * PAGE_SIZE + 1}–{Math.min((pageClamped + 1) * PAGE_SIZE, visibleLines.length)} de{' '}
+            {visibleLines.length}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -812,6 +1123,7 @@ function LineRowEditor({
   line,
   importId,
   tree,
+  tags,
   accounts,
   currentAccountId,
   readOnly,
@@ -819,10 +1131,15 @@ function LineRowEditor({
   onSetStatus,
   isSelected,
   onToggleSelect,
+  onMutate,
+  dimmed,
+  onCategoryApplied,
+  onLabelApplied,
 }: {
   line: LineRow;
   importId: string;
   tree: CategoryNode[];
+  tags: TagOption[];
   accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
   currentAccountId: string;
   readOnly: boolean;
@@ -830,12 +1147,69 @@ function LineRowEditor({
   onSetStatus: (id: string, status: 'accepted' | 'rejected' | 'pending') => void;
   isSelected: boolean;
   onToggleSelect: () => void;
+  /** Congela la lista estable antes de mutar (ver pinList en el padre). */
+  onMutate: () => void;
+  /** La fila ya no matchea el filtro pero sigue visible (lista congelada). */
+  dimmed: boolean;
+  /** Ofrecer propagar la categoría a líneas hermanas con la misma contraparte. */
+  onCategoryApplied: (lineId: string, categoryId: string) => void;
+  /** Ídem para la etiqueta de contraparte. */
+  onLabelApplied: (lineId: string, label: string) => void;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ParsedTxLine>(line.parsedData);
   const [categoryId, setCategoryId] = useState<string | null>(line.proposedCategoryId);
+
+  // Candidatos de previsión para la línea: se buscan al abrir el editor (no por
+  // fila — un import puede tener cientos). null = aún no buscados.
+  const [forecastCands, setForecastCands] = useState<LineForecastCandidate[] | null>(null);
+  useEffect(() => {
+    if (!editing || forecastCands !== null || draft.isTransfer || !currentAccountId) return;
+    let cancelled = false;
+    findLineForecastCandidates({
+      accountId: currentAccountId,
+      date: line.parsedData.date,
+      kind: line.parsedData.kind,
+      amount: line.parsedData.amountOriginal,
+      currency: line.parsedData.currencyOriginal,
+    }).then((res) => {
+      if (!cancelled) setForecastCands(res.ok ? res.candidates : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  // Item 14: para líneas transfer, buscar si matchea una transacción YA existente
+  // (la pata del otro extracto). Si hay match, se informa y se pre-carga la cuenta
+  // destino; el pareo real lo hace el match-al-confirmar (#44).
+  const [transferMatch, setTransferMatch] = useState<LineTransferMatch | null | undefined>(undefined);
+  useEffect(() => {
+    if (!editing || transferMatch !== undefined || !draft.isTransfer || !currentAccountId) return;
+    let cancelled = false;
+    findLineTransferMatch({
+      importAccountId: currentAccountId,
+      date: line.parsedData.date,
+      kind: line.parsedData.kind,
+      amount: line.parsedData.amountOriginal,
+      currency: line.parsedData.currencyOriginal,
+    }).then((res) => {
+      if (cancelled) return;
+      const match = res.ok ? res.match : null;
+      setTransferMatch(match);
+      // Pre-cargar la cuenta destino si todavía no hay una elegida.
+      if (match && !draft.transferAccountId) {
+        setDraft((d) => ({ ...d, transferAccountId: match.accountId }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, draft.isTransfer]);
 
   const categoriesForKind = useMemo(
     () => tree.filter((c) => c.kind === draft.kind),
@@ -847,6 +1221,23 @@ function LineRowEditor({
   }, [tree, categoryId, line.proposedCategoryId]);
 
   function save() {
+    // Validación temprana del sub-form doméstico (el server lo rechazaría con un
+    // "invalid_input" genérico).
+    if (draft.domesticService) {
+      if (!draft.domesticService.empleado_nombre.trim()) {
+        toast.error('Servicio doméstico: falta el nombre del empleado/a');
+        return;
+      }
+      if (!/^\d{2}-\d{8}-\d{1}$/.test(draft.domesticService.empleado_cuil)) {
+        toast.error('Servicio doméstico: CUIL inválido (formato ##-########-#)');
+        return;
+      }
+      if (!/^\d{4}-\d{2}$/.test(draft.domesticService.periodo)) {
+        toast.error('Servicio doméstico: período inválido (YYYY-MM)');
+        return;
+      }
+    }
+    onMutate();
     startTransition(async () => {
       const res = await updateImportLine({
         lineId: line.id,
@@ -858,6 +1249,15 @@ function LineRowEditor({
         toast.success('Línea actualizada');
         setEditing(false);
         router.refresh();
+        // Propagación intra-import: si cambió la categoría o la etiqueta de
+        // contraparte, ofrecer aplicar a las hermanas con la misma identidad.
+        if (categoryId && categoryId !== line.proposedCategoryId && !draft.isTransfer) {
+          onCategoryApplied(line.id, categoryId);
+        }
+        const newLabel = draft.counterparty?.label?.trim();
+        if (newLabel && newLabel !== line.parsedData.counterparty?.label?.trim()) {
+          onLabelApplied(line.id, newLabel);
+        }
       } else {
         toast.error(`Error: ${res.error}`);
       }
@@ -874,10 +1274,12 @@ function LineRowEditor({
   // Reusa `bulkSetCategory` (valida kind, desmarca transfer) con un solo lineId.
   function quickCategory(catId: string) {
     setCategoryId(catId || null);
+    onMutate();
     startTransition(async () => {
       const res = await bulkSetCategory({ importId, lineIds: [line.id], categoryId: catId });
       if (res.ok) {
         router.refresh();
+        if (catId) onCategoryApplied(line.id, catId);
       } else {
         setCategoryId(line.proposedCategoryId);
         toast.error(`Error: ${res.error}`);
@@ -895,10 +1297,12 @@ function LineRowEditor({
         'border-t align-top',
         isSelected && !readOnly && 'bg-blue-50/50',
         editing && !readOnly && 'bg-blue-50/40',
-        !readOnly && !editing && line.status !== 'rejected' && 'cursor-pointer',
+        line.status === 'rejected' && 'opacity-70',
+        dimmed && 'opacity-50',
+        !readOnly && !editing && 'cursor-pointer',
       )}
       onClick={(e) => {
-        if (readOnly || editing || line.status === 'rejected') return;
+        if (readOnly || editing) return;
         const tag = (e.target as HTMLElement).closest('button, input, select, a, [role="combobox"]');
         if (tag) return;
         onToggleSelect();
@@ -911,7 +1315,7 @@ function LineRowEditor({
             aria-label="Seleccionar línea"
             checked={isSelected}
             onChange={onToggleSelect}
-            disabled={line.status === 'rejected' || editing}
+            disabled={editing || line.transactionId !== null}
             className="size-4 rounded border-input"
           />
         </td>
@@ -938,6 +1342,32 @@ function LineRowEditor({
               Devolución
             </span>
           )}
+          {line.parsedData.deducibleGanancias && (
+            <span className="inline-block rounded-full border border-violet-300 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800">
+              Deducible
+            </span>
+          )}
+          {line.parsedData.domesticService && (
+            <span className="inline-block rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
+              Doméstico
+            </span>
+          )}
+          {line.parsedData.forecastId && (
+            <span className="inline-block rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+              Previsión
+            </span>
+          )}
+          {(line.parsedData.tagIds ?? []).map((tid) => {
+            const t = tags.find((x) => x.id === tid);
+            return t ? (
+              <span
+                key={tid}
+                className="inline-block rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+              >
+                #{t.name}
+              </span>
+            ) : null;
+          })}
         </div>
       </td>
       <td className="px-2 py-1.5 text-right tabular-nums">
@@ -953,7 +1383,9 @@ function LineRowEditor({
               {counterpart.name} ({counterpart.ownerTag})
             </span>
           ) : (
-            <span className="text-muted-foreground">Sin contraparte</span>
+            // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
+            // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
+            <span className="text-muted-foreground">Cuenta destino sin asignar</span>
           )
         ) : readOnly || line.transactionId || editing ? (
           categoryName ?? <span className="text-muted-foreground">—</span>
@@ -978,6 +1410,11 @@ function LineRowEditor({
           >
             {STATUS_LABEL[line.status] ?? line.status}
           </span>
+          {line.status === 'rejected' && (
+            <span className="text-[10px] leading-tight text-muted-foreground">
+              {rejectReason(line)}
+            </span>
+          )}
           {line.transactionId && (
             <a
               href={`/transactions/${line.transactionId}`}
@@ -995,75 +1432,92 @@ function LineRowEditor({
           ) : editing ? (
             <span className="text-xs font-medium text-blue-700">✎ editando ↓</span>
           ) : (
+            // Rechazada: única acción posible es recuperarla a pendiente. Editar una
+            // rechazada no tiene sentido (primero se des-rechaza, después se edita) y
+            // es la red de seguridad ante falsos positivos del dedup automático.
             <div className="flex flex-wrap gap-1">
-              {line.status === 'pending' && (
-                <>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'accepted')}
-                    disabled={isPending}
-                  >
-                    ✓
-                  </Button>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'rejected')}
-                    disabled={isPending}
-                  >
-                    ✕
-                  </Button>
-                </>
-              )}
-              {line.status !== 'pending' && line.status !== 'rejected' && (
-                <>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'rejected')}
-                    disabled={isPending}
-                  >
-                    ✕
-                  </Button>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'pending')}
-                    disabled={isPending}
-                  >
-                    Volver
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                type="button"
-                variant="ghost"
-                onClick={() => setEditing(true)}
-                disabled={isPending}
-              >
-                Editar
-              </Button>
-              {!line.parsedData.isTransfer && (
+              {line.status === 'rejected' ? (
                 <Button
                   size="sm"
                   type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setDraft({ ...line.parsedData, isTransfer: true });
-                    setCategoryId(null);
-                    setEditing(true);
-                  }}
+                  variant="outline"
+                  onClick={() => onSetStatus(line.id, 'pending')}
                   disabled={isPending}
-                  className="text-amber-700"
                 >
-                  ⇄ Transfer
+                  Des-rechazar
                 </Button>
+              ) : (
+                <>
+                  {line.status === 'pending' && (
+                    <>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'accepted')}
+                        disabled={isPending}
+                      >
+                        ✓
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'rejected')}
+                        disabled={isPending}
+                      >
+                        ✕
+                      </Button>
+                    </>
+                  )}
+                  {line.status !== 'pending' && (
+                    <>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'rejected')}
+                        disabled={isPending}
+                      >
+                        ✕
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'pending')}
+                        disabled={isPending}
+                      >
+                        Volver
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setEditing(true)}
+                    disabled={isPending}
+                  >
+                    Editar
+                  </Button>
+                  {!line.parsedData.isTransfer && (
+                    <Button
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setDraft({ ...line.parsedData, isTransfer: true });
+                        setCategoryId(null);
+                        setEditing(true);
+                      }}
+                      disabled={isPending}
+                      className="text-amber-700"
+                    >
+                      ⇄ Transfer
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1147,22 +1601,23 @@ function LineRowEditor({
                   />
                 </Field>
               )}
-              <Field label="Categoría">
-                <CategoryCombobox
-                  options={categoriesForKind}
-                  value={categoryId ?? ''}
-                  onChange={(id) => {
-                    setCategoryId(id || null);
-                    // Asignar categoría desmarca la transferencia (mutuamente excluyentes).
-                    if (id && draft.isTransfer) {
-                      setDraft({ ...draft, isTransfer: false, transferAccountId: undefined });
-                    }
-                  }}
-                  placeholder="Buscar categoría…"
-                />
-              </Field>
+              {/* Categoría y transfer son mutuamente excluyentes: si es transfer no se
+                  muestra el selector de categoría (antes quedaba clickeable e invitaba
+                  a un estado contradictorio). */}
+              {!draft.isTransfer && (
+                <Field label="Categoría">
+                  <CategoryCombobox
+                    options={categoriesForKind}
+                    value={categoryId ?? ''}
+                    onChange={(id) => {
+                      setCategoryId(id || null);
+                    }}
+                    placeholder="Buscar categoría…"
+                  />
+                </Field>
+              )}
               {draft.isTransfer && (
-                <Field label="Cuenta contraparte">
+                <Field label="Cuenta destino (transfer)">
                   <Combobox
                     options={accounts
                       .filter((a) => a.id !== currentAccountId)
@@ -1203,6 +1658,208 @@ function LineRowEditor({
                   </span>
                 </span>
               </label>
+            )}
+            {/* Item 14: aviso de match con una transacción existente (pata del otro
+                extracto ya importada). El pareo lo concreta el confirm. */}
+            {draft.isTransfer && transferMatch && (
+              <div className="max-w-xl rounded-md border border-emerald-300 bg-emerald-50/70 p-2 text-sm text-emerald-900">
+                ✓ Matchea con una transferencia existente en{' '}
+                <span className="font-medium">{transferMatch.accountLabel}</span>{' '}
+                ({transferMatch.date} · {transferMatch.amountOriginal}).
+                <span className="block text-xs text-emerald-800">
+                  Cuenta destino pre-cargada — al confirmar, ambas patas se parean en vez de
+                  duplicarse.{' '}
+                  <a
+                    href={`/transactions/${transferMatch.transactionId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    Ver transacción ↗
+                  </a>
+                </span>
+              </div>
+            )}
+            {/* Previsión: linkear la línea a un forecast pendiente (1-click, regla
+                PRD §5.3). Siempre visible — el toggle de auto-match solo gobierna
+                el match automático al confirmar. */}
+            {!draft.isTransfer && (
+              <div className="max-w-xl">
+                {forecastCands === null ? (
+                  <p className="text-xs text-muted-foreground">Buscando previsiones…</p>
+                ) : forecastCands.length === 0 ? (
+                  draft.forecastId ? null : (
+                    <p className="text-xs text-muted-foreground">
+                      Sin previsiones candidatas (±5 días, ±10% del monto).
+                    </p>
+                  )
+                ) : (
+                  <Field label="Linkear a previsión">
+                    <div className="flex items-center gap-2">
+                      <Combobox
+                        options={forecastCands.map((c) => ({
+                          id: c.id,
+                          label: `${c.recurrenceName} · ${c.expectedDate} · ${c.currency} ${c.expectedAmount}`,
+                        }))}
+                        value={draft.forecastId ?? ''}
+                        onChange={(id) => setDraft({ ...draft, forecastId: id || undefined })}
+                        placeholder="Elegí una previsión…"
+                        widthClassName="w-96"
+                      />
+                      {draft.forecastId && (
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setDraft({ ...draft, forecastId: undefined })}
+                        >
+                          Quitar
+                        </Button>
+                      )}
+                    </div>
+                  </Field>
+                )}
+              </div>
+            )}
+            {/* Tags: disponibles en cualquier línea — en transferencias son el
+                clasificador (no llevan categoría). */}
+            {tags.length > 0 && (
+              <Field label="Tags">
+                <div className="flex flex-wrap gap-1">
+                  {tags.map((t) => {
+                    const active = (draft.tagIds ?? []).includes(t.id);
+                    return (
+                      <FilterChip
+                        key={t.id}
+                        active={active}
+                        onClick={() => {
+                          const current = draft.tagIds ?? [];
+                          setDraft({
+                            ...draft,
+                            tagIds: active
+                              ? current.filter((id) => id !== t.id)
+                              : [...current, t.id],
+                          });
+                        }}
+                      >
+                        {t.name}
+                      </FilterChip>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+            {!draft.isTransfer && draft.kind === 'expense' && (
+              <div className="space-y-2">
+                <label className="flex max-w-xl items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={draft.deducibleGanancias ?? false}
+                    onChange={(e) => setDraft({ ...draft, deducibleGanancias: e.target.checked })}
+                    className="mt-0.5 size-4 rounded border-input"
+                  />
+                  <span>
+                    <span className="font-medium">Deducible Ganancias</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Entra al CSV de deducibles del export contador.
+                    </span>
+                  </span>
+                </label>
+                {!draft.isRefund && (
+                  <label className="flex max-w-xl items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!!draft.domesticService}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          domesticService: e.target.checked
+                            ? {
+                                empleado_nombre: draft.domesticService?.empleado_nombre ?? '',
+                                empleado_cuil: draft.domesticService?.empleado_cuil ?? '',
+                                concepto: draft.domesticService?.concepto ?? 'sueldo',
+                                periodo: draft.domesticService?.periodo ?? draft.date.slice(0, 7),
+                              }
+                            : undefined,
+                        })
+                      }
+                      className="mt-0.5 size-4 rounded border-input"
+                    />
+                    <span>
+                      <span className="font-medium">Servicio doméstico</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Alimenta el CSV 03 (por empleado/mes) del export contador.
+                      </span>
+                    </span>
+                  </label>
+                )}
+                {draft.domesticService && (
+                  <div className="flex flex-wrap items-end gap-3 rounded-md border border-sky-200 bg-sky-50/50 p-2">
+                    <Field label="Empleado/a">
+                      <Input
+                        value={draft.domesticService.empleado_nombre}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: { ...draft.domesticService!, empleado_nombre: e.target.value },
+                          })
+                        }
+                        placeholder="Nombre y apellido"
+                        className="h-8 w-48"
+                      />
+                    </Field>
+                    <Field label="CUIL">
+                      <Input
+                        value={draft.domesticService.empleado_cuil}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: { ...draft.domesticService!, empleado_cuil: e.target.value },
+                          })
+                        }
+                        placeholder="27-12345678-9"
+                        className="h-8 w-36"
+                      />
+                    </Field>
+                    <Field label="Concepto">
+                      <Select
+                        value={draft.domesticService.concepto}
+                        onValueChange={(v) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: {
+                              ...draft.domesticService!,
+                              concepto: v as 'sueldo' | 'aporte' | 'aguinaldo',
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sueldo">Sueldo</SelectItem>
+                          <SelectItem value="aporte">Aporte</SelectItem>
+                          <SelectItem value="aguinaldo">Aguinaldo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Período">
+                      <Input
+                        value={draft.domesticService.periodo}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            domesticService: { ...draft.domesticService!, periodo: e.target.value },
+                          })
+                        }
+                        placeholder="YYYY-MM"
+                        className="h-8 w-28"
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
             )}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" type="button" onClick={save} disabled={isPending}>
@@ -1317,6 +1974,18 @@ function FilterChip({
       {children}
     </button>
   );
+}
+
+/**
+ * Motivo legible del rechazo de una línea. Las auto-rechazadas por dedup llevan
+ * el marcador `[DUPLICADA]` en `parsedData.notes` (parse-internal); el resto
+ * fueron rechazadas a mano por el usuario.
+ */
+function rejectReason(line: LineRow): string {
+  if (line.parsedData.notes?.includes('[DUPLICADA]')) {
+    return 'Auto: duplicada — ya existía como transacción. No requiere acción.';
+  }
+  return 'Rechazada por vos.';
 }
 
 type CurrencyTotals = {

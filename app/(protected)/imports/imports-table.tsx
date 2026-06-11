@@ -272,7 +272,8 @@ export function ImportsTable({ rows, criteria }: Props) {
                     <Num className="text-sm text-foreground">{r.transactionCount ?? '—'}</Num>
                   </td>
                   <td className="px-3 py-3 text-right">
-                    <div className="flex justify-end gap-1.5 opacity-0 transition-opacity [tr:hover_&]:opacity-100">
+                    {/* Siempre visibles: con hover-only eran indescubribles (touch/mobile). */}
+                    <div className="flex justify-end gap-1.5">
                       {r.status === 'error' && (
                         <Button variant="outline" size="sm" onClick={() => doRetry(r.id)} disabled={isPending}>
                           Reintentar

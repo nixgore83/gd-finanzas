@@ -10,11 +10,14 @@ import { CsvFormatError, type ParsedTxLine, type ParserOutput } from '@/lib/impo
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
 import {
   counterpartyHasIdentity,
+  enrichLineWithHistory,
   lookupCounterpartyHistory,
+  type CounterpartyHistory,
 } from '@/lib/imports/counterparty-suggest';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
+import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
 import { formatAccount } from '@/lib/accounts/format';
 import { getServerEnv } from '@/lib/env';
@@ -308,6 +311,23 @@ export async function parseImportInternal(
   // Auto-detect transfers for banco imports
   const lines = row.type === 'banco' ? detectTransfers(filteredLines) : filteredLines;
 
+  // Auto-resolución de cuenta destino por refs bancarias aprendidas (item 8):
+  // si una línea transfer trae CBU/CUIT/alias de contraparte que matchea
+  // EXACTAMENTE una cuenta propia (por `accounts.transfer_refs`), se asigna sola.
+  if (lines.some((l) => l.isTransfer && !l.transferAccountId && l.counterparty)) {
+    const refAccounts = await db
+      .select({ id: accounts.id, transferRefs: accounts.transferRefs })
+      .from(accounts)
+      .where(and(eq(accounts.householdId, householdId), eq(accounts.archived, false)));
+    const candidates = refAccounts.filter((a) => a.id !== row.accountId);
+    for (const l of lines) {
+      if (l.isTransfer && !l.transferAccountId && l.counterparty) {
+        const matched = matchAccountByRefs(l.counterparty, candidates);
+        if (matched) l.transferAccountId = matched;
+      }
+    }
+  }
+
   // Cross-import dedup
   const accountId = row.accountId;
   const existingTxKeys = new Set<string>();
@@ -339,11 +359,12 @@ export async function parseImportInternal(
 
   const lineRows = await Promise.all(
     lines.map(async (line) => {
-      // Historial por contraparte (categoría + etiqueta) si la línea trae una con identidad.
-      const cpHistory =
+      // Historial por contraparte (categoría, etiqueta, deducible, tags, doméstico)
+      // si la línea trae una con identidad.
+      const cpHistory: CounterpartyHistory =
         line.counterparty && counterpartyHasIdentity(line.counterparty)
           ? await lookupCounterpartyHistory(householdId, line.counterparty)
-          : { categoryId: null, label: null };
+          : { categoryId: null, label: null, deducible: null, tagIds: [], domesticService: null };
 
       // Categoría: contraparte (señal fuerte para pagos recurrentes a terceros) →
       // descripción histórica → sugerencia del LLM. Las transferencias entre cuentas
@@ -356,14 +377,9 @@ export async function parseImportInternal(
         proposedCategoryId = catByName.get(line.suggestedCategory.toLowerCase()) ?? null;
       }
 
-      // Etiqueta: precargar desde el historial si la contraparte no trae una.
-      let lineData: ParsedTxLine = line;
-      if (cpHistory.label && line.counterparty && !line.counterparty.label?.trim()) {
-        lineData = {
-          ...line,
-          counterparty: { ...line.counterparty, label: cpHistory.label },
-        };
-      }
+      // Etiqueta/tags/deducible/doméstico: precargar lo aprendido sin pisar lo
+      // que la línea ya trae (en transfers solo etiqueta+tags).
+      const lineData: ParsedTxLine = enrichLineWithHistory(line, cpHistory);
 
       const lineKey = `${line.date}|${line.description.toLowerCase()}|${line.amountOriginal}`;
       const isDuplicate = existingTxKeys.has(lineKey);

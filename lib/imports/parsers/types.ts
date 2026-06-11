@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ImportType } from '@/lib/schemas/import';
+import { domesticServiceMetaSchema } from '@/lib/schemas/transaction';
 
 /**
  * Identificadores de la contraparte de una transferencia/movimiento (ordenante o
@@ -59,6 +60,22 @@ const parsedTxLineStrictSchema = z.object({
    * resuelve a `transferAccountId` y lo BORRA antes de persistir — no debe quedar en
    * `parsed_data`. El LLM no lo usa. */
   transferAccountName: z.string().max(120).optional(),
+  /** Deducible Ganancias. Se captura en la review o se precarga del historial por
+   * contraparte; al confirmar se persiste en transactions.deducible_ganancias
+   * (antes el import lo hardcodeaba a false). Solo gastos no-transfer.
+   * Opcional SIN default: los parsers determinísticos construyen líneas literales
+   * y los consumidores tratan undefined como false. */
+  deducibleGanancias: z.boolean().optional(),
+  /** Tags a aplicar al confirmar (UUIDs de `tags` del household). Se capturan en la
+   * review o se precargan del historial por contraparte. En TRANSFERENCIAS el tag es
+   * el clasificador (no llevan categoría) — decisión Nico 2026-06-11. */
+  tagIds: z.array(z.string().uuid()).max(20).optional(),
+  /** Datos de servicio doméstico (subtype domestic_service al confirmar). Solo
+   * gastos no-transfer. Alimenta el CSV 03 del export Ganancias. */
+  domesticService: domesticServiceMetaSchema.optional(),
+  /** Previsión (forecast) elegida en la review para linkear al confirmar. Si al
+   * confirmar ya no está pending (la matcheó otra tx), se ignora sin error. */
+  forecastId: z.string().uuid().optional(),
 });
 
 /**

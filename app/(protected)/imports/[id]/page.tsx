@@ -2,14 +2,16 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, institutions } from '@/db/schema';
+import { accounts, imports, importLines, institutions, tags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { resolveParser } from '@/lib/imports/parsers/registry';
 import { generateSignedUrl } from '@/lib/imports/storage';
 import { isParseStale } from '@/lib/imports/parse-stale';
+import { isDeletableStatus } from '@/lib/imports/list-filters';
 import { ParseButton } from './parse-button';
+import { DeleteImportButton } from './delete-import-button';
 import { ImportReview } from './import-review';
 
 export const metadata = {
@@ -97,6 +99,11 @@ export default async function ImportDetailPage({
     .orderBy(asc(importLines.createdAt));
 
   const tree = await loadCategoryTree(session.householdId);
+  const tagRows = await db
+    .select({ id: tags.id, name: tags.name })
+    .from(tags)
+    .where(eq(tags.householdId, session.householdId))
+    .orderBy(asc(tags.name));
   const accountRows = await db
     .select({
       id: accounts.id,
@@ -141,6 +148,7 @@ export default async function ImportDetailPage({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {isDeletableStatus(row.status) && <DeleteImportButton importId={row.id} />}
           {pdfUrl && (
             <a
               href={pdfUrl}
@@ -277,6 +285,7 @@ export default async function ImportDetailPage({
             transactionId: l.transactionId,
           }))}
           tree={tree}
+          tags={tagRows}
           accounts={accountRows}
           importInstitutionId={row.institutionId}
           importAccountId={row.accountId}
