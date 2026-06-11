@@ -14,6 +14,7 @@ const CSV = [
   '05/04/26,DEB SUSCR FCI,1.8E7,0.0,',
   '06/09/26,PAGO TARJETA VISA,835743.22,0.0,',
   '06/09/26,PAGO TARJETA MASTERCARD,1000000.0,0.0,',
+  '06/01/26,DEB PREA DEBIN  30703088534,30000.0,0.0,',
   '06/08/26,COMISION CUSTODIA MENSUAL,217.11,0.0,',
   '06/08/26,SALDO INFORMATIVO,0.0,0.0,', // ambos 0 → se saltea
 ].join('\n');
@@ -35,7 +36,7 @@ describe('icbcBancoParser.parseCsv', () => {
   it('saltea filas con débito y crédito en cero', () => {
     const { lines } = parse(CSV);
     expect(lines.some((l) => l.description === 'SALDO INFORMATIVO')).toBe(false);
-    expect(lines).toHaveLength(7);
+    expect(lines).toHaveLength(8);
   });
 
   it('expande notación científica en montos', () => {
@@ -54,6 +55,12 @@ describe('icbcBancoParser.parseCsv', () => {
     const { lines } = parse(CSV);
     expect(lines.find((l) => l.description === 'PAGO TARJETA VISA')!.transferAccountName).toBe('ICBC Visa');
     expect(lines.find((l) => l.description === 'PAGO TARJETA MASTERCARD')!.transferAccountName).toBe('ICBC Master');
+  });
+
+  it('marca DEBIN preacordado contra CUIT de Mercado Libre como transfer a Mercado Pago', () => {
+    const debin = parse(CSV).lines.find((l) => l.description.startsWith('DEB PREA DEBIN'))!;
+    expect(debin.isTransfer).toBe(true);
+    expect(debin.transferAccountName).toBe('Mercado Pago');
   });
 
   it('sugiere categoría para conceptos sistemáticos', () => {

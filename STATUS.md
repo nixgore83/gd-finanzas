@@ -10,6 +10,24 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-11 — Transfers no detectados en import ICBC manual + regla DEBIN→MP (PR #47)
+
+Nico reportó que "TRANSF. ACC.B." (transfer a Galicia) no venía marcada como transfer en el
+import `347a6ae9`. Causa: ese import fue la **carga manual ad-hoc por SQL** (sesión
+2026-06-10), que nunca pasó por `parse-internal` → `detectTransfers()` no corrió (el pipeline
+real sí la habría marcado: `\bTRANSF\b` matchea).
+
+- [x] **Corrección de datos (SQL vía MCP):** 80 líneas `pending` del import marcadas
+  `isTransfer: true` aplicando los mismos patrones de `detect-transfers.ts` (TRANSF. MOBILE
+  ×30, E/BCOS-ONLINE ×22, DEBIN ×13, ACC.B. ×11, PUSH ×3, TRF.DATANET ×1). Las `edited`
+  (marcas manuales de Nico) no se tocaron.
+- [x] **Regla de negocio nueva (confirmada con Nico):** `DEB PREA DEBIN 30703088534` (CUIT
+  Mercado Libre) = fondeo de la billetera propia → transfer a **Mercado Pago**. Las 13 líneas
+  ya tienen `transferAccountId` asignado por SQL; **PR #47** codifica la regla en
+  `classifyIcbcConcept` (hint `transferAccountName: 'Mercado Pago'`) + test. Suite 346 verde.
+- **Pendiente (Nico, en la UI de review):** asignar cuenta destino a las otras 67 líneas
+  transfer (ACC.B. → Galicia, etc.) con filtro Transfers + bulk, y confirmar. Mergear PR #47.
+
 ### Sesión 2026-06-10 — Naming/display de cuentas estructurado + helper único (branch `feat/account-naming`)
 
 El campo `accounts.name` venía metiendo a mano institución + tipo + dueño (ya campos
