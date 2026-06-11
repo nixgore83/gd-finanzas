@@ -10,6 +10,28 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
+
+Pedido de Nico: poder ordenar por varios criterios a la vez (ej. nombre primario + fecha
+secundaria). Decidido: **click reemplaza** (la "limpieza" es automática), **Shift+click
+acumula** (orden de click = prioridad, máx. 3), click en columna activa invierte su
+dirección. Indicador: flecha + superíndice de prioridad. Aplica a las **4 tablas**.
+
+- [x] **Núcleo compartido `lib/sorting/`** (nuevo): `criteria.ts` (`SortCriterion`,
+  `applySortClick` puro), `url.ts` (`sort=date:desc,amount:asc` en un solo param, con
+  retrocompat de links viejos `?sort=x&dir=y`), `compare.ts` (comparador encadenado con
+  factories por campo — permite reglas que no se invierten con la dirección). 22 tests.
+- [x] **`SortableHeader` v2** (firma nueva `criteria`/`onSort(field, additive)`, genérico,
+  shift detection, superíndices, `select-none`). Migrados los 4 call sites de una.
+- [x] **Server-side** (`/transactions`, `/imports`): `parseSortParam` reemplaza los `z.enum`,
+  `orderBy` por mapa de columnas + spread (tiebreaker `createdAt desc` se mantiene al final),
+  `sort-config.ts` por ruta. El param `dir` legacy se lee pero ya no se escribe.
+- [x] **Client-side**: review de import → `lib/imports/review-sort.ts` (conserva la regla
+  "sin categoría siempre arriba" en ambas direcciones); budget → `lib/budgets/sort.ts`
+  (multi-sort dentro de cada nivel, jerarquía padre/hijos intacta, des-duplica el sort viejo).
+- **Suite 346→375** (+29). Typecheck, lint y `next build` verdes. Sin migraciones.
+- PRD: no se toca (mejora de UX de implementación, no regla de negocio).
+
 ### Sesión 2026-06-10 — Naming/display de cuentas estructurado + helper único (branch `feat/account-naming`)
 
 El campo `accounts.name` venía metiendo a mano institución + tipo + dueño (ya campos

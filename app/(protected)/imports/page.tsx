@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, type AnyColumn, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, institutions } from '@/db/schema';
@@ -19,7 +19,10 @@ import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
 import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
+import { parseSortParam, serializeSort } from '@/lib/sorting/url';
+import type { SortCriterion } from '@/lib/sorting/criteria';
 import { ImportsTable, type ImportRow } from './imports-table';
+import { IMPORTS_DEFAULT_SORT, IMPORTS_SORT_FIELDS, type ImportsSortField } from './sort-config';
 import { ParseUploadedButton } from './parse-uploaded-button';
 
 export const metadata = { title: 'Imports · gd-finanzas' };
@@ -31,6 +34,14 @@ export const metadata = { title: 'Imports · gd-finanzas' };
 export const maxDuration = 300;
 
 const PAGE_LIMIT = 50;
+
+const IMPORTS_SORT_COLUMNS: Record<ImportsSortField, AnyColumn> = {
+  created: imports.createdAt,
+  account: accounts.name,
+  period: imports.periodStart,
+  status: imports.status,
+  txns: imports.transactionCount,
+};
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -42,8 +53,7 @@ type Filters = {
   from: string | undefined;
   to: string | undefined;
   q: string | undefined;
-  sort: 'created' | 'account' | 'period' | 'status' | 'txns';
-  dir: 'asc' | 'desc';
+  sort: SortCriterion<ImportsSortField>[];
   page: number;
 };
 
@@ -60,8 +70,11 @@ function parseFilters(sp: Record<string, string | string[] | undefined>): Filter
   const from = z.string().regex(ISO_DATE_RE).safeParse(get('from'));
   const to = z.string().regex(ISO_DATE_RE).safeParse(get('to'));
   const q = z.string().trim().min(1).max(200).safeParse(get('q'));
-  const sort = z.enum(['created', 'account', 'period', 'status', 'txns']).safeParse(get('sort'));
-  const dir = z.enum(['asc', 'desc']).safeParse(get('dir'));
+  const sort = parseSortParam(get('sort'), get('dir'), {
+    allowed: IMPORTS_SORT_FIELDS,
+    fallback: IMPORTS_DEFAULT_SORT,
+    legacyDefaultDir: 'desc',
+  });
   const page = z.coerce.number().int().positive().safeParse(get('page'));
 
   return {
@@ -73,8 +86,7 @@ function parseFilters(sp: Record<string, string | string[] | undefined>): Filter
     from: from.success ? from.data : undefined,
     to: to.success ? to.data : undefined,
     q: q.success ? q.data : undefined,
-    sort: sort.success ? sort.data : 'created',
-    dir: dir.success ? dir.data : 'desc',
+    sort,
     page: page.success ? page.data : 1,
   };
 }
@@ -89,8 +101,8 @@ function buildHref(filters: Filters, pageOverride: number): string {
   if (filters.from) sp.set('from', filters.from);
   if (filters.to) sp.set('to', filters.to);
   if (filters.q) sp.set('q', filters.q);
-  if (filters.sort !== 'created') sp.set('sort', filters.sort);
-  if (filters.dir !== 'desc') sp.set('dir', filters.dir);
+  const sortSerialized = serializeSort(filters.sort);
+  if (sortSerialized !== serializeSort(IMPORTS_DEFAULT_SORT)) sp.set('sort', sortSerialized);
   if (pageOverride > 1) sp.set('page', String(pageOverride));
   const qs = sp.toString();
   return qs.length > 0 ? `/imports?${qs}` : '/imports';
@@ -206,21 +218,9 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
   const page = Math.min(filters.page, totalPages);
   const offset = (page - 1) * PAGE_LIMIT;
 
-  const orderExpr = (() => {
-    const d = filters.dir === 'asc' ? asc : desc;
-    switch (filters.sort) {
-      case 'account':
-        return d(accounts.name);
-      case 'period':
-        return d(imports.periodStart);
-      case 'status':
-        return d(imports.status);
-      case 'txns':
-        return d(imports.transactionCount);
-      default:
-        return d(imports.createdAt);
-    }
-  })();
+  const orderExprs = filters.sort.map((c) =>
+    (c.dir === 'asc' ? asc : desc)(IMPORTS_SORT_COLUMNS[c.field]),
+  );
 
   const rows = await db
     .select({
@@ -240,7 +240,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
     .leftJoin(accounts, eq(accounts.id, imports.accountId))
     .where(whereClause)
-    .orderBy(orderExpr, desc(imports.createdAt))
+    .orderBy(...orderExprs, desc(imports.createdAt))
     .limit(PAGE_LIMIT)
     .offset(offset);
 
@@ -509,7 +509,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
             </div>
           ) : (
             <>
-              <ImportsTable rows={tableRows} sort={filters.sort} dir={filters.dir} />
+              <ImportsTable rows={tableRows} criteria={filters.sort} />
 
               <div className="flex items-center justify-between border-t border-border pt-4">
                 <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
