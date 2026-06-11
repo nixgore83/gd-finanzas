@@ -50,10 +50,12 @@ el TAG es el clasificador.
   el aprendizaje SOLO sobre líneas pending (no pisa ediciones) → los imports en curso
   (ICBC `347a6ae9`, Galicia `e36d50d2`) se benefician sin re-parsear.
 - **Validación:** typecheck + lint + build + **375 tests** verdes (345→375).
-- [ ] **Pendiente:** merge PR + smoke en prod (revisar un import en curso end-to-end con
-  los campos nuevos) + **sync PRD Notion (changelog v1.11)** — los puntos de regla de
-  negocio nuevos: captura fiscal en review, tag-clasificador en transfers, cobertura de
-  gaps por período, link de previsión en review.
+- [x] **Cierre (2026-06-11):** PR **#50** mergeado a `main` (commit `0db0dcd`) y deployado a
+  prod (READY). **Sync PRD Notion hecho como changelog v1.11** — reglas de negocio nuevas:
+  captura fiscal en review, tag-clasificador en transfers, cobertura de gaps por período,
+  link de previsión en review.
+- [ ] **Pendiente (Nico):** smoke en prod (revisar un import en curso end-to-end con los
+  campos fiscales nuevos).
 
 ### Sesión 2026-06-11 (bis) — Bulk de contraparte en la review (branch `feat/bulk-counterparty`)
 
@@ -65,7 +67,11 @@ el TAG es el clasificador.
 - [x] Editor inline: campo "Etiqueta contraparte" siempre visible (antes oculto si el
   parser no extrajo contraparte); el preprocess del schema ya limpiaba el caso vacío.
 - [x] Helper puro `mergeCounterpartyLabels` + 5 tests (381 verdes). Typecheck + lint OK.
-- [ ] **Pendiente:** smoke manual en prod: bulk sobre líneas sin contraparte de un
+- [x] **Cierre (2026-06-11):** PR **#53** mergeado a `main` (commit `d698672`, reemplazó al
+  #51 que GitHub cerró al borrarse su base tras el merge de #50) y deployado a prod (READY,
+  suite 412 sobre `main`). **Sync PRD Notion hecho como changelog v1.12** (bulk de
+  contraparte + counterparty solo-etiqueta sin identidad; categoría "Donaciones" PR #48).
+- [ ] **Pendiente (Nico):** smoke manual en prod: bulk sobre líneas sin contraparte de un
   resumen TC.
 
 ### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
