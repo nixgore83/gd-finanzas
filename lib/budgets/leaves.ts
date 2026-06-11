@@ -2,7 +2,7 @@ import type { CategoryNode } from '@/lib/categories/tree';
 
 /**
  * Una categoría es hoja si ninguna otra del árbol la tiene como parent.
- * En la taxonomía actual: "Vacaciones" / "Personales" / "Otros gastos" son
+ * En la taxonomía actual: "Vacaciones" / "Mario" / "Seguros" son
  * parents sin children → también hojas (presupuesto editable directamente).
  * "Vivienda" / "Sueldo" / etc. tienen children → no son hojas (subtotal
  * calculado, read-only).
