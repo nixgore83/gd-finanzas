@@ -19,9 +19,11 @@ import { SortableHeader } from '@/components/ui/sortable-header';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
+import { sameCounterpartyIdentity } from '@/lib/imports/counterparty-identity';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
+import { bulkSetCounterpartyLabel } from '@/app/actions/imports/bulk-set-counterparty-label';
 import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
 import { bulkSetTransfer } from '@/app/actions/imports/bulk-set-transfer';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
@@ -368,6 +370,85 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }
 
+  // Propagación intra-import por contraparte: tras categorizar/etiquetar una
+  // línea, ofrecer aplicar lo mismo a las hermanas PENDING con la misma identidad
+  // (CUIT/CBU/cuenta/alias; fallback nombre normalizado). Complemento intra-import
+  // del aprendizaje inter-import de counterparty-suggest.
+  function offerCategoryPropagation(sourceId: string, categoryId: string) {
+    const source = lineById.get(sourceId);
+    const cp = source?.parsedData.counterparty;
+    if (!source || !cp) return;
+    const siblings = lines.filter(
+      (l) =>
+        l.id !== sourceId &&
+        l.status === 'pending' &&
+        !l.parsedData.isTransfer &&
+        l.proposedCategoryId !== categoryId &&
+        l.parsedData.kind === source.parsedData.kind &&
+        sameCounterpartyIdentity(cp, l.parsedData.counterparty),
+    );
+    if (siblings.length === 0) return;
+    const catName = tree.find((c) => c.id === categoryId)?.name ?? 'la categoría';
+    const who = cp.label || cp.name || 'la misma contraparte';
+    toast(`Hay ${siblings.length} línea${siblings.length === 1 ? '' : 's'} más de ${who}.`, {
+      duration: 12_000,
+      action: {
+        label: `Aplicar ${catName}`,
+        onClick: () => {
+          startTransition(async () => {
+            const res = await bulkSetCategory({
+              importId,
+              lineIds: siblings.map((l) => l.id),
+              categoryId,
+            });
+            if (res.ok) {
+              toast.success(`Categoría aplicada a ${res.updated} líneas más`);
+              router.refresh();
+            } else {
+              toast.error(`Error: ${res.error}`);
+            }
+          });
+        },
+      },
+    });
+  }
+
+  function offerLabelPropagation(sourceId: string, label: string) {
+    const source = lineById.get(sourceId);
+    const cp = source?.parsedData.counterparty;
+    if (!source || !cp || !label.trim()) return;
+    const siblings = lines.filter(
+      (l) =>
+        l.id !== sourceId &&
+        l.status === 'pending' &&
+        l.parsedData.counterparty &&
+        l.parsedData.counterparty.label !== label &&
+        sameCounterpartyIdentity(cp, l.parsedData.counterparty),
+    );
+    if (siblings.length === 0) return;
+    toast(`Hay ${siblings.length} línea${siblings.length === 1 ? '' : 's'} más de la misma contraparte.`, {
+      duration: 12_000,
+      action: {
+        label: `Etiquetar "${label}"`,
+        onClick: () => {
+          startTransition(async () => {
+            const res = await bulkSetCounterpartyLabel({
+              importId,
+              lineIds: siblings.map((l) => l.id),
+              label,
+            });
+            if (res.ok) {
+              toast.success(`Etiqueta aplicada a ${res.updated} líneas más`);
+              router.refresh();
+            } else {
+              toast.error(`Error: ${res.error}`);
+            }
+          });
+        },
+      },
+    });
+  }
+
   function doConfirm() {
     const hasToConfirm = lineSummary.accepted + lineSummary.edited > 0;
     if (hasToConfirm && !accountId) {
@@ -660,6 +741,8 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                 onToggleSelect={() => toggleOne(l.id)}
                 onMutate={pinList}
                 dimmed={pinnedIds !== null && !matchesFilter(l)}
+                onCategoryApplied={offerCategoryPropagation}
+                onLabelApplied={offerLabelPropagation}
               />
             ))}
             {lines.length === 0 && (
@@ -899,6 +982,8 @@ function LineRowEditor({
   onToggleSelect,
   onMutate,
   dimmed,
+  onCategoryApplied,
+  onLabelApplied,
 }: {
   line: LineRow;
   importId: string;
@@ -914,6 +999,10 @@ function LineRowEditor({
   onMutate: () => void;
   /** La fila ya no matchea el filtro pero sigue visible (lista congelada). */
   dimmed: boolean;
+  /** Ofrecer propagar la categoría a líneas hermanas con la misma contraparte. */
+  onCategoryApplied: (lineId: string, categoryId: string) => void;
+  /** Ídem para la etiqueta de contraparte. */
+  onLabelApplied: (lineId: string, label: string) => void;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -943,6 +1032,15 @@ function LineRowEditor({
         toast.success('Línea actualizada');
         setEditing(false);
         router.refresh();
+        // Propagación intra-import: si cambió la categoría o la etiqueta de
+        // contraparte, ofrecer aplicar a las hermanas con la misma identidad.
+        if (categoryId && categoryId !== line.proposedCategoryId && !draft.isTransfer) {
+          onCategoryApplied(line.id, categoryId);
+        }
+        const newLabel = draft.counterparty?.label?.trim();
+        if (newLabel && newLabel !== line.parsedData.counterparty?.label?.trim()) {
+          onLabelApplied(line.id, newLabel);
+        }
       } else {
         toast.error(`Error: ${res.error}`);
       }
@@ -964,6 +1062,7 @@ function LineRowEditor({
       const res = await bulkSetCategory({ importId, lineIds: [line.id], categoryId: catId });
       if (res.ok) {
         router.refresh();
+        if (catId) onCategoryApplied(line.id, catId);
       } else {
         setCategoryId(line.proposedCategoryId);
         toast.error(`Error: ${res.error}`);

@@ -15,20 +15,10 @@ import type { Counterparty } from '@/lib/imports/parsers/types';
  * household (2 usuarios) es suficiente.
  */
 
-/** Campos identificadores "fuertes" (match exacto). */
-const STRONG_ID_FIELDS = ['cuil', 'cbu', 'accountRef', 'alias'] as const;
+// Identidad canónica: definida una sola vez en counterparty-identity.ts.
+import { counterpartyHasIdentity, STRONG_ID_FIELDS } from '@/lib/imports/counterparty-identity';
 
-/** True si la contraparte tiene al menos un identificador usable para matchear. */
-export function counterpartyHasIdentity(cp: Counterparty | null | undefined): boolean {
-  if (!cp) return false;
-  return Boolean(
-    cp.cuil?.trim() ||
-      cp.cbu?.trim() ||
-      cp.accountRef?.trim() ||
-      cp.alias?.trim() ||
-      cp.name?.trim(),
-  );
-}
+export { counterpartyHasIdentity };
 
 /**
  * Construye la condición SQL que matchea una contraparte histórica con `cp`.
