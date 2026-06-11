@@ -10,6 +10,51 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-11 — Backlog de feedback completo (items 1–14, branch `feat/imports-backlog`)
+
+Implementación de TODO el backlog levantado del feedback de Nico (sesión 2026-06-10,
+items 1–13 reconstruidos del transcript + item 14 pedido hoy). Decisiones de negocio
+confirmadas con Nico al inicio: gaps por período de imports / doméstico en la review +
+deducible aprende por contraparte con fallback categoría / candidatos de previsión
+siempre visibles (el toggle solo gobierna el auto-match al confirmar) / en transfers
+el TAG es el clasificador.
+
+- [x] **Items 1/5/6/7/12 — quick wins review:** borrar import desde el detalle + acciones
+  de lista siempre visibles; motivo de rechazo por línea (auto-dup vs manual); rechazadas
+  solo "Des-rechazar" (sin editar); "Volver a pendiente" en lote (rechazadas seleccionables);
+  selector de categoría oculto en transfers; rename "Sin contraparte"→"Cuenta destino sin asignar".
+- [x] **Item 2 — gaps:** cobertura = período de imports confirmados ∪ meses con líneas
+  (helpers puros + 10 tests). Un consolidado ene–jun ya no marca "faltante" un mes sin
+  movimientos. Aplica retroactivo.
+- [x] **Item 9 — lista estable:** al primer cambio se congela el set visible; ediciones
+  in-place sin refiltrar/reordenar (filas que dejan de matchear quedan atenuadas);
+  "Recargar lista" / cambiar filtro / reordenar recomputan.
+- [x] **Transversal + item 13 — identidad de contraparte:** helper canónico único
+  `lib/imports/counterparty-identity.ts` (CUIT/CBU/cuenta/alias, fallback nombre
+  normalizado). Propagación intra-import: tras categorizar/etiquetar, toast ofrece
+  aplicar a las hermanas pending de la misma contraparte (`bulkSetCounterpartyLabel` nueva).
+- [x] **Items 3+10 — EPIC captura fiscal:** deducible + tags + servicio doméstico
+  capturables en la review (panel de edición + bulk + badges); `confirm.ts` los persiste
+  (antes hardcodeaba false/[]/standard → el export contador salía vacío). Sugerencia
+  aprendida por contraparte (`lookupCounterpartyHistory` extendido + `enrichLineWithHistory`
+  puro). **Tags también en transfers** (ahí son el clasificador).
+- [x] **Item 4 — previsiones en review:** candidatos por línea (cuenta+kind+±5d+±10% USD)
+  al abrir el editor, badge "Previsión"; `confirm.ts` linkea el forecast elegido si sigue
+  pending (ignora si otra tx lo matcheó).
+- [x] **Items 8+14 — cuenta destino por refs + match con tx existente:** **migración `0016`**
+  (`accounts.transfer_refs` jsonb, aditiva, **aplicada a prod vía MCP**, journal registrado);
+  las refs se APRENDEN al confirmar transfers y el parse auto-resuelve la cuenta destino
+  cuando matchea exactamente una. En la review, una línea transfer muestra si matchea una
+  transacción ya existente (regla de #44) con banner + pre-carga de cuenta destino.
+- [x] **Transversal — "↻ Re-sugerir pendientes":** pase no-destructivo que re-aplica todo
+  el aprendizaje SOLO sobre líneas pending (no pisa ediciones) → los imports en curso
+  (ICBC `347a6ae9`, Galicia `e36d50d2`) se benefician sin re-parsear.
+- **Validación:** typecheck + lint + build + **375 tests** verdes (345→375).
+- [ ] **Pendiente:** merge PR + smoke en prod (revisar un import en curso end-to-end con
+  los campos nuevos) + **sync PRD Notion (changelog v1.11)** — los puntos de regla de
+  negocio nuevos: captura fiscal en review, tag-clasificador en transfers, cobertura de
+  gaps por período, link de previsión en review.
+
 ### Sesión 2026-06-10 — Naming/display de cuentas estructurado + helper único (branch `feat/account-naming`)
 
 El campo `accounts.name` venía metiendo a mano institución + tipo + dueño (ya campos
