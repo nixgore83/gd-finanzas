@@ -37,11 +37,15 @@ export default async function NewImportPage() {
         name: accounts.name,
         ownerTag: accounts.ownerTag,
         institutionId: accounts.institutionId,
+        institutionName: institutions.name,
         type: accounts.type,
+        cardBrand: accounts.cardBrand,
+        currencyDefault: accounts.currencyDefault,
       })
       .from(accounts)
+      .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
       .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
-      .orderBy(asc(accounts.name)),
+      .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name)),
   ]);
 
   return (

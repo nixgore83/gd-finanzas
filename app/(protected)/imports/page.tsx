@@ -4,6 +4,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, type SQL } fro
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, institutions } from '@/db/schema';
+import { formatAccount } from '@/lib/accounts/format';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPES, IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import {
@@ -140,17 +141,37 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
   };
 
   // ===== Opciones de filtro =====
-  const [accountOptions, institutionOptions] = await Promise.all([
+  const [accountOptionRows, institutionOptions] = await Promise.all([
     db
-      .select({ id: accounts.id, name: accounts.name, ownerTag: accounts.ownerTag })
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        type: accounts.type,
+        cardBrand: accounts.cardBrand,
+        institutionName: institutions.name,
+        currencyDefault: accounts.currencyDefault,
+        ownerTag: accounts.ownerTag,
+      })
       .from(accounts)
+      .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
       .where(eq(accounts.householdId, householdId))
-      .orderBy(asc(accounts.name)),
+      .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name)),
     db
       .select({ id: institutions.id, name: institutions.name })
       .from(institutions)
       .orderBy(asc(institutions.name)),
   ]);
+  const accountOptions = accountOptionRows.map((a) => ({
+    id: a.id,
+    label: formatAccount({
+      institutionName: a.institutionName,
+      type: a.type,
+      cardBrand: a.cardBrand,
+      name: a.name,
+      ownerTag: a.ownerTag,
+      currency: a.currencyDefault,
+    }),
+  }));
 
   // ===== WHERE dinámico =====
   const conditions: SQL[] = [eq(imports.householdId, householdId)];
@@ -250,7 +271,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
     const acc = accountOptions.find((a) => a.id === filters.accountId);
     activeChips.push({
       label: 'Cuenta',
-      value: acc ? `${acc.name}${acc.ownerTag ? ` (${acc.ownerTag})` : ''}` : '—',
+      value: acc ? acc.label : '—',
     });
   }
 
@@ -453,8 +474,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                     <option value="">Todas</option>
                     {accountOptions.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name}
-                        {a.ownerTag ? ` (${a.ownerTag})` : ''}
+                        {a.label}
                       </option>
                     ))}
                   </select>

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
@@ -45,7 +46,7 @@ type Props = {
   status: string;
   lines: LineRow[];
   tree: CategoryNode[];
-  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
+  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
   /** Nº de cuenta propia del extracto extraído por el parser (encabezado). */
@@ -747,7 +748,7 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
               <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.name} ({a.ownerTag}) · {a.currency}
+                    {accountLabel(a)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -817,7 +818,7 @@ function LineRowEditor({
   line: LineRow;
   importId: string;
   tree: CategoryNode[];
-  accounts: Array<{ id: string; name: string; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
+  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
   currentAccountId: string;
   readOnly: boolean;
   isPending: boolean;
@@ -1162,7 +1163,7 @@ function LineRowEditor({
                       .filter((a) => a.id !== currentAccountId)
                       .map((a) => ({
                         id: a.id,
-                        label: `${a.name} (${a.ownerTag}) · ${a.currency}`,
+                        label: accountLabel(a),
                       }))}
                     value={draft.transferAccountId ?? ''}
                     onChange={(id) => setDraft({ ...draft, transferAccountId: id || undefined })}
@@ -1585,4 +1586,23 @@ function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+/** Nombre legible de una cuenta (el shape de review usa `currency`, no `currencyDefault`). */
+function accountLabel(a: {
+  institutionName: string | null;
+  type: AccountForDisplay['type'];
+  cardBrand: AccountForDisplay['cardBrand'];
+  name: string;
+  ownerTag: string;
+  currency: 'ARS' | 'USD';
+}): string {
+  return formatAccount({
+    institutionName: a.institutionName,
+    type: a.type,
+    cardBrand: a.cardBrand,
+    name: a.name,
+    ownerTag: a.ownerTag,
+    currency: a.currency,
+  });
 }

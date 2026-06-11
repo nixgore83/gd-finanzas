@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions } from '@/db/schema';
+import { formatAccount } from '@/lib/accounts/format';
 
 /**
  * No se esperan ni se sugieren imports previos a esta fecha: el tracking del
@@ -33,6 +34,10 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
     .select({
       id: accounts.id,
       name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      ownerTag: accounts.ownerTag,
+      currencyDefault: accounts.currencyDefault,
       institutionId: accounts.institutionId,
       institutionName: institutions.name,
     })
@@ -95,7 +100,18 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
 
       return {
         accountId: acc.id,
-        accountName: acc.name,
+        // La institución se muestra aparte → acá solo producto + dueño + moneda.
+        accountName: formatAccount(
+          {
+            institutionName: acc.institutionName,
+            type: acc.type,
+            cardBrand: acc.cardBrand,
+            name: acc.name,
+            ownerTag: acc.ownerTag,
+            currency: acc.currencyDefault,
+          },
+          { withInstitution: false },
+        ),
         institutionId: acc.institutionId,
         institutionName: acc.institutionName,
         missingMonths: missing,

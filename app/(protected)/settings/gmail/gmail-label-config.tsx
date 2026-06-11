@@ -14,11 +14,14 @@ import {
 import { Hair, Body } from '@/components/ui/typography';
 import { listGmailLabels } from '@/app/actions/gmail/list-labels';
 import { saveLabelMapping } from '@/app/actions/gmail/save-label-mapping';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 
 interface AccountRow {
   id: string;
   name: string;
-  type: string;
+  type: AccountForDisplay['type'];
+  cardBrand: AccountForDisplay['cardBrand'];
+  currencyDefault: 'ARS' | 'USD';
   institutionName: string | null;
   ownerTag: string;
   gmailLabelId: string | null;
@@ -92,12 +95,23 @@ export function GmailLabelConfig({ accounts }: { accounts: AccountRow[] }) {
             className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-border/40 pb-3"
           >
             <div>
-              <span className="font-display text-sm text-foreground">{acc.name}</span>
-              {acc.institutionName && (
-                <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
-                  {acc.institutionName} · {acc.ownerTag}
-                </span>
-              )}
+              <span className="font-display text-sm text-foreground">
+                {formatAccount(
+                  {
+                    institutionName: acc.institutionName,
+                    type: acc.type,
+                    cardBrand: acc.cardBrand,
+                    name: acc.name,
+                    ownerTag: acc.ownerTag,
+                    currency: acc.currencyDefault,
+                  },
+                  { withInstitution: false, withOwner: false, withCurrency: false },
+                )}
+              </span>
+              <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
+                {acc.institutionName ? `${acc.institutionName} · ` : ''}
+                {acc.ownerTag} · {acc.currencyDefault}
+              </span>
               {acc.gmailLabelId && (
                 <span className="ml-2 inline-block rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-800">
                   Configurado

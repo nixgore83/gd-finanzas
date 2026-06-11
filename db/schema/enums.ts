@@ -12,6 +12,8 @@ export const accountTypeEnum = pgEnum('account_type', [
   'other',
 ]);
 
+export const cardBrandEnum = pgEnum('card_brand', ['visa', 'master', 'amex']);
+
 export const categoryKindEnum = pgEnum('category_kind', ['income', 'expense']);
 
 export const transactionKindEnum = pgEnum('transaction_kind', ['income', 'expense', 'transfer']);

@@ -28,6 +28,7 @@ type WatchedAccount = {
   id: string;
   name: string;
   type: string;
+  cardBrand: 'visa' | 'master' | 'amex' | null;
   currencyDefault: string;
   institutionId: string | null;
   gmailLabelId: string | null;
@@ -82,6 +83,7 @@ export async function GET(request: Request) {
       id: accounts.id,
       name: accounts.name,
       type: accounts.type,
+      cardBrand: accounts.cardBrand,
       currencyDefault: accounts.currencyDefault,
       institutionId: accounts.institutionId,
       gmailLabelId: accounts.gmailLabelId,
@@ -149,6 +151,7 @@ export async function GET(request: Request) {
                 id: a.id,
                 name: a.name,
                 type: a.type as RoutableAccount['type'],
+                cardBrand: a.cardBrand,
                 currencyDefault: a.currencyDefault as RoutableAccount['currencyDefault'],
                 institutionId: a.institutionId,
                 pdfPassword: a.pdfPassword,

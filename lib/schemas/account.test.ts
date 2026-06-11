@@ -42,9 +42,28 @@ describe('accountInputSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects empty name', () => {
+  it('acepta name vacío (el rótulo es opcional, se trimea a "")', () => {
     const result = accountInputSchema.safeParse({ ...valid, name: '   ' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe('');
+  });
+
+  it('acepta card_brand en una tarjeta de crédito', () => {
+    const result = accountInputSchema.safeParse({ ...valid, cardBrand: 'visa' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.cardBrand).toBe('visa');
+  });
+
+  it('rechaza card_brand en una cuenta que no es tarjeta', () => {
+    const result = accountInputSchema.safeParse({
+      ...valid,
+      type: 'bank_savings',
+      cardBrand: 'visa',
+    });
     expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path[0] === 'cardBrand')).toBe(true);
+    }
   });
 
   it('rejects invalid institutionId uuid', () => {

@@ -1,7 +1,7 @@
 import { pgTable, uuid, text, boolean, timestamp, index } from 'drizzle-orm/pg-core';
 import { households } from './households';
 import { institutions } from './institutions';
-import { accountTypeEnum, currencyEnum } from './enums';
+import { accountTypeEnum, cardBrandEnum, currencyEnum } from './enums';
 
 export const accounts = pgTable(
   'accounts',
@@ -10,8 +10,14 @@ export const accounts = pgTable(
     householdId: uuid('household_id')
       .notNull()
       .references(() => households.id, { onDelete: 'cascade' }),
+    // "Rótulo" distintivo opcional: solo cuando ningún campo estructurado
+    // (institución/tipo/marca/dueño/moneda) captura la distinción. Ej. Balanz
+    // "Argentina" vs "Internacional". Vacío en la mayoría de las cuentas; el
+    // nombre legible se arma con `formatAccount()`, no con este campo solo.
     name: text('name').notNull(),
     type: accountTypeEnum('type').notNull(),
+    // Marca de la tarjeta — SOLO para `type='credit_card'`. Null en el resto.
+    cardBrand: cardBrandEnum('card_brand'),
     currencyDefault: currencyEnum('currency_default').notNull(),
     institutionId: uuid('institution_id').references(() => institutions.id, {
       onDelete: 'restrict',

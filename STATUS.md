@@ -10,6 +10,47 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-10 — Naming/display de cuentas estructurado + helper único (branch `feat/account-naming`)
+
+El campo `accounts.name` venía metiendo a mano institución + tipo + dueño (ya campos
+estructurados aparte) → nombres redundantes e inconsistentes ("Caja Ahorro" vs "Caja de
+Ahorro" vs "CA", "CC", "TC"), duplicados por dueño indistinguibles, y **cada vista armaba el
+label distinto** (no había un formateador único). Rearmado completo, decidido con Nico.
+
+- [x] **Modelo nuevo.** Display canónico **`Institución Producto · Dueño · Moneda`**
+  (ej. `Galicia Visa · Nico · ARS`). Producto = marca para TC / "Caja de ahorro" /
+  "Cuenta corriente" / "Inversiones" (broker) / "Efectivo" (cash) / nada (ewallet). `name`
+  se repurposea a **"rótulo"** opcional (casi siempre vacío; solo distinciones que ningún
+  campo captura, ej. Balanz "Argentina"/"Internacional").
+- [x] **Migración `0015`** — enum `card_brand` (`visa`/`master`/`amex`) + columna nullable
+  `accounts.card_brand` (solo TC). Aditiva. **Aplicada a prod vía Supabase MCP** (idempotente,
+  `CREATE TYPE`/`ADD COLUMN IF NOT EXISTS`); el `.sql` queda versionado en `db/migrations/`.
+  Como 0013/0014, el journal de Drizzle no la registra (un `db:migrate` futuro es no-op).
+- [x] **Helper único `lib/accounts/format.ts`** (`formatAccount`, puro, 10 tests con las 28
+  cuentas reales + colisiones). Opciones `withInstitution`/`withOwner`/`withCurrency` para
+  contextos donde una parte es redundante (lista agrupada por institución, etc.).
+- [x] **Zod + form.** `card_brand` opcional con `superRefine` (solo `credit_card`); `name`
+  pasa a opcional (default `''`). Form de cuenta: campo "Marca" condicional a TC + label
+  "Rótulo (opcional)" con helper text.
+- [x] **Cableado en TODOS los call sites** (antes improvisaban): forms de transacción /
+  transferencia / recurrencia, sus loaders (`+ institutionName/type/cardBrand`, join
+  `institutions`), filtros y tabla de `/transactions` (búsqueda ahora también por institución),
+  filtro de `/imports`, review de import (selector de cuenta + contraparte), upload multi-archivo,
+  snapshot de patrimonio (saldos + dropdown broker), `/settings/gmail`, detalle de transacción.
+- [x] **Consumidores no-UI blindados** (se romperían al vaciar `name`): el matcher de
+  `transferAccountName` en `parse-internal` ahora keya por `formatAccount(...,{sin dueño/moneda})`
+  (= "ICBC Inversiones"/"Galicia Visa", la forma que emiten los parsers); routing multi-cuenta
+  del cron Gmail (`attachment-router`) desambigua por `card_brand` en vez de `name`; export
+  Ganancias y `detect-gaps` componen el nombre con `formatAccount`; `_transfer-candidates` y
+  `load-snapshot-detail` idem.
+- [x] **Limpieza de datos (SQL vía MCP):** 10 TC con su `card_brand` (incl. **HSBC US TC =
+  Master**, decisión Nico), `name=''` en 26 cuentas, rótulo conservado en las 2 Balanz Hogar USD.
+  **Verificado: las 28 cuentas dan display único.** Decisiones Nico: brokers muestran
+  "Inversiones" (no chocan con CA/CC); Master Meli → `Mercado Pago Master`.
+- **Validación:** typecheck + lint + **345 tests** verdes. **Sin migraciones nuevas además de 0015.**
+- [ ] **Pendiente:** smoke visual en prod tras deploy + **sync PRD Notion** (changelog v1.9 +
+  nota fáctica del campo `card_brand` y la convención de naming en §4/§5).
+
 ### Sesión 2026-06-10 — Transferencias de doble lado: match-al-confirmar + linkeo manual + UI de review
 
 Trabajo en worktree aislado (`feat/transfers-match-confirm`), en paralelo con otro agente

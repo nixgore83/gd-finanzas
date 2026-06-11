@@ -24,6 +24,8 @@ import {
 import {
   ACCOUNT_TYPES,
   ACCOUNT_TYPE_LABELS,
+  CARD_BRANDS,
+  CARD_BRAND_LABELS,
   CURRENCIES,
   OWNER_TAGS,
   type AccountInput,
@@ -63,6 +65,7 @@ export function AccountForm({
   // Estado controlado solo para los selects (necesario porque Radix Select no
   // emite name/value como input nativo). El resto va via FormData del DOM.
   const [type, setType] = useState<string>(initial?.type ?? 'bank_savings');
+  const [cardBrand, setCardBrand] = useState<string>(initial?.cardBrand ?? NONE_VALUE);
   const [currencyDefault, setCurrencyDefault] = useState<string>(
     initial?.currencyDefault ?? 'ARS',
   );
@@ -74,6 +77,11 @@ export function AccountForm({
   function handleSubmit(formData: FormData) {
     // Inyectar los valores controlados de los Selects en el FormData.
     formData.set('type', type);
+    // La marca solo aplica a TC; en otros tipos se manda vacío (→ null).
+    formData.set(
+      'cardBrand',
+      type === 'credit_card' && cardBrand !== NONE_VALUE ? cardBrand : '',
+    );
     formData.set('currencyDefault', currencyDefault);
     formData.set('institutionId', institutionId === NONE_VALUE ? '' : institutionId);
     formData.set('ownerTag', ownerTag);
@@ -110,17 +118,21 @@ export function AccountForm({
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nombre</Label>
+            <Label htmlFor="name">Rótulo (opcional)</Label>
             <Input
               id="name"
               name="name"
-              required
               maxLength={80}
               defaultValue={initial?.name ?? ''}
               disabled={isPending}
-              placeholder="Galicia Amex"
+              placeholder="Solo si hace falta distinguirla — ej. Argentina"
               aria-invalid={errors.name ? true : undefined}
             />
+            <p className="text-xs text-muted-foreground">
+              El nombre se arma solo con institución, tipo, marca, titular y moneda. Usá el
+              rótulo únicamente para una distinción extra (ej. Balanz “Argentina” vs
+              “Internacional”).
+            </p>
             {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
           </div>
 
@@ -168,6 +180,31 @@ export function AccountForm({
               )}
             </div>
           </div>
+
+          {type === 'credit_card' && (
+            <div className="space-y-2">
+              <Label htmlFor="cardBrand">Marca</Label>
+              <Select value={cardBrand} onValueChange={setCardBrand} disabled={isPending}>
+                <SelectTrigger
+                  id="cardBrand"
+                  aria-invalid={errors.cardBrand ? true : undefined}
+                >
+                  <SelectValue placeholder="Elegí la marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>— Sin especificar —</SelectItem>
+                  {CARD_BRANDS.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {CARD_BRAND_LABELS[b]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.cardBrand && (
+                <p className="text-sm text-destructive">{errors.cardBrand}</p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="institutionId">Institución</Label>

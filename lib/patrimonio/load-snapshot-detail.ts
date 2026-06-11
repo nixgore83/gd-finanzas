@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { netWorthSnapshots, accountBalances, holdings, accounts } from '@/db/schema';
+import { netWorthSnapshots, accountBalances, holdings, accounts, institutions } from '@/db/schema';
+import { formatAccount } from '@/lib/accounts/format';
 
 export interface SnapshotBalance {
   id: string;
@@ -71,7 +72,10 @@ export async function loadSnapshotDetail(
       .select({
         id: accountBalances.id,
         accountId: accountBalances.accountId,
-        accountName: accounts.name,
+        accName: accounts.name,
+        accCardBrand: accounts.cardBrand,
+        accCurrencyDefault: accounts.currencyDefault,
+        accInstitutionName: institutions.name,
         accountType: accounts.type,
         ownerTag: accounts.ownerTag,
         balance: accountBalances.balance,
@@ -82,12 +86,18 @@ export async function loadSnapshotDetail(
       })
       .from(accountBalances)
       .innerJoin(accounts, eq(accounts.id, accountBalances.accountId))
+      .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
       .where(eq(accountBalances.snapshotId, snapshotId)),
     db
       .select({
         id: holdings.id,
         accountId: holdings.accountId,
-        accountName: accounts.name,
+        accName: accounts.name,
+        accType: accounts.type,
+        accCardBrand: accounts.cardBrand,
+        accCurrencyDefault: accounts.currencyDefault,
+        accInstitutionName: institutions.name,
+        accOwnerTag: accounts.ownerTag,
         ticker: holdings.ticker,
         name: holdings.name,
         assetType: holdings.assetType,
@@ -101,12 +111,35 @@ export async function loadSnapshotDetail(
       })
       .from(holdings)
       .innerJoin(accounts, eq(accounts.id, holdings.accountId))
+      .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
       .where(eq(holdings.snapshotId, snapshotId)),
   ]);
 
   return {
     ...snapshot,
-    balances: balanceRows,
-    holdings: holdingRows,
+    balances: balanceRows.map(({ accName, accCardBrand, accCurrencyDefault, accInstitutionName, ...b }) => ({
+      ...b,
+      accountName: formatAccount({
+        institutionName: accInstitutionName,
+        type: b.accountType,
+        cardBrand: accCardBrand,
+        name: accName,
+        ownerTag: b.ownerTag,
+        currency: accCurrencyDefault,
+      }),
+    })),
+    holdings: holdingRows.map(
+      ({ accName, accType, accCardBrand, accCurrencyDefault, accInstitutionName, accOwnerTag, ...h }) => ({
+        ...h,
+        accountName: formatAccount({
+          institutionName: accInstitutionName,
+          type: accType,
+          cardBrand: accCardBrand,
+          name: accName,
+          ownerTag: accOwnerTag,
+          currency: accCurrencyDefault,
+        }),
+      }),
+    ),
   };
 }

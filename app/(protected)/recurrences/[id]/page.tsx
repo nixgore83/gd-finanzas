@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { and, asc, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { accounts, forecasts, recurrences } from '@/db/schema';
+import { accounts, forecasts, institutions, recurrences } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { updateRecurrence } from '@/app/actions/recurrences/update';
@@ -43,12 +43,16 @@ export default async function EditRecurrencePage({ params }: { params: RoutePara
     .select({
       id: accounts.id,
       name: accounts.name,
+      type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      institutionName: institutions.name,
       currencyDefault: accounts.currencyDefault,
       ownerTag: accounts.ownerTag,
     })
     .from(accounts)
+    .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
-    .orderBy(asc(accounts.name));
+    .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
 
   const categoryRows = await loadCategoryTree(session.householdId);
 

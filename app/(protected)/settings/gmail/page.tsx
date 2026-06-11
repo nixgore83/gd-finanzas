@@ -23,6 +23,8 @@ export default async function GmailSettingsPage() {
       id: accounts.id,
       name: accounts.name,
       type: accounts.type,
+      cardBrand: accounts.cardBrand,
+      currencyDefault: accounts.currencyDefault,
       institutionName: institutions.name,
       ownerTag: accounts.ownerTag,
       gmailLabelId: accounts.gmailLabelId,
@@ -35,7 +37,7 @@ export default async function GmailSettingsPage() {
         eq(accounts.archived, false),
       ),
     )
-    .orderBy(accounts.name);
+    .orderBy(institutions.name, accounts.type, accounts.name);
 
   return (
     <div className="space-y-8">
