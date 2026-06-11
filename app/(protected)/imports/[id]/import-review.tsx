@@ -36,6 +36,7 @@ import {
   findLineTransferMatch,
   type LineTransferMatch,
 } from '@/app/actions/imports/line-transfer-match';
+import { resuggestPendingLines } from '@/app/actions/imports/resuggest-pending';
 import { learnAccountNumber } from '@/app/actions/imports/learn-account-number';
 import { confirmImport } from '@/app/actions/imports/confirm';
 
@@ -641,6 +642,31 @@ export function ImportReview({ importId, status, lines, tree, tags, accounts, im
             disabled={isPending || lineSummary.pending === 0}
           >
             Rechazar todas las pending
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              pinList();
+              startTransition(async () => {
+                const res = await resuggestPendingLines({ importId });
+                if (res.ok) {
+                  toast.success(
+                    res.updated > 0
+                      ? `${res.updated} de ${res.scanned} pendientes enriquecidas con el historial`
+                      : 'Sin cambios — las pendientes ya estaban al día',
+                  );
+                  router.refresh();
+                } else {
+                  toast.error(`Error: ${res.error}`);
+                }
+              });
+            }}
+            disabled={isPending || lineSummary.pending === 0}
+            title="Re-aplica las sugerencias aprendidas (categoría, tags, deducible, cuenta destino) solo sobre las líneas pendientes, sin pisar tus ediciones"
+          >
+            ↻ Re-sugerir pendientes
           </Button>
         </div>
       )}
