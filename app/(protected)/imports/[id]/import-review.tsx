@@ -193,11 +193,10 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
     });
   }
 
-  // Selecciona/deselecciona TODAS las filas filtradas (no solo la página visible),
-  // excluyendo las rechazadas. Combinado con el filtro, es el atajo para
-  // categorizar en lote un grupo homogéneo.
+  // Selecciona/deselecciona TODAS las filas filtradas (no solo la página visible).
+  // Incluye rechazadas: hace falta poder seleccionarlas para des-rechazar en lote.
   const selectableFilteredIds = useMemo(
-    () => filteredLines.filter((l) => l.status !== 'rejected').map((l) => l.id),
+    () => filteredLines.filter((l) => l.transactionId === null).map((l) => l.id),
     [filteredLines],
   );
   const allFilteredSelected =
@@ -279,6 +278,26 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
         toast.success(
           `${res.updated} ${res.updated === 1 ? 'línea marcada' : 'líneas marcadas'} como ${isTransfer ? 'transferencia' : 'no transferencia'}`,
         );
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Deshacer en lote: vuelve la SELECCIÓN a pendiente (aceptadas, editadas o
+  // rechazadas). Sin esto, un "aceptar todas" accidental era irreversible en la
+  // práctica (deshacer era clic por clic).
+  function doBulkBackToPending() {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    startTransition(async () => {
+      const res = await setLineStatus({ importId, lineIds: [...selectedIds], status: 'pending' });
+      if (res.ok) {
+        toast.success(`${res.updated} ${res.updated === 1 ? 'línea vuelta' : 'líneas vueltas'} a pendiente`);
         setSelectedIds(new Set());
         router.refresh();
       } else {
@@ -525,6 +544,21 @@ export function ImportReview({ importId, status, lines, tree, accounts, importIn
                   No es transfer
                 </Button>
               </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">Estado</label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={doBulkBackToPending}
+                disabled={isPending}
+                className="bg-background"
+              >
+                Volver a pendiente
+              </Button>
             </div>
           </div>
           <Button
@@ -890,10 +924,11 @@ function LineRowEditor({
         'border-t align-top',
         isSelected && !readOnly && 'bg-blue-50/50',
         editing && !readOnly && 'bg-blue-50/40',
-        !readOnly && !editing && line.status !== 'rejected' && 'cursor-pointer',
+        line.status === 'rejected' && 'opacity-70',
+        !readOnly && !editing && 'cursor-pointer',
       )}
       onClick={(e) => {
-        if (readOnly || editing || line.status === 'rejected') return;
+        if (readOnly || editing) return;
         const tag = (e.target as HTMLElement).closest('button, input, select, a, [role="combobox"]');
         if (tag) return;
         onToggleSelect();
@@ -906,7 +941,7 @@ function LineRowEditor({
             aria-label="Seleccionar línea"
             checked={isSelected}
             onChange={onToggleSelect}
-            disabled={line.status === 'rejected' || editing}
+            disabled={editing || line.transactionId !== null}
             className="size-4 rounded border-input"
           />
         </td>
@@ -948,7 +983,9 @@ function LineRowEditor({
               {counterpart.name} ({counterpart.ownerTag})
             </span>
           ) : (
-            <span className="text-muted-foreground">Sin contraparte</span>
+            // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
+            // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
+            <span className="text-muted-foreground">Cuenta destino sin asignar</span>
           )
         ) : readOnly || line.transactionId || editing ? (
           categoryName ?? <span className="text-muted-foreground">—</span>
@@ -973,6 +1010,11 @@ function LineRowEditor({
           >
             {STATUS_LABEL[line.status] ?? line.status}
           </span>
+          {line.status === 'rejected' && (
+            <span className="text-[10px] leading-tight text-muted-foreground">
+              {rejectReason(line)}
+            </span>
+          )}
           {line.transactionId && (
             <a
               href={`/transactions/${line.transactionId}`}
@@ -990,75 +1032,92 @@ function LineRowEditor({
           ) : editing ? (
             <span className="text-xs font-medium text-blue-700">✎ editando ↓</span>
           ) : (
+            // Rechazada: única acción posible es recuperarla a pendiente. Editar una
+            // rechazada no tiene sentido (primero se des-rechaza, después se edita) y
+            // es la red de seguridad ante falsos positivos del dedup automático.
             <div className="flex flex-wrap gap-1">
-              {line.status === 'pending' && (
-                <>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'accepted')}
-                    disabled={isPending}
-                  >
-                    ✓
-                  </Button>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'rejected')}
-                    disabled={isPending}
-                  >
-                    ✕
-                  </Button>
-                </>
-              )}
-              {line.status !== 'pending' && line.status !== 'rejected' && (
-                <>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'rejected')}
-                    disabled={isPending}
-                  >
-                    ✕
-                  </Button>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onSetStatus(line.id, 'pending')}
-                    disabled={isPending}
-                  >
-                    Volver
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                type="button"
-                variant="ghost"
-                onClick={() => setEditing(true)}
-                disabled={isPending}
-              >
-                Editar
-              </Button>
-              {!line.parsedData.isTransfer && (
+              {line.status === 'rejected' ? (
                 <Button
                   size="sm"
                   type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setDraft({ ...line.parsedData, isTransfer: true });
-                    setCategoryId(null);
-                    setEditing(true);
-                  }}
+                  variant="outline"
+                  onClick={() => onSetStatus(line.id, 'pending')}
                   disabled={isPending}
-                  className="text-amber-700"
                 >
-                  ⇄ Transfer
+                  Des-rechazar
                 </Button>
+              ) : (
+                <>
+                  {line.status === 'pending' && (
+                    <>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'accepted')}
+                        disabled={isPending}
+                      >
+                        ✓
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'rejected')}
+                        disabled={isPending}
+                      >
+                        ✕
+                      </Button>
+                    </>
+                  )}
+                  {line.status !== 'pending' && (
+                    <>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'rejected')}
+                        disabled={isPending}
+                      >
+                        ✕
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSetStatus(line.id, 'pending')}
+                        disabled={isPending}
+                      >
+                        Volver
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setEditing(true)}
+                    disabled={isPending}
+                  >
+                    Editar
+                  </Button>
+                  {!line.parsedData.isTransfer && (
+                    <Button
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setDraft({ ...line.parsedData, isTransfer: true });
+                        setCategoryId(null);
+                        setEditing(true);
+                      }}
+                      disabled={isPending}
+                      className="text-amber-700"
+                    >
+                      ⇄ Transfer
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1142,22 +1201,23 @@ function LineRowEditor({
                   />
                 </Field>
               )}
-              <Field label="Categoría">
-                <CategoryCombobox
-                  options={categoriesForKind}
-                  value={categoryId ?? ''}
-                  onChange={(id) => {
-                    setCategoryId(id || null);
-                    // Asignar categoría desmarca la transferencia (mutuamente excluyentes).
-                    if (id && draft.isTransfer) {
-                      setDraft({ ...draft, isTransfer: false, transferAccountId: undefined });
-                    }
-                  }}
-                  placeholder="Buscar categoría…"
-                />
-              </Field>
+              {/* Categoría y transfer son mutuamente excluyentes: si es transfer no se
+                  muestra el selector de categoría (antes quedaba clickeable e invitaba
+                  a un estado contradictorio). */}
+              {!draft.isTransfer && (
+                <Field label="Categoría">
+                  <CategoryCombobox
+                    options={categoriesForKind}
+                    value={categoryId ?? ''}
+                    onChange={(id) => {
+                      setCategoryId(id || null);
+                    }}
+                    placeholder="Buscar categoría…"
+                  />
+                </Field>
+              )}
               {draft.isTransfer && (
-                <Field label="Cuenta contraparte">
+                <Field label="Cuenta destino (transfer)">
                   <Combobox
                     options={accounts
                       .filter((a) => a.id !== currentAccountId)
@@ -1312,6 +1372,18 @@ function FilterChip({
       {children}
     </button>
   );
+}
+
+/**
+ * Motivo legible del rechazo de una línea. Las auto-rechazadas por dedup llevan
+ * el marcador `[DUPLICADA]` en `parsedData.notes` (parse-internal); el resto
+ * fueron rechazadas a mano por el usuario.
+ */
+function rejectReason(line: LineRow): string {
+  if (line.parsedData.notes?.includes('[DUPLICADA]')) {
+    return 'Auto: duplicada — ya existía como transacción. No requiere acción.';
+  }
+  return 'Rechazada por vos.';
 }
 
 type CurrencyTotals = {

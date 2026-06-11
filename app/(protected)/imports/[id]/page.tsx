@@ -9,7 +9,9 @@ import { loadCategoryTree } from '@/lib/categories/tree';
 import { resolveParser } from '@/lib/imports/parsers/registry';
 import { generateSignedUrl } from '@/lib/imports/storage';
 import { isParseStale } from '@/lib/imports/parse-stale';
+import { isDeletableStatus } from '@/lib/imports/list-filters';
 import { ParseButton } from './parse-button';
+import { DeleteImportButton } from './delete-import-button';
 import { ImportReview } from './import-review';
 
 export const metadata = {
@@ -141,6 +143,7 @@ export default async function ImportDetailPage({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {isDeletableStatus(row.status) && <DeleteImportButton importId={row.id} />}
           {pdfUrl && (
             <a
               href={pdfUrl}
