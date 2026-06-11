@@ -18,12 +18,53 @@ export interface ImportGap {
   missingMonths: string[]; // ['2026-03', '2026-04']
 }
 
+/** Período declarado por un import confirmado (`imports.period_start/end`). */
+export interface ImportPeriod {
+  periodStart: string | null; // YYYY-MM-DD
+  periodEnd: string | null;
+}
+
+/**
+ * Meses 'YYYY-MM' cubiertos por una cuenta.
+ *
+ * Cobertura = unión de:
+ * - los meses abarcados por el período de cada import confirmado (un consolidado
+ *   ene–jun cubre feb aunque feb no tenga movimientos — antes eso daba falso
+ *   "faltante" porque solo se miraban meses con líneas), y
+ * - los meses con líneas confirmadas (fallback para imports sin período declarado).
+ */
+export function buildCoveredMonths(periods: ImportPeriod[], lineMonths: string[]): Set<string> {
+  const covered = new Set<string>(lineMonths);
+  for (const p of periods) {
+    const start = p.periodStart?.slice(0, 7);
+    if (!start) continue;
+    const end = p.periodEnd?.slice(0, 7) ?? start;
+    for (const m of generateMonthRange(start, end)) covered.add(m);
+  }
+  return covered;
+}
+
+/**
+ * Meses faltantes para una cuenta dado su set de cobertura. Devuelve [] si no hay
+ * nada cubierto todavía (sin imports no hay gaps que reportar) o si no falta nada.
+ * Excluye el mes corriente (puede no haber vencido el resumen) y todo lo previo a
+ * `EARLIEST_TRACKED_MONTH`.
+ */
+export function computeMissingMonths(
+  covered: Set<string>,
+  currentMonth: string,
+  earliestTracked: string = EARLIEST_TRACKED_MONTH,
+): string[] {
+  if (covered.size === 0) return [];
+  const sortedMonths = [...covered].sort();
+  const earliest = sortedMonths[0]!;
+  const rangeStart = earliest < earliestTracked ? earliestTracked : earliest;
+  const expectedMonths = generateMonthRange(rangeStart, currentMonth);
+  return expectedMonths.filter((m) => m !== currentMonth && !covered.has(m));
+}
+
 /**
  * Detects missing monthly imports for accounts that have `expectsMonthlyImport = true`.
- *
- * For each such account, looks at the range from the earliest confirmed import line date
- * to today, and finds months with no confirmed import lines.
- *
  * Returns only accounts that have at least one gap.
  */
 export async function detectImportGaps(householdId: string): Promise<ImportGap[]> {
@@ -60,41 +101,41 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
   // latencia se acumulaba; en cold start podía empujar a /imports al timeout 504).
   const perAccount = await Promise.all(
     watchedAccounts.map(async (acc): Promise<ImportGap | null> => {
-      // 2. Find months that have confirmed import lines for this account
-      const coveredRows = await db
-        .select({
-          month: sql<string>`to_char(
-            (${importLines.parsedData}->>'date')::date,
-            'YYYY-MM'
-          )`,
-        })
-        .from(importLines)
-        .innerJoin(imports, eq(imports.id, importLines.importId))
-        .where(
-          and(
-            eq(imports.householdId, householdId),
-            eq(imports.accountId, acc.id),
-            eq(imports.status, 'confirmed'),
-            sql`${importLines.transactionId} IS NOT NULL`,
+      const [periodRows, coveredRows] = await Promise.all([
+        // 2a. Períodos declarados por los imports confirmados de la cuenta.
+        db
+          .select({ periodStart: imports.periodStart, periodEnd: imports.periodEnd })
+          .from(imports)
+          .where(
+            and(
+              eq(imports.householdId, householdId),
+              eq(imports.accountId, acc.id),
+              eq(imports.status, 'confirmed'),
+            ),
           ),
-        )
-        .groupBy(sql`to_char((${importLines.parsedData}->>'date')::date, 'YYYY-MM')`);
+        // 2b. Meses con líneas confirmadas (fallback si el import no declara período).
+        db
+          .select({
+            month: sql<string>`to_char(
+              (${importLines.parsedData}->>'date')::date,
+              'YYYY-MM'
+            )`,
+          })
+          .from(importLines)
+          .innerJoin(imports, eq(imports.id, importLines.importId))
+          .where(
+            and(
+              eq(imports.householdId, householdId),
+              eq(imports.accountId, acc.id),
+              eq(imports.status, 'confirmed'),
+              sql`${importLines.transactionId} IS NOT NULL`,
+            ),
+          )
+          .groupBy(sql`to_char((${importLines.parsedData}->>'date')::date, 'YYYY-MM')`),
+      ]);
 
-      const coveredMonths = new Set(coveredRows.map((r) => r.month));
-
-      if (coveredMonths.size === 0) return null; // No imports yet — no gaps to report
-
-      // 3. Find the range: earliest covered month to current month, pero nunca
-      //    antes de EARLIEST_TRACKED_MONTH (no esperamos imports previos a 2026).
-      const sortedMonths = [...coveredMonths].sort();
-      const earliest = sortedMonths[0]!;
-      const rangeStart = earliest < EARLIEST_TRACKED_MONTH ? EARLIEST_TRACKED_MONTH : earliest;
-
-      // 4. Generate all expected months in range
-      const expectedMonths = generateMonthRange(rangeStart, currentMonth);
-
-      // 5. Find missing months (exclude current month — it may not be due yet)
-      const missing = expectedMonths.filter((m) => m !== currentMonth && !coveredMonths.has(m));
+      const covered = buildCoveredMonths(periodRows, coveredRows.map((r) => r.month));
+      const missing = computeMissingMonths(covered, currentMonth);
 
       if (missing.length === 0) return null;
 
