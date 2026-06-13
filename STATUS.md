@@ -108,18 +108,29 @@ el TAG es el clasificador.
   el aprendizaje SOLO sobre líneas pending (no pisa ediciones) → los imports en curso
   (ICBC `347a6ae9`, Galicia `e36d50d2`) se benefician sin re-parsear.
 - **Validación:** typecheck + lint + build + **375 tests** verdes (345→375).
-- [x] **Merge PR #50** — mergeado a `main` (commit `0db0dcd`).
-- [x] **Sync PRD Notion (changelog v1.11 + v1.12)** hecho (2026-06-11): el header del
-  changelog ya tenía v1.11/v1.12; además se corrigieron las **divergencias fácticas del
-  cuerpo** — §4.1 (agregado `accounts.transfer_refs` jsonb de la migración 0016 +
-  `account_number`), §5.2.1 (captura fiscal aprendida por contraparte: deducible/tags/
-  `domestic_service`; tag-clasificador en transfers), §5.3 (candidatos de previsión
-  siempre visibles en la review; el toggle solo gobierna el auto-match al confirmar).
-  La regla de cobertura de gaps por período queda en el changelog v1.11 (sin sección de
-  cuerpo propia en el PRD).
-- [ ] **Pendiente (Nico):** smoke en prod end-to-end — revisar un import en curso
-  (ICBC `347a6ae9` / Galicia `e36d50d2`) con los campos nuevos (captura fiscal, candidatos
-  de previsión, match con tx existente, refs de cuenta destino).
+- [x] **Cierre (2026-06-11):** PR **#50** mergeado a `main` (commit `0db0dcd`) y deployado a
+  prod (READY). **Sync PRD Notion hecho como changelog v1.11** — reglas de negocio nuevas:
+  captura fiscal en review, tag-clasificador en transfers, cobertura de gaps por período,
+  link de previsión en review.
+- [ ] **Pendiente (Nico):** smoke en prod (revisar un import en curso end-to-end con los
+  campos fiscales nuevos).
+
+### Sesión 2026-06-11 (bis) — Bulk de contraparte en la review (branch `feat/bulk-counterparty`)
+
+- [x] Barra azul: bloque "Contraparte" — combobox con etiquetas conocidas (historial de
+  transacciones + las del import) con texto libre, aplica `counterparty.label` a las
+  seleccionadas. **Crea `{label}` en líneas sin counterparty parseado** (decisión Nico:
+  sin inventar identificadores — solo-label no entra al matching, test que lo fija).
+  `bulkSetCounterpartyLabel` ahora hace coalesce-create; no cambia status (metadata).
+- [x] Editor inline: campo "Etiqueta contraparte" siempre visible (antes oculto si el
+  parser no extrajo contraparte); el preprocess del schema ya limpiaba el caso vacío.
+- [x] Helper puro `mergeCounterpartyLabels` + 5 tests (381 verdes). Typecheck + lint OK.
+- [x] **Cierre (2026-06-11):** PR **#53** mergeado a `main` (commit `d698672`, reemplazó al
+  #51 que GitHub cerró al borrarse su base tras el merge de #50) y deployado a prod (READY,
+  suite 412 sobre `main`). **Sync PRD Notion hecho como changelog v1.12** (bulk de
+  contraparte + counterparty solo-etiqueta sin identidad; categoría "Donaciones" PR #48).
+- [ ] **Pendiente (Nico):** smoke manual en prod: bulk sobre líneas sin contraparte de un
+  resumen TC.
 
 ### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
 

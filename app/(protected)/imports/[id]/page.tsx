@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, institutions, tags } from '@/db/schema';
+import { accounts, imports, importLines, institutions, tags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
@@ -120,6 +120,21 @@ export default async function ImportDetailPage({
     .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
     .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name));
+
+  // Etiquetas de contraparte ya usadas en transacciones confirmadas, para el
+  // combobox del bulk "Contraparte". jsonb sin índice: trade-off ya aceptado a
+  // escala household (ver counterparty-suggest.ts).
+  const labelRows = await db
+    .selectDistinct({
+      label: sql<string>`${transactions.meta} -> 'counterparty' ->> 'label'`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.householdId, session.householdId),
+        sql`${transactions.meta} -> 'counterparty' ->> 'label' IS NOT NULL`,
+      ),
+    );
 
   // Auto-sugerencia de cuenta destino: si el parser extrajo el nº de cuenta del
   // extracto y matchea una cuenta ya "aprendida", la preseleccionamos.
@@ -287,6 +302,7 @@ export default async function ImportDetailPage({
           tree={tree}
           tags={tagRows}
           accounts={accountRows}
+          knownCounterpartyLabels={labelRows.map((r) => r.label)}
           importInstitutionId={row.institutionId}
           importAccountId={row.accountId}
           statementAccountRef={row.statementAccountRef ?? null}
