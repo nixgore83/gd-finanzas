@@ -3,12 +3,59 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-06-11 por Claude
+**Última actualización:** 2026-06-13 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-06-13 — Limpieza de duplicados por imports solapados (ICBC CC + caja de ahorro 0926)
+
+Nico reportó movimientos duplicados en la **cuenta corriente ICBC** (`0905/02100757/27`, `fb46fa8e`)
+y meses "pendientes" fantasma. Diagnóstico: la misma cuenta entró por **varios imports que se solapan**.
+
+- [x] **Causa raíz CC:** la CC se importó por 2 PDFs angostos (`EXT (3/2).DE.MOVIMIENTOS-5727`, ene/feb)
+  + el **CSV consolidado** `347a6ae9` (atado a la caja de ahorro, confirmado después) que al confirmar
+  creó las patas CA↔CC en la CC. El match-al-confirmar no dedupeó porque las copias PDF eran `expense`
+  o transfer con fecha corrida 1 día. Resultado: 4 movimientos ×2.
+- [x] **Limpieza CC (SQL vía MCP, transacción atómica):** borradas **8 transacciones** (4 copias PDF +
+  1 pata dup en la 0926 + 2 patas de marzo mal-ruteadas que en realidad eran del extracto USD 0413);
+  desvinculadas+`rejected` 4 líneas de import; las 2 contrapartes del 0413 quedaron como transfer suelto;
+  agregado el `IMP 0,33` del 09/06 que faltaba (manual). **Verificado: la CC quedó EXACTA a la captura del
+  banco — 12 movimientos, débitos 166,31 / créditos 185,00.** `transaction_count` recomputado en los imports tocados.
+- [x] **Dedup caja de ahorro ICBC 0926 (`de1a10b2`) — RESUELTO (reconciliación quirúrgica contra verdad externa).**
+  Nico bajó el **listado completo del homebanking** (`0926.csv`, 380 movimientos todo 2026, débitos
+  217.997.247,39 / créditos 217.915.207,18). Se cargó a una tabla de staging y se reconcilió la app (que tenía
+  **423** txns de 7 imports solapados + estaba **incompleta**) contra esa verdad por `(fecha, monto, D/C)`:
+  354 calzaban, 69 sobraban (duplicados de los PDFs AV/Galicia/parciales + 6 fechas corridas), **20 faltaban
+  de verdad** (13 de jun 9–12, posteriores a los imports viejos). **Decisión Nico: método quirúrgico** (no rebuild,
+  porque el rebuild orfanaba **182 contra-patas en 6 cuentas** — broker/Galicia/MP/tarjetas/cash/CC). Operación
+  atómica (SQL vía MCP, con backup previo): borradas las 69 excedentes (conservando la copia **con contraparte**),
+  desapareadas las 14 contra-patas same-import en otras cuentas (sin borrarlas, como el 0413), insertados los 26
+  faltantes categorizados con las reglas reales del parser (`classifyIcbcConcept` + `detectTransfers` + fx BCRA del día).
+  **Verificado: la 0926 quedó EXACTA al banco — 380 movimientos, 0 sobran / 0 faltan, totales idénticos.** Estado:
+  192 transfers, 47 ingresos, 141 gastos, 4 sin categorizar, 84 con contraparte.
+  - **Pendientes menores de esta limpieza:** (a) ~150 "TRANSF. MOBILE/E-BCOS" a personas quedan como `transfer`
+    (comportamiento del `detectTransfers`); si alguno es gasto real, reclasificar en la UI. (b) 14 contra-patas
+    desapareadas en Galicia/broker/MP/tarjetas/cash quedaron como transfer suelto → se limpian en la reconciliación
+    propia de cada cuenta. (c) 3 `TR.xxx A 0905…` entraron como gasto (fiel al parser) pero son transfers a la caja
+    USD → revisar. (d) 6 movimientos con fecha corrida perdieron su nombre de contraparte al reubicarse.
+- [x] **Feature — marcar meses "sin movimientos" (gaps fantasma) — IMPLEMENTADO** (branch `feat/skip-no-movement-months`).
+  La queja original de Nico: la CC marcaba mar/abr/may como pendientes aunque no hubo movimientos. **Migración `0017`**
+  (tabla `account_skipped_months` = household+account+`year_month`, PK account+mes, **RLS household-scoped**, aplicada a
+  prod vía MCP, `.sql` versionado). `detectImportGaps` carga los meses marcados (1 query/household) y los excluye de
+  `missingMonths`; `computeMissingMonths` toma un set `skipped` (testeado). Server actions `markMonthNoMovements` /
+  `unmarkMonthNoMovements` (Zod + household scoping). UI: en "Resúmenes faltantes" de `/imports`, cada mes faltante es
+  un chip con botón "sin mov." (`GapMonthChip` cliente) que lo marca y lo saca del aviso. `/pendientes` y el badge del
+  sidebar usan el mismo helper → se arreglan solos. typecheck + lint + **407 tests** verdes. **Falta: PR + merge (Nico).**
+- [ ] **PENDIENTE — Revisar extracto USD 0413** (`EXT.DE.MOVIMIENTOS-0413.PDF`, import `6d1aa82d`, cuenta
+  `f627454d`): montos mal parseados (TR.7620783 = 25 cuando el CSV lo registró como 34.000 en la 0926; MEP -558,60);
+  tras la limpieza CC quedaron 2 transfers sueltos (`e87e5bcd`, `c982792a`) sin aparear.
+- [ ] **PENDIENTE — Gaps fantasma (feature):** la CC marca mar/abr/may como pendientes aunque no hubo
+  movimientos. Decisión Nico: **marcar a mano un mes/cuenta como "sin movimientos"** (esquema + UI + cableado
+  en `detect-gaps`). El fix del item-2 (consolidado tapa meses vacíos) no cubre cuentas importadas como PDFs
+  mensuales angostos. Plan Mode antes de implementar.
 
 ### Sesión 2026-06-11 — Backlog de feedback completo (items 1–14, branch `feat/imports-backlog`)
 

@@ -14,6 +14,7 @@ import {
   type ImportView,
 } from '@/lib/imports/list-filters';
 import { detectImportGaps } from '@/lib/imports/detect-gaps';
+import { GapMonthChip } from '@/components/imports/gap-month-chip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
@@ -335,14 +336,19 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                 {gap.institutionName && (
                   <span className="text-amber-700 dark:text-amber-400"> · {gap.institutionName}</span>
                 )}
-                <span className="ml-1">
+                <span className="ml-1 inline-flex flex-wrap items-center gap-1 align-middle">
                   — falta{gap.missingMonths.length > 1 ? 'n' : ''}{' '}
-                  {gap.missingMonths
-                    .map((m) => {
-                      const [y, mo] = m.split('-');
-                      return `${MONTHS[Number(mo) - 1]} ${y}`;
-                    })
-                    .join(', ')}
+                  {gap.missingMonths.map((m) => {
+                    const [y, mo] = m.split('-');
+                    return (
+                      <GapMonthChip
+                        key={m}
+                        accountId={gap.accountId}
+                        yearMonth={m}
+                        label={`${MONTHS[Number(mo) - 1]} ${y}`}
+                      />
+                    );
+                  })}
                 </span>
                 <Link
                   href={`/imports/new${gap.institutionId ? `?institutionId=${gap.institutionId}&accountId=${gap.accountId}` : ''}`}

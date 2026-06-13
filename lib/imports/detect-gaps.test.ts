@@ -81,4 +81,21 @@ describe('computeMissingMonths', () => {
     );
     expect(computeMissingMonths(covered, '2026-06')).toEqual([]);
   });
+
+  it('excluye los meses marcados "sin movimientos"', () => {
+    const covered = new Set(['2026-01']);
+    // sin marcar: faltarían feb, mar, abr, may
+    expect(computeMissingMonths(covered, '2026-06')).toEqual([
+      '2026-02',
+      '2026-03',
+      '2026-04',
+      '2026-05',
+    ]);
+    // marcando mar y abr como sin movimientos → solo quedan feb y may
+    const skipped = new Set(['2026-03', '2026-04']);
+    expect(computeMissingMonths(covered, '2026-06', '2026-01', skipped)).toEqual([
+      '2026-02',
+      '2026-05',
+    ]);
+  });
 });
