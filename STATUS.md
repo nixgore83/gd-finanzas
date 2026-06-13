@@ -49,9 +49,20 @@ y meses "pendientes" fantasma. Diagnóstico: la misma cuenta entró por **varios
   `unmarkMonthNoMovements` (Zod + household scoping). UI: en "Resúmenes faltantes" de `/imports`, cada mes faltante es
   un chip con botón "sin mov." (`GapMonthChip` cliente) que lo marca y lo saca del aviso. `/pendientes` y el badge del
   sidebar usan el mismo helper → se arreglan solos. typecheck + lint + **407 tests** verdes. **Falta: PR + merge (Nico).**
-- [ ] **PENDIENTE — Revisar extracto USD 0413** (`EXT.DE.MOVIMIENTOS-0413.PDF`, import `6d1aa82d`, cuenta
-  `f627454d`): montos mal parseados (TR.7620783 = 25 cuando el CSV lo registró como 34.000 en la 0926; MEP -558,60);
-  tras la limpieza CC quedaron 2 transfers sueltos (`e87e5bcd`, `c982792a`) sin aparear.
+- [x] **Caja de ahorro USD 0413 (`f627454d`) — RECONCILIADA contra verdad externa.** Nico bajó el listado del
+  homebanking (`0413.csv`, 27 movimientos USD). Aclaró 2 cosas: el `TR.7620783 -25 USD` **no era mal-parseo** (es
+  un traspaso **cross-moneda** real: 25 USD salieron del 0413 ↔ 34.000 ARS entraron al 0926); y el 558,60 estaba
+  **triplicado** (3 imports). Reconciliación quirúrgica: borrados 6 excedentes (558,60 ×2, 1043,36 dup, 3 fechas
+  corridas), insertados 10 faltantes (may/jun no importados + las 3 fechas corregidas) categorizados (transfers,
+  fx USD→ARS). **Verificado: 27 USD reales = la verdad, 0 sobran / 0 faltan.**
+  - **Nota de proceso:** un filtro `imp <> '93f28c1e'` trató `NULL` como excluido → el insert se re-ejecutó 3×
+    (30 filas); se dedupeó dejando 1 set de 10. Lección: usar `IS DISTINCT FROM` con columnas nullable.
+  - [x] **8 consumos de tarjeta mal-ruteados → movidos a Master Galicia · Nico (decisión Nico).** El import `93f28c1e`
+    estaba mal atado a la caja USD (y mal etiquetado como ICBC); sus 8 consumos (MERPAGO/SODIMAC/MOVISTAR/GOOGLE,
+    con cuotas, ya categorizados) se re-apuntaron a la **Master Galicia de Nico** (`c65ddc18`) — txns + el import
+    (institución corregida a Galicia). El 0413 quedó limpio en 27 USD. Quedan los 2 transfers del 0413
+    que se desaparearon en la limpieza de la CC (`e87e5bcd` MEP 558,60, `c982792a` TR -25): el MEP era una de las
+    copias del 558,60 triplicado (ya resuelto); el TR -25 es real (cross-moneda) y quedó como transfer suelto, OK.
 - [ ] **PENDIENTE — Gaps fantasma (feature):** la CC marca mar/abr/may como pendientes aunque no hubo
   movimientos. Decisión Nico: **marcar a mano un mes/cuenta como "sin movimientos"** (esquema + UI + cableado
   en `detect-gaps`). El fix del item-2 (consolidado tapa meses vacíos) no cubre cuentas importadas como PDFs
