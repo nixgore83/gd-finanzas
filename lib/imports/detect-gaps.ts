@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, imports, importLines, institutions } from '@/db/schema';
+import { accounts, imports, importLines, institutions, accountSkippedMonths } from '@/db/schema';
 import { formatAccount } from '@/lib/accounts/format';
 
 /**
@@ -54,13 +54,16 @@ export function computeMissingMonths(
   covered: Set<string>,
   currentMonth: string,
   earliestTracked: string = EARLIEST_TRACKED_MONTH,
+  skipped: Set<string> = new Set(),
 ): string[] {
   if (covered.size === 0) return [];
   const sortedMonths = [...covered].sort();
   const earliest = sortedMonths[0]!;
   const rangeStart = earliest < earliestTracked ? earliestTracked : earliest;
   const expectedMonths = generateMonthRange(rangeStart, currentMonth);
-  return expectedMonths.filter((m) => m !== currentMonth && !covered.has(m));
+  // Excluye el mes corriente, los ya cubiertos, y los que el usuario marcó
+  // explícitamente como "sin movimientos" (cuentas con actividad esporádica).
+  return expectedMonths.filter((m) => m !== currentMonth && !covered.has(m) && !skipped.has(m));
 }
 
 /**
@@ -93,6 +96,25 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
     );
 
   if (watchedAccounts.length === 0) return [];
+
+  // Meses marcados "sin movimientos" por el usuario → se excluyen de los gaps.
+  // Una sola query para todo el household; se agrupa por cuenta en memoria.
+  const skippedRows = await db
+    .select({
+      accountId: accountSkippedMonths.accountId,
+      yearMonth: accountSkippedMonths.yearMonth,
+    })
+    .from(accountSkippedMonths)
+    .where(eq(accountSkippedMonths.householdId, householdId));
+  const skippedByAccount = new Map<string, Set<string>>();
+  for (const r of skippedRows) {
+    let set = skippedByAccount.get(r.accountId);
+    if (!set) {
+      set = new Set<string>();
+      skippedByAccount.set(r.accountId, set);
+    }
+    set.add(r.yearMonth);
+  }
 
   const today = new Date();
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -135,7 +157,12 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
       ]);
 
       const covered = buildCoveredMonths(periodRows, coveredRows.map((r) => r.month));
-      const missing = computeMissingMonths(covered, currentMonth);
+      const missing = computeMissingMonths(
+        covered,
+        currentMonth,
+        EARLIEST_TRACKED_MONTH,
+        skippedByAccount.get(acc.id) ?? new Set<string>(),
+      );
 
       if (missing.length === 0) return null;
 
