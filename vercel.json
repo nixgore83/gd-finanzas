@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/reap-stale-parses",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/reap-stale-licitaciones",
+      "schedule": "30 12 * * *"
     }
   ]
 }

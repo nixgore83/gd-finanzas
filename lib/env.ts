@@ -17,6 +17,11 @@ const serverEnvSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
   GOOGLE_DRIVE_BACKUP_FOLDER_ID: z.string().optional(),
+  // Microservicio de licitaciones (wrapper Python de procesar.py). Opcionales:
+  // si no están seteadas, el módulo /licitaciones no puede procesar pero el
+  // resto de la app arranca igual.
+  LICITACIONES_SERVICE_URL: z.string().url().optional(),
+  LICITACIONES_SERVICE_SECRET: z.string().min(16).optional(),
 });
 
 const clientEnvSchema = z.object({

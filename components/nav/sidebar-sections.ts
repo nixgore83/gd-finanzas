@@ -58,6 +58,11 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     ],
   },
   {
+    key: 'licitaciones',
+    title: 'Licitaciones',
+    links: [{ href: '/licitaciones', label: 'Calendario', matchPrefix: '/licitaciones' }],
+  },
+  {
     key: 'settings',
     title: 'Settings',
     links: [
