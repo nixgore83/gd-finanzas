@@ -1,5 +1,5 @@
 import { google, type gmail_v1 } from 'googleapis';
-import { getServerEnv } from '@/lib/env';
+import { getGoogleEnv } from '@/lib/env';
 
 let cachedGmail: gmail_v1.Gmail | null = null;
 
@@ -12,7 +12,7 @@ export class GmailConfigError extends Error {
 
 function getGmailClient(): gmail_v1.Gmail {
   if (cachedGmail) return cachedGmail;
-  const env = getServerEnv();
+  const env = getGoogleEnv();
   if (
     !env.GOOGLE_OAUTH_CLIENT_ID ||
     !env.GOOGLE_OAUTH_CLIENT_SECRET ||

@@ -1,6 +1,6 @@
 import { google, type drive_v3 } from 'googleapis';
 import { Readable } from 'node:stream';
-import { getServerEnv } from '@/lib/env';
+import { getGoogleEnv } from '@/lib/env';
 
 let cachedDrive: drive_v3.Drive | null = null;
 
@@ -13,7 +13,7 @@ export class DriveConfigError extends Error {
 
 function getDriveClient(): drive_v3.Drive {
   if (cachedDrive) return cachedDrive;
-  const env = getServerEnv();
+  const env = getGoogleEnv();
   if (
     !env.GOOGLE_OAUTH_CLIENT_ID ||
     !env.GOOGLE_OAUTH_CLIENT_SECRET ||
@@ -35,7 +35,7 @@ function getDriveClient(): drive_v3.Drive {
 }
 
 export function getBackupFolderId(): string {
-  const env = getServerEnv();
+  const env = getGoogleEnv();
   if (!env.GOOGLE_DRIVE_BACKUP_FOLDER_ID) {
     throw new DriveConfigError('GOOGLE_DRIVE_BACKUP_FOLDER_ID no está seteada');
   }

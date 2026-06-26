@@ -1,4 +1,4 @@
-import { getServerEnv } from '@/lib/env';
+import { getLicitacionesServiceEnv } from '@/lib/env';
 import {
   DEFAULT_LICITACIONES_MODEL,
   LICITACIONES_PDF_CONTENT_TYPE,
@@ -28,7 +28,7 @@ export type ProcesarResult =
  * Pau reintenta). Nunca loguea contenido de los PDFs ni montos.
  */
 export async function procesarLicitaciones(input: ProcesarInput): Promise<ProcesarResult> {
-  const env = getServerEnv();
+  const env = getLicitacionesServiceEnv();
   if (!env.LICITACIONES_SERVICE_URL || !env.LICITACIONES_SERVICE_SECRET) {
     return {
       ok: false,

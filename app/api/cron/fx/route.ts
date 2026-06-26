@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { fxRates } from '@/db/schema';
 import { getDb } from '@/lib/db/client';
-import { getServerEnv } from '@/lib/env';
+import { getCronSecret, getBcraVariableId } from '@/lib/env';
 import { fetchBcraSeries, BcraApiError } from '@/lib/fx/bcra';
 import { USD_ARS_PAIR } from '@/lib/fx/get-fx-rate';
 
@@ -18,10 +18,8 @@ function toIsoDate(d: Date): string {
 }
 
 export async function GET(request: Request) {
-  const env = getServerEnv();
-
   const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${getCronSecret()}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
@@ -33,7 +31,7 @@ export async function GET(request: Request) {
   let points;
   try {
     points = await fetchBcraSeries({
-      idVariable: env.BCRA_FX_MINORISTA_VARIABLE_ID,
+      idVariable: getBcraVariableId(),
       desde,
       hasta,
     });

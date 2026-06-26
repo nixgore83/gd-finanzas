@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/client';
 import { households } from '@/db/schema';
-import { getServerEnv } from '@/lib/env';
+import { getCronSecret } from '@/lib/env';
 import { runBackup } from '@/lib/backups/run';
 import { DriveConfigError } from '@/lib/backups/drive';
 
@@ -9,10 +9,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const env = getServerEnv();
-
   const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${getCronSecret()}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 

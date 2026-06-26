@@ -1,13 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { z } from 'zod';
-import { getServerEnv } from '@/lib/env';
+import { getImportParserEnv } from '@/lib/env';
 
 let cached: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (cached) return cached;
-  const env = getServerEnv();
-  cached = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  cached = new Anthropic({ apiKey: getImportParserEnv().ANTHROPIC_API_KEY });
   return cached;
 }
 
