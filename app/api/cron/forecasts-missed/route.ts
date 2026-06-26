@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, eq, lt } from 'drizzle-orm';
 import { forecasts } from '@/db/schema';
 import { getDb } from '@/lib/db/client';
-import { getServerEnv } from '@/lib/env';
+import { getCronSecret } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,10 +10,8 @@ export const runtime = 'nodejs';
 const GRACE_DAYS = 7;
 
 export async function GET(request: Request) {
-  const env = getServerEnv();
-
   const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${getCronSecret()}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 

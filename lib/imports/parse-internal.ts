@@ -20,7 +20,7 @@ import { detectTransfers } from '@/lib/imports/detect-transfers';
 import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
 import { formatAccount } from '@/lib/accounts/format';
-import { getServerEnv } from '@/lib/env';
+import { getImportParserEnv } from '@/lib/env';
 
 export type ParseImportInternalResult =
   | { ok: true; lineCount: number }
@@ -167,8 +167,7 @@ export async function parseImportInternal(
     }
   }
 
-  const env = getServerEnv();
-  const modelId = env.IMPORT_PARSER_MODEL_DEFAULT;
+  const modelId = getImportParserEnv().IMPORT_PARSER_MODEL_DEFAULT;
 
   const tree = await loadCategoryTree(householdId);
   const categoryBlock = buildCategoryPromptBlock(tree);

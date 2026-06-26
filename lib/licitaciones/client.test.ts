@@ -1,17 +1,17 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-vi.mock('@/lib/env', () => ({ getServerEnv: vi.fn() }));
-import { getServerEnv } from '@/lib/env';
+vi.mock('@/lib/env', () => ({ getLicitacionesServiceEnv: vi.fn() }));
+import { getLicitacionesServiceEnv } from '@/lib/env';
 import { procesarLicitaciones } from './client';
 
-const mockedEnv = vi.mocked(getServerEnv);
+const mockedEnv = vi.mocked(getLicitacionesServiceEnv);
 
 function setEnv(over: Record<string, unknown> = {}) {
   mockedEnv.mockReturnValue({
     LICITACIONES_SERVICE_URL: 'https://svc.test',
     LICITACIONES_SERVICE_SECRET: 'x'.repeat(16),
     ...over,
-  } as unknown as ReturnType<typeof getServerEnv>);
+  } as unknown as ReturnType<typeof getLicitacionesServiceEnv>);
 }
 
 const onePdf = { pdfs: [{ filename: 'a.pdf', bytes: new Uint8Array([1, 2, 3]) }] };

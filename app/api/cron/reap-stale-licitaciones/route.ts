@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, eq, sql } from 'drizzle-orm';
 import { licitacionesJobs } from '@/db/schema';
 import { getDb } from '@/lib/db/client';
-import { getServerEnv } from '@/lib/env';
+import { getCronSecret } from '@/lib/env';
 import { LICITACIONES_STALE_AFTER_MS } from '@/lib/licitaciones/stale';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +16,8 @@ export const runtime = 'nodejs';
  * resetearlo a mano por SQL.
  */
 export async function GET(request: Request) {
-  const env = getServerEnv();
-
   const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${getCronSecret()}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 

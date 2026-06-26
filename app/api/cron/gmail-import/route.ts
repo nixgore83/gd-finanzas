@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, households, householdMembers } from '@/db/schema';
-import { getServerEnv } from '@/lib/env';
+import { getCronSecret, getGoogleEnv } from '@/lib/env';
 import {
   listMessagesInLabel,
   getAttachments,
@@ -48,15 +48,14 @@ function groupByLabel(accs: WatchedAccount[]): Map<string, WatchedAccount[]> {
 }
 
 export async function GET(request: Request) {
-  const env = getServerEnv();
-
   const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${getCronSecret()}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
   // Check if Gmail OAuth is configured
-  if (!env.GOOGLE_OAUTH_CLIENT_ID || !env.GOOGLE_OAUTH_CLIENT_SECRET || !env.GOOGLE_OAUTH_REFRESH_TOKEN) {
+  const google = getGoogleEnv();
+  if (!google.GOOGLE_OAUTH_CLIENT_ID || !google.GOOGLE_OAUTH_CLIENT_SECRET || !google.GOOGLE_OAUTH_REFRESH_TOKEN) {
     return NextResponse.json({ ok: true, skipped: 'gmail_not_configured' });
   }
 
