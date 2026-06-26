@@ -5,7 +5,7 @@ import { LicitacionesUploadForm } from './licitaciones-upload-form';
 
 export const metadata = { title: 'Nueva licitación · gd-finanzas' };
 
-// El procesamiento corre en el after() disparado desde createLicitacionJob,
+// El procesamiento corre en el after() disparado desde startLicitacionJob,
 // acotado a esta maxDuration (el microservicio puede tardar ~30–60s o más).
 export const maxDuration = 300;
 

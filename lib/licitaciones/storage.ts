@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerEnv } from '@/lib/env';
+import { LICITACIONES_BUCKET_NAME } from '@/lib/schemas/licitaciones';
 
-const BUCKET_NAME = 'licitaciones';
+const BUCKET_NAME = LICITACIONES_BUCKET_NAME;
 
 let cached: ReturnType<typeof createClient> | null = null;
 
@@ -51,6 +52,39 @@ export async function generateSignedUrl(path: string, expiresIn = 3600): Promise
     .createSignedUrl(path, expiresIn);
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
+}
+
+/**
+ * Crea una signed upload URL (token de un solo uso) para que el CLIENTE suba el
+ * PDF directo a Storage, sin pasar los bytes por la Server Action (esquiva el
+ * límite de body de Next/Vercel). El token autoriza la subida a ese path puntual.
+ */
+export async function createSignedUpload(path: string): Promise<{ path: string; token: string }> {
+  const client = adminClient();
+  const { data, error } = await client.storage.from(BUCKET_NAME).createSignedUploadUrl(path);
+  if (error || !data?.token) throw error ?? new Error('no signed upload url');
+  return { path: data.path, token: data.token };
+}
+
+/** Cuenta los PDFs de entrada ya subidos a la carpeta del job (verificación). */
+export async function countJobInputs(householdId: string, jobId: string): Promise<number> {
+  const client = adminClient();
+  const { data, error } = await client.storage
+    .from(BUCKET_NAME)
+    .list(`${householdId}/${jobId}`);
+  if (error) throw error;
+  return (data ?? []).filter((o) => o.name.startsWith('input_')).length;
+}
+
+/** Borra todos los objetos de la carpeta del job (cleanup ante subida fallida). */
+export async function deleteJobFolder(householdId: string, jobId: string): Promise<void> {
+  const client = adminClient();
+  const prefix = `${householdId}/${jobId}`;
+  const { data, error } = await client.storage.from(BUCKET_NAME).list(prefix);
+  if (error) throw error;
+  if (data && data.length > 0) {
+    await client.storage.from(BUCKET_NAME).remove(data.map((o) => `${prefix}/${o.name}`));
+  }
 }
 
 /** Path de un PDF de entrada: `${householdId}/${jobId}/input_${n}.pdf`. */

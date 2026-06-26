@@ -7,21 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  LICITACIONES_PDF_CONTENT_TYPE,
+  MAX_LICITACIONES_FILE_BYTES,
   MAX_LICITACIONES_PDF_COUNT,
+  MAX_LICITACIONES_TOTAL_BYTES,
   isPdfFilename,
 } from '@/lib/schemas/licitaciones';
-import { createLicitacionJob } from '@/app/actions/licitaciones/create';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  session: 'Sesión expirada — volvé a entrar.',
-  no_files: 'Adjuntá al menos un PDF.',
-  too_many_files: `Máximo ${MAX_LICITACIONES_PDF_COUNT} PDFs por tanda.`,
-  file_too_large: 'Algún PDF supera los 20 MB.',
-  total_too_large: 'El total supera los 50 MB.',
-  unsupported_format: 'Solo se aceptan archivos PDF.',
-  storage: 'No se pudieron subir los archivos. Reintentá.',
-  unknown: 'Algo falló. Reintentá.',
-};
+import { createClient } from '@/lib/supabase/client';
+import {
+  cancelLicitacionJob,
+  createLicitacionUploadSlots,
+  startLicitacionJob,
+} from '@/app/actions/licitaciones/create';
 
 type FileEntry = { id: string; file: File };
 
@@ -30,12 +27,17 @@ export function LicitacionesUploadForm() {
   const [isPending, startTransition] = useTransition();
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [lunes, setLunes] = useState('');
+  const [progress, setProgress] = useState<string | null>(null);
 
   function addFiles(fileList: FileList) {
     const entries: FileEntry[] = [];
     for (const file of Array.from(fileList)) {
       if (!isPdfFilename(file.name)) {
         toast.error(`"${file.name}" no es un PDF — se ignora.`);
+        continue;
+      }
+      if (file.size > MAX_LICITACIONES_FILE_BYTES) {
+        toast.error(`"${file.name}" supera los 20 MB — se ignora.`);
         continue;
       }
       entries.push({ id: crypto.randomUUID(), file });
@@ -56,19 +58,65 @@ export function LicitacionesUploadForm() {
       toast.error(`Máximo ${MAX_LICITACIONES_PDF_COUNT} PDFs por tanda.`);
       return;
     }
+    const total = files.reduce((s, f) => s + f.file.size, 0);
+    if (total > MAX_LICITACIONES_TOTAL_BYTES) {
+      toast.error('El total supera los 50 MB.');
+      return;
+    }
 
     startTransition(async () => {
-      const formData = new FormData();
-      for (const entry of files) formData.append('files', entry.file);
-      if (lunes) formData.set('lunes', lunes);
-
-      const res = await createLicitacionJob(formData);
-      if (res.ok) {
-        toast.success('Procesando…');
-        router.push(`/licitaciones/${res.jobId}`);
+      // 1. Crear el job + obtener un slot de subida (signed URL) por PDF.
+      setProgress('Preparando…');
+      const slotsRes = await createLicitacionUploadSlots({
+        pdfCount: files.length,
+        lunes: lunes || null,
+      });
+      if (!slotsRes.ok) {
+        setProgress(null);
+        toast.error(
+          slotsRes.error === 'session'
+            ? 'Sesión expirada — volvé a entrar.'
+            : slotsRes.error === 'invalid'
+              ? 'Revisá los archivos y la fecha.'
+              : 'No se pudo iniciar la subida. Reintentá.',
+        );
         return;
       }
-      toast.error(ERROR_MESSAGES[res.error] ?? 'Error');
+      const { jobId, bucket, slots } = slotsRes;
+
+      // 2. Subir cada PDF DIRECTO a Storage con su token (no pasa por la action).
+      const supabase = createClient();
+      try {
+        for (let i = 0; i < files.length; i++) {
+          setProgress(`Subiendo ${i + 1} de ${files.length}…`);
+          const slot = slots[i]!;
+          const { error } = await supabase.storage
+            .from(bucket)
+            .uploadToSignedUrl(slot.path, slot.token, files[i]!.file, {
+              contentType: LICITACIONES_PDF_CONTENT_TYPE,
+            });
+          if (error) throw error;
+        }
+      } catch {
+        setProgress(null);
+        await cancelLicitacionJob(jobId);
+        toast.error('Falló la subida de los archivos. Reintentá.');
+        return;
+      }
+
+      // 3. Cerrar: verifica que estén todos y dispara el procesamiento.
+      setProgress('Iniciando procesamiento…');
+      const startRes = await startLicitacionJob(jobId);
+      if (!startRes.ok) {
+        setProgress(null);
+        await cancelLicitacionJob(jobId);
+        toast.error('No se pudo iniciar el procesamiento. Reintentá.');
+        return;
+      }
+
+      setProgress(null);
+      toast.success('Procesando…');
+      router.push(`/licitaciones/${jobId}`);
     });
   }
 
@@ -132,6 +180,8 @@ export function LicitacionesUploadForm() {
           Vacío = próximo lunes. Forzá la fecha si estás armando una semana distinta.
         </p>
       </div>
+
+      {progress && <p className="text-sm text-muted-foreground">{progress}</p>}
 
       <div className="flex justify-end">
         <Button type="button" onClick={submit} disabled={isPending || files.length === 0}>
