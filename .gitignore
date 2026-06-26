@@ -21,3 +21,6 @@ playwright-report/
 *.tsbuildinfo
 # Local Claude Code agent state (worktrees, transcripts) — never commit
 .claude/
+# Material de referencia local (ej. procesar.py / template.xlsx de Pau).
+# Código/datos ajenos al repo, para relevamiento. NUNCA se commitea.
+/local-ref/

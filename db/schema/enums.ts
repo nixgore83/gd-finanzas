@@ -71,3 +71,12 @@ export const assetTypeEnum = pgEnum('asset_type', [
   'crypto',
   'other',
 ]);
+
+// Módulo Calendario de Licitaciones (inquilino de conveniencia: reusa infra de
+// gd-finanzas pero dominio propio). Máquina de estados del job de procesamiento.
+export const licitacionesJobStatusEnum = pgEnum('licitaciones_job_status', [
+  'uploaded',
+  'processing',
+  'done',
+  'error',
+]);

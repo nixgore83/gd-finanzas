@@ -3,12 +3,40 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-06-13 por Claude
+**Última actualización:** 2026-06-26 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-06-26 — Módulo Calendario de Licitaciones (feature de Pau, Opción A)
+
+Nuevo módulo `/licitaciones`: Pau sube PDFs de avisos de licitaciones primarias, se procesan con
+Claude y se descarga el Excel del calendario semanal. **Dominio ajeno a finanzas** — reusa infra
+(auth, RLS, Storage, patrón de jobs de `imports`) pero queda autocontenido/extraíble.
+
+- [x] **Decisión arquitectónica: Opción A** (microservicio Python, no reescritura TS). Confirmado
+  leyendo `procesar.py`: la generación del Excel está calibrada a quirks de openpyxl (reset de estilos
+  por celda, round-trip del `template.xlsx`); ExcelJS round-trippea distinto → riesgo de fidelidad. Se
+  reusa el script entero envuelto en FastAPI.
+- [x] **DB:** tabla `licitaciones_jobs` (estados uploaded→processing→done→error + `processing_started_at`
+  para el reaper), enum `licitaciones_job_status`, **migración `0018`** idempotente + RLS household-scoped
+  (hand-written, estilo 0013–0017). **Falta aplicar a prod (Nico/MCP).**
+- [x] **Lado gd-finanzas** (branch `feat/licitaciones-calendario`): schemas Zod, `lib/licitaciones`
+  (storage bucket `licitaciones`, client del microservicio con auth Bearer + timeout 280s, process-internal
+  async, stale 10 min), 3 server actions (create/process/get-download-url), UI completa (lista + historial +
+  upload + detalle con polling 4s + descarga/reintentar), cron reaper `reap-stale-licitaciones` (`30 12 * * *`),
+  sección en el sidebar. Bucket agregado a `setup-storage.ts`.
+- [x] **Microservicio** (repo aparte `../licitaciones-service`): FastAPI `POST /procesar` + `/health`,
+  `procesar.py` con refactor mínimo (modelo por env, extracción desde bytes, `procesar_en_memoria`),
+  Dockerfile + requirements + README. Devuelve el xlsx binario; **Next lo sube a Storage** (el
+  `SUPABASE_SECRET_KEY` nunca sale de Vercel). Modelo default `claude-sonnet-4-5` (parametrizable).
+- [x] **Verificación:** typecheck + lint + **434 tests** verdes; `py_compile` OK.
+- **Pendientes (Nico):** aplicar migración `0018`; crear bucket `licitaciones` (`npm run storage:setup`);
+  deployar microservicio (Railway/Render) + setear `LICITACIONES_SERVICE_URL` / `LICITACIONES_SERVICE_SECRET`
+  en Vercel; sumar email de Pau a `ALLOWED_EMAILS` + household; PR + merge.
+- **PRD:** sincronizado (changelog + módulo agregado como implementado, pendiente de deploy).
 
 ### Sesión 2026-06-13 — Limpieza de duplicados por imports solapados (ICBC CC + caja de ahorro 0926)
 

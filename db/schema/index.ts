@@ -16,3 +16,4 @@ export * from './financial-goals';
 export * from './patrimonio';
 export * from './household-settings';
 export * from './account-skipped-months';
+export * from './licitaciones';
