@@ -5,6 +5,10 @@ import { z } from 'zod';
  *  registramos cuando la respuesta no informa cuál usó. */
 export const DEFAULT_LICITACIONES_MODEL = 'claude-sonnet-4-5';
 
+/** Bucket de Storage del módulo. Constante client-safe (la usa el form para la
+ *  subida directa con signed URLs). */
+export const LICITACIONES_BUCKET_NAME = 'licitaciones';
+
 /** Máximo de PDFs por job (un set semanal típico es < 20). */
 export const MAX_LICITACIONES_PDF_COUNT = 20;
 
