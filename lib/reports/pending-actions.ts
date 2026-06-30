@@ -1,8 +1,9 @@
-import { and, asc, count, desc, eq, inArray, lt, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, budgets, forecasts, imports, institutions, recurrences } from '@/db/schema';
+import { accounts, budgets, forecasts, imports, institutions, recurrences, transactions } from '@/db/schema';
 import { detectImportGaps, type ImportGap } from '@/lib/imports/detect-gaps';
 import type { ImportType } from '@/lib/schemas/import';
+import { formatAccount } from '@/lib/accounts/format';
 
 export type OverdueKind = 'missed' | 'grace';
 
@@ -34,12 +35,22 @@ export type OverdueForecast = {
   overdueKind: OverdueKind;
 };
 
+export type UnmatchedTransfer = {
+  id: string;
+  date: string;
+  amountOriginal: string;
+  currencyOriginal: 'ARS' | 'USD';
+  description: string;
+  accountName: string;
+};
+
 export type PendingActions = {
   importsToReview: PendingImportReview[];
   importsErrored: PendingImportError[];
   overdueForecasts: OverdueForecast[];
   importGaps: ImportGap[];
   budgetMissing: boolean;
+  unmatchedTransfers: UnmatchedTransfer[];
   /** Cantidad de ítems accionables, para el badge del nav y el resumen del dashboard. */
   totalCount: number;
 };
@@ -71,7 +82,7 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const [importRows, forecastRows, budgetRows, importGaps] = await Promise.all([
+  const [importRows, forecastRows, budgetRows, importGaps, unmatchedTransferRows] = await Promise.all([
     // Imports que requieren acción: revisar (parsed/reviewing) o fallados (error).
     db
       .select({
@@ -131,6 +142,33 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
       ),
 
     detectImportGaps(householdId),
+
+    // Transferencias sin parear (pata única)
+    db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        amountOriginal: transactions.amountOriginal,
+        currencyOriginal: transactions.currencyOriginal,
+        description: transactions.description,
+        accName: accounts.name,
+        accType: accounts.type,
+        accCardBrand: accounts.cardBrand,
+        accOwnerTag: accounts.ownerTag,
+        accCurrency: accounts.currencyDefault,
+        accInstitutionName: institutions.name,
+      })
+      .from(transactions)
+      .leftJoin(accounts, eq(accounts.id, transactions.accountId))
+      .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
+      .where(
+        and(
+          eq(transactions.householdId, householdId),
+          eq(transactions.kind, 'transfer'),
+          isNull(transactions.transferPairId),
+        ),
+      )
+      .orderBy(asc(transactions.date)),
   ]);
 
   const importsToReview: PendingImportReview[] = [];
@@ -175,11 +213,30 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
 
   const budgetMissing = (budgetRows[0]?.c ?? 0) === 0;
 
+  const unmatchedTransfers: UnmatchedTransfer[] = unmatchedTransferRows.map((row) => ({
+    id: row.id,
+    date: row.date,
+    amountOriginal: row.amountOriginal,
+    currencyOriginal: row.currencyOriginal as 'ARS' | 'USD',
+    description: row.description,
+    accountName: row.accType
+      ? formatAccount({
+          institutionName: row.accInstitutionName,
+          type: row.accType,
+          cardBrand: row.accCardBrand,
+          name: row.accName,
+          ownerTag: row.accOwnerTag ?? '',
+          currency: row.accCurrency ?? 'ARS',
+        })
+      : '—',
+  }));
+
   const totalCount =
     importsToReview.length +
     importsErrored.length +
     overdueForecasts.length +
     importGaps.length +
+    unmatchedTransfers.length +
     (budgetMissing ? 1 : 0);
 
   return {
@@ -188,6 +245,7 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
     overdueForecasts,
     importGaps,
     budgetMissing,
+    unmatchedTransfers,
     totalCount,
   };
 }

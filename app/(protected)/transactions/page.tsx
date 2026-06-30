@@ -9,6 +9,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNull,
   lte,
   or,
   sql,
@@ -58,7 +59,11 @@ function parseFilters(sp: Record<string, string | string[] | undefined>) {
 
   const kind = z.enum(['income', 'expense', 'transfer']).safeParse(get('kind'));
   const accountId = z.string().uuid().safeParse(get('accountId'));
-  const categoryId = z.string().uuid().safeParse(get('categoryId'));
+  const categoryIdRaw = get('categoryId');
+  const categoryId =
+    categoryIdRaw === 'unclassified'
+      ? { success: true, data: 'unclassified' as const }
+      : z.string().uuid().safeParse(categoryIdRaw);
   const tagId = z.string().uuid().safeParse(get('tagId'));
   const from = z.string().regex(ISO_DATE_RE).safeParse(get('from'));
   const to = z.string().regex(ISO_DATE_RE).safeParse(get('to'));
@@ -173,7 +178,13 @@ export default async function TransactionsPage({
   const conditions: SQL[] = [eq(transactions.householdId, session.householdId)];
   if (filters.kind) conditions.push(eq(transactions.kind, filters.kind));
   if (filters.accountId) conditions.push(eq(transactions.accountId, filters.accountId));
-  if (filters.categoryId) conditions.push(eq(transactions.categoryId, filters.categoryId));
+  if (filters.categoryId) {
+    if (filters.categoryId === 'unclassified') {
+      conditions.push(isNull(transactions.categoryId));
+    } else {
+      conditions.push(eq(transactions.categoryId, filters.categoryId));
+    }
+  }
   if (filters.tagId) {
     conditions.push(
       sql`exists (select 1 from ${transactionTags} tt where tt.transaction_id = ${transactions.id} and tt.tag_id = ${filters.tagId})`,
@@ -287,8 +298,12 @@ export default async function TransactionsPage({
     activeChips.push({ label: 'Cuenta', value: acc?.label ?? '—' });
   }
   if (filters.categoryId) {
-    const cat = categoryOptions.find((c) => c.id === filters.categoryId);
-    activeChips.push({ label: 'Categoría', value: cat?.name ?? '—' });
+    if (filters.categoryId === 'unclassified') {
+      activeChips.push({ label: 'Categoría', value: 'Sin clasificar' });
+    } else {
+      const cat = categoryOptions.find((c) => c.id === filters.categoryId);
+      activeChips.push({ label: 'Categoría', value: cat?.name ?? '—' });
+    }
   }
   if (filters.tagId) {
     const tag = tagOptions.find((t) => t.id === filters.tagId);
@@ -454,6 +469,7 @@ export default async function TransactionsPage({
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     <option value="">Todas</option>
+                    <option value="unclassified">Sin clasificar</option>
                     {categoryOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.depth === 1 ? `    ↳ ${c.name}` : c.name}

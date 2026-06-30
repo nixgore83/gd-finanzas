@@ -34,7 +34,7 @@ export type ConfirmImportResult =
     }
   | {
       ok: false;
-      error: 'session' | 'not_found' | 'invalid_state' | 'no_account' | 'unknown';
+      error: 'session' | 'not_found' | 'invalid_state' | 'no_account' | 'unresolved_lines' | 'unknown';
       message?: string;
       lineErrors?: Array<{ lineId: string; reason: string }>;
     };
@@ -75,6 +75,26 @@ export async function confirmImport(input: {
   if (!imp) return { ok: false, error: 'not_found' };
   if (imp.status !== 'parsed' && imp.status !== 'reviewing' && imp.status !== 'confirmed') {
     return { ok: false, error: 'invalid_state' };
+  }
+
+  // Verificar que no queden líneas en estado 'pending' (sin clasificar o rechazar)
+  const pendingLines = await db
+    .select({ id: importLines.id })
+    .from(importLines)
+    .where(
+      and(
+        eq(importLines.importId, input.importId),
+        eq(importLines.status, 'pending'),
+      ),
+    )
+    .limit(1);
+
+  if (pendingLines.length > 0) {
+    return {
+      ok: false,
+      error: 'unresolved_lines',
+      message: 'No se puede confirmar la importación porque quedan líneas pendientes de revisar (debés aceptarlas o rechazarlas).',
+    };
   }
 
   // "Aprender" el nº de cuenta del extracto en la cuenta destino, si la cuenta

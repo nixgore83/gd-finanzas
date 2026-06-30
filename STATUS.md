@@ -10,6 +10,20 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-06-30 — Eliminación de Blindspots (Confirmación, Transferencias sin parear y Filtros)
+
+- [x] **Importación segura (Bloqueo de pending):** Se bloquea la confirmación de importaciones si existen líneas en estado `pending`.
+  - Servidor: Modificada la server action `confirmImport` (`confirm.ts`) para lanzar un error `unresolved_lines` si quedan líneas `pending`. Agregado el código de error a `ConfirmImportResult`.
+  - Cliente: Modificada la UI de `import-review.tsx` para deshabilitar el botón de confirmar y mostrar el contador de líneas sin resolver si `lineSummary.pending > 0`.
+- [x] **Aviso de Transferencias sin parear (Pata única):**
+  - Data layer: Modificados `PendingActions` y `loadPendingActions` (`pending-actions.ts`) para buscar transacciones de tipo `transfer` donde `transferPairId IS NULL` (household-scoped) y devolverlas.
+  - Dashboard: Incluido el conteo de transferencias sin parear en el componente `PendingActionsSummary` para alertar al usuario desde el inicio.
+  - Pendientes: Agregada una sección en `/pendientes` que muestra la lista de transferencias sin parear con sus importes, cuenta y el botón "Parear →" que redirige al editor/linker del movimiento.
+- [x] **Filtro "Sin categoría" en Movimientos:**
+  - Búsqueda/Filtro: Modificado el parseador de filtros en `/transactions` y el endpoint `/api/exports/transactions` para aceptar el valor `"unclassified"`.
+  - SQL: Si se filtra por `"unclassified"`, se genera una condición `isNull(transactions.categoryId)`.
+  - UI: Agregada la opción "Sin clasificar" al select dropdown de categorías de movimientos y mapeado su correspondiente filter chip activo.
+
 ### Sesión 2026-06-26 — Módulo Calendario de Licitaciones (feature de Pau, Opción A)
 
 Nuevo módulo `/licitaciones`: Pau sube PDFs de avisos de licitaciones primarias, se procesan con
