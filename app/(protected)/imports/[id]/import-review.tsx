@@ -555,12 +555,16 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   }
 
   function doConfirm() {
+    if (lineSummary.pending > 0) {
+      toast.error('No podés confirmar la importación hasta que resuelvas todas las líneas (aceptándolas o rechazándolas).');
+      return;
+    }
     const hasToConfirm = lineSummary.accepted + lineSummary.edited > 0;
     if (hasToConfirm && !accountId) {
       toast.error('Elegí una cuenta destino');
       return;
     }
-    if (!hasToConfirm && lineSummary.pending > 0) {
+    if (!hasToConfirm) {
       toast.error('No hay líneas aceptadas para confirmar');
       return;
     }
@@ -1144,15 +1148,22 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                 </p>
               ))}
           </div>
-          <Button
-            type="button"
-            onClick={doConfirm}
-            disabled={isPending || (lineSummary.accepted + lineSummary.edited === 0 && lineSummary.pending > 0)}
-          >
-            {lineSummary.accepted + lineSummary.edited === 0
-              ? 'Confirmar import'
-              : `Confirmar import (${lineSummary.accepted + lineSummary.edited})`}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            {lineSummary.pending > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 self-center mr-2">
+                Quedan {lineSummary.pending} {lineSummary.pending === 1 ? 'línea' : 'líneas'} sin resolver.
+              </p>
+            )}
+            <Button
+              type="button"
+              onClick={doConfirm}
+              disabled={isPending || lineSummary.pending > 0}
+            >
+              {lineSummary.accepted + lineSummary.edited === 0
+                ? 'Confirmar import'
+                : `Confirmar import (${lineSummary.accepted + lineSummary.edited})`}
+            </Button>
+          </div>
           </div>
         </div>
       )}

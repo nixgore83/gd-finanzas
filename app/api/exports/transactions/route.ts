@@ -6,6 +6,7 @@ import {
   eq,
   gte,
   ilike,
+  isNull,
   lte,
   or,
   sql,
@@ -22,7 +23,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const filtersSchema = z.object({
   kind: z.enum(['income', 'expense', 'transfer']).optional(),
   accountId: z.string().uuid().optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryId: z.union([z.string().uuid(), z.literal('unclassified')]).optional(),
   tagId: z.string().uuid().optional(),
   from: z.string().regex(ISO_DATE_RE).optional(),
   to: z.string().regex(ISO_DATE_RE).optional(),
@@ -58,7 +59,13 @@ export async function GET(request: Request): Promise<Response> {
   const conditions: SQL[] = [eq(transactions.householdId, session.householdId)];
   if (filters.kind) conditions.push(eq(transactions.kind, filters.kind));
   if (filters.accountId) conditions.push(eq(transactions.accountId, filters.accountId));
-  if (filters.categoryId) conditions.push(eq(transactions.categoryId, filters.categoryId));
+  if (filters.categoryId) {
+    if (filters.categoryId === 'unclassified') {
+      conditions.push(isNull(transactions.categoryId));
+    } else {
+      conditions.push(eq(transactions.categoryId, filters.categoryId));
+    }
+  }
   if (filters.tagId) {
     conditions.push(
       sql`exists (select 1 from ${transactionTags} tt where tt.transaction_id = ${transactions.id} and tt.tag_id = ${filters.tagId})`,

@@ -31,6 +31,12 @@ function buildItems(data: PendingActions): SummaryItem[] {
   if (data.budgetMissing) {
     items.push({ label: 'presupuesto del mes sin definir', tone: 'attn' });
   }
+  if (data.unmatchedTransfers && data.unmatchedTransfers.length > 0) {
+    items.push({
+      label: `${data.unmatchedTransfers.length} transferencia${data.unmatchedTransfers.length > 1 ? 's' : ''} sin parear`,
+      tone: 'attn',
+    });
+  }
   return items;
 }
 

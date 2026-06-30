@@ -226,6 +226,44 @@ export default async function PendientesPage() {
             </PendingSection>
           )}
 
+          {/* ===== Transferencias sin parear ===== */}
+          {data.unmatchedTransfers && data.unmatchedTransfers.length > 0 && (
+            <PendingSection
+              title="Transferencias sin parear"
+              hint={`${data.unmatchedTransfers.length} pendientes`}
+            >
+              <ul className="divide-y divide-border/60">
+                {data.unmatchedTransfers.map((t) => (
+                  <li
+                    key={t.id}
+                    className="grid grid-cols-[56px_1fr_auto_auto] items-center gap-3 py-3"
+                  >
+                    <Num className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                      {shortDate(t.date)}
+                    </Num>
+                    <div className="min-w-0">
+                      <div className="truncate font-display text-base text-foreground">
+                        {t.description}
+                      </div>
+                      <div className="mt-0.5 truncate font-sans text-xs text-muted-foreground">
+                        {t.accountName}
+                      </div>
+                    </div>
+                    <Num className="text-sm text-foreground">
+                      {formatAmount(t.amountOriginal, t.currencyOriginal)}
+                    </Num>
+                    <Link
+                      href={`/transactions/${t.id}`}
+                      className="link font-display text-sm italic text-muted-foreground ml-2"
+                    >
+                      Parear →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </PendingSection>
+          )}
+
           {/* ===== Presupuesto del mes ===== */}
           {data.budgetMissing && (
             <PendingSection title="Presupuesto del mes" hint="sin definir">
