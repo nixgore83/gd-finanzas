@@ -3,7 +3,7 @@ import { getDb } from '@/lib/db/client';
 import { accounts, budgets, forecasts, imports, institutions, recurrences, transactions } from '@/db/schema';
 import { detectImportGaps, type ImportGap } from '@/lib/imports/detect-gaps';
 import type { ImportType } from '@/lib/schemas/import';
-import { formatAccount } from '@/lib/accounts/format';
+import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 
 export type OverdueKind = 'missed' | 'grace';
 
@@ -43,6 +43,46 @@ export type UnmatchedTransfer = {
   description: string;
   accountName: string;
 };
+
+/** Fila cruda del join de la query de transferencias sin parear. */
+export type UnmatchedTransferRow = {
+  id: string;
+  date: string;
+  amountOriginal: string;
+  currencyOriginal: string;
+  description: string;
+  accName: string | null;
+  accType: AccountForDisplay['type'] | null;
+  accCardBrand: AccountForDisplay['cardBrand'];
+  accOwnerTag: string | null;
+  accCurrency: AccountForDisplay['currency'] | null;
+  accInstitutionName: string | null;
+};
+
+/**
+ * Mapea la fila cruda a `UnmatchedTransfer`, componiendo el nombre de cuenta con
+ * `formatAccount`. Si la cuenta no resolvió en el join (`accType` nulo), cae a
+ * `'—'`. Pura y testeable.
+ */
+export function mapUnmatchedTransferRow(row: UnmatchedTransferRow): UnmatchedTransfer {
+  return {
+    id: row.id,
+    date: row.date,
+    amountOriginal: row.amountOriginal,
+    currencyOriginal: row.currencyOriginal as 'ARS' | 'USD',
+    description: row.description,
+    accountName: row.accType
+      ? formatAccount({
+          institutionName: row.accInstitutionName,
+          type: row.accType,
+          cardBrand: row.accCardBrand,
+          name: row.accName,
+          ownerTag: row.accOwnerTag ?? '',
+          currency: row.accCurrency ?? 'ARS',
+        })
+      : '—',
+  };
+}
 
 export type PendingActions = {
   importsToReview: PendingImportReview[];
@@ -213,23 +253,8 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
 
   const budgetMissing = (budgetRows[0]?.c ?? 0) === 0;
 
-  const unmatchedTransfers: UnmatchedTransfer[] = unmatchedTransferRows.map((row) => ({
-    id: row.id,
-    date: row.date,
-    amountOriginal: row.amountOriginal,
-    currencyOriginal: row.currencyOriginal as 'ARS' | 'USD',
-    description: row.description,
-    accountName: row.accType
-      ? formatAccount({
-          institutionName: row.accInstitutionName,
-          type: row.accType,
-          cardBrand: row.accCardBrand,
-          name: row.accName,
-          ownerTag: row.accOwnerTag ?? '',
-          currency: row.accCurrency ?? 'ARS',
-        })
-      : '—',
-  }));
+  const unmatchedTransfers: UnmatchedTransfer[] =
+    unmatchedTransferRows.map(mapUnmatchedTransferRow);
 
   const totalCount =
     importsToReview.length +

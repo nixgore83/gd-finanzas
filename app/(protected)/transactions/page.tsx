@@ -23,6 +23,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { counterpartyFromMeta } from '@/lib/imports/parsers/types';
 import { formatAccount } from '@/lib/accounts/format';
+import { categoryFilterSchema } from '@/lib/transactions/category-filter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
@@ -59,11 +60,7 @@ function parseFilters(sp: Record<string, string | string[] | undefined>) {
 
   const kind = z.enum(['income', 'expense', 'transfer']).safeParse(get('kind'));
   const accountId = z.string().uuid().safeParse(get('accountId'));
-  const categoryIdRaw = get('categoryId');
-  const categoryId =
-    categoryIdRaw === 'unclassified'
-      ? { success: true, data: 'unclassified' as const }
-      : z.string().uuid().safeParse(categoryIdRaw);
+  const categoryId = categoryFilterSchema.safeParse(get('categoryId'));
   const tagId = z.string().uuid().safeParse(get('tagId'));
   const from = z.string().regex(ISO_DATE_RE).safeParse(get('from'));
   const to = z.string().regex(ISO_DATE_RE).safeParse(get('to'));

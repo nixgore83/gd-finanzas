@@ -18,6 +18,7 @@ import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
 import { makeReviewComparator, type ReviewSortField } from '@/lib/imports/review-sort';
+import { summarizeLineStatuses, importConfirmError } from '@/lib/imports/line-summary';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
@@ -132,11 +133,10 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [page, setPage] = useState(0);
 
-  const lineSummary = useMemo(() => {
-    const c = { pending: 0, accepted: 0, rejected: 0, edited: 0 };
-    for (const l of lines) c[l.status] += 1;
-    return c;
-  }, [lines]);
+  const lineSummary = useMemo(
+    () => summarizeLineStatuses(lines.map((l) => l.status)),
+    [lines],
+  );
 
   const totals = useMemo(() => computeTotalsByCurrency(lines), [lines]);
 
@@ -555,7 +555,8 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   }
 
   function doConfirm() {
-    if (lineSummary.pending > 0) {
+    const confirmErr = importConfirmError(lineSummary);
+    if (confirmErr === 'unresolved_lines') {
       toast.error('No podés confirmar la importación hasta que resuelvas todas las líneas (aceptándolas o rechazándolas).');
       return;
     }
@@ -564,7 +565,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
       toast.error('Elegí una cuenta destino');
       return;
     }
-    if (!hasToConfirm) {
+    if (confirmErr === 'no_accepted') {
       toast.error('No hay líneas aceptadas para confirmar');
       return;
     }
