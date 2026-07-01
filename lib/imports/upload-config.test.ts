@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   applyBulkToEntries,
   importTypeFromAccountType,
+  resolveInitialUploadConfig,
+  type AccountForInit,
   type AccountMeta,
   type BulkApplyFlags,
 } from './upload-config';
@@ -128,5 +130,60 @@ describe('applyBulkToEntries', () => {
 
   it('lista vacía → devuelve lista vacía', () => {
     expect(applyBulkToEntries([], { institutionId: 'icbc', type: 'tc', accountId: '' }, ALL, meta)).toEqual([]);
+  });
+});
+
+const initAccounts: AccountForInit[] = [
+  { id: 'acc-icbc-amex', institutionId: 'icbc', type: 'credit_card' },
+  { id: 'acc-hsbc-ca', institutionId: 'hsbc', type: 'bank_savings' },
+  { id: 'acc-cash', institutionId: null, type: 'cash' },
+];
+
+describe('resolveInitialUploadConfig', () => {
+  it('con cuenta preseleccionada: manda su institución, tipo y id', () => {
+    const cfg = resolveInitialUploadConfig(initAccounts, {
+      initialAccountId: 'acc-icbc-amex',
+      fallbackInstitutionId: 'fallback',
+    });
+    expect(cfg).toEqual({ institutionId: 'icbc', type: 'tc', accountId: 'acc-icbc-amex' });
+  });
+
+  it('cuenta de banco → tipo banco', () => {
+    const cfg = resolveInitialUploadConfig(initAccounts, {
+      initialAccountId: 'acc-hsbc-ca',
+      fallbackInstitutionId: 'fallback',
+    });
+    expect(cfg).toEqual({ institutionId: 'hsbc', type: 'banco', accountId: 'acc-hsbc-ca' });
+  });
+
+  it('cuenta sin institución (cash) → cae al fallback de institución', () => {
+    const cfg = resolveInitialUploadConfig(initAccounts, {
+      initialAccountId: 'acc-cash',
+      fallbackInstitutionId: 'fallback',
+    });
+    expect(cfg.institutionId).toBe('fallback');
+    expect(cfg.accountId).toBe('acc-cash');
+  });
+
+  it('sin cuenta pero con institución → usa esa institución, tipo tc, sin cuenta', () => {
+    const cfg = resolveInitialUploadConfig(initAccounts, {
+      initialInstitutionId: 'hsbc',
+      fallbackInstitutionId: 'fallback',
+    });
+    expect(cfg).toEqual({ institutionId: 'hsbc', type: 'tc', accountId: '' });
+  });
+
+  it('sin preselección → fallback', () => {
+    const cfg = resolveInitialUploadConfig(initAccounts, { fallbackInstitutionId: 'fallback' });
+    expect(cfg).toEqual({ institutionId: 'fallback', type: 'tc', accountId: '' });
+  });
+
+  it('accountId inexistente → ignora y usa institución/fallback', () => {
+    const cfg = resolveInitialUploadConfig(initAccounts, {
+      initialAccountId: 'no-existe',
+      initialInstitutionId: 'icbc',
+      fallbackInstitutionId: 'fallback',
+    });
+    expect(cfg).toEqual({ institutionId: 'icbc', type: 'tc', accountId: '' });
   });
 });

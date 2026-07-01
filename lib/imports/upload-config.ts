@@ -24,6 +24,35 @@ export function importTypeFromAccountType(accountType: string): ImportType {
   return 'banco';
 }
 
+/** Forma mínima de cuenta para resolver la config inicial. */
+export type AccountForInit = { id: string; institutionId: string | null; type: string };
+
+/**
+ * Config inicial del upload a partir de la preselección (link "Importar →" de
+ * Resúmenes faltantes). Si vino una cuenta válida, manda su institución y tipo
+ * (fuente de verdad); si no, se usa la institución dada o el fallback. Pura.
+ */
+export function resolveInitialUploadConfig(
+  accounts: readonly AccountForInit[],
+  opts: { initialAccountId?: string; initialInstitutionId?: string; fallbackInstitutionId: string },
+): UploadEntryConfig {
+  const acc = opts.initialAccountId
+    ? accounts.find((a) => a.id === opts.initialAccountId)
+    : undefined;
+  if (acc) {
+    return {
+      institutionId: acc.institutionId ?? opts.fallbackInstitutionId,
+      type: importTypeFromAccountType(acc.type),
+      accountId: acc.id,
+    };
+  }
+  return {
+    institutionId: opts.initialInstitutionId || opts.fallbackInstitutionId,
+    type: 'tc',
+    accountId: '',
+  };
+}
+
 /**
  * Aplica la config bulk a cada entrada según los campos tildados (`flags`),
  * preservando el resto de las props de cada entrada (id, file). Reglas de

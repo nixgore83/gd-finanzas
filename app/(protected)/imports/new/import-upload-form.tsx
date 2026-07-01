@@ -18,6 +18,7 @@ import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import {
   applyBulkToEntries,
   importTypeFromAccountType,
+  resolveInitialUploadConfig,
   type AccountMeta,
   type BulkApplyFlags,
 } from '@/lib/imports/upload-config';
@@ -65,9 +66,14 @@ type UploadResult = {
 export function ImportUploadForm({
   institutions,
   accounts,
+  initialInstitutionId,
+  initialAccountId,
 }: {
   institutions: Institution[];
   accounts: Account[];
+  /** Preselección (link "Importar →" de Resúmenes faltantes): institución/cuenta que se espera importar. */
+  initialInstitutionId?: string;
+  initialAccountId?: string;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -76,14 +82,25 @@ export function ImportUploadForm({
   const [results, setResults] = useState<UploadResult[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
 
-  const defaultInstitutionId = institutions[0]?.id ?? '';
+  // Preselección (link "Importar →" de Resúmenes faltantes): la cuenta manda su
+  // institución y tipo. Los archivos nuevos y la barra bulk arrancan cargados con
+  // esto, así importar desde ahí no obliga a re-elegir la cuenta.
+  const {
+    institutionId: defaultInstitutionId,
+    type: defaultType,
+    accountId: defaultAccountId,
+  } = resolveInitialUploadConfig(accounts, {
+    initialAccountId,
+    initialInstitutionId,
+    fallbackInstitutionId: institutions[0]?.id ?? '',
+  });
 
   // Config bulk "aplicar a todos" (visible con ≥2 archivos). Cada campo se
   // propaga solo si su checkbox está tildado (propagación parcial).
   const [bulk, setBulk] = useState<{ institutionId: string; type: ImportType; accountId: string }>({
     institutionId: defaultInstitutionId,
-    type: 'tc',
-    accountId: '',
+    type: defaultType,
+    accountId: defaultAccountId,
   });
   const [bulkFlags, setBulkFlags] = useState<BulkApplyFlags>({
     institution: true,
@@ -136,8 +153,8 @@ export function ImportUploadForm({
         id: crypto.randomUUID(),
         file,
         institutionId: lastEntry?.institutionId ?? defaultInstitutionId,
-        type: lastEntry?.type ?? 'tc',
-        accountId: '',
+        type: lastEntry?.type ?? defaultType,
+        accountId: lastEntry?.accountId ?? defaultAccountId,
       });
     }
     setFiles((prev) => [...prev, ...newEntries]);
