@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,13 @@ import {
 } from '@/components/ui/select';
 import { IMPORT_TYPES, IMPORT_TYPE_LABELS, type ImportType } from '@/lib/schemas/import';
 import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
+import {
+  applyBulkToEntries,
+  importTypeFromAccountType,
+  resolveInitialUploadConfig,
+  type AccountMeta,
+  type BulkApplyFlags,
+} from '@/lib/imports/upload-config';
 import { createImport } from '@/app/actions/imports/create';
 
 type Institution = { id: string; name: string };
@@ -56,18 +63,17 @@ type UploadResult = {
   duplicate?: { importId: string; confirmedAt: string | null };
 };
 
-function importTypeFromAccountType(accountType: string): ImportType {
-  if (accountType === 'credit_card') return 'tc';
-  if (accountType === 'broker') return 'broker';
-  return 'banco';
-}
-
 export function ImportUploadForm({
   institutions,
   accounts,
+  initialInstitutionId,
+  initialAccountId,
 }: {
   institutions: Institution[];
   accounts: Account[];
+  /** Preselección (link "Importar →" de Resúmenes faltantes): institución/cuenta que se espera importar. */
+  initialInstitutionId?: string;
+  initialAccountId?: string;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -76,7 +82,67 @@ export function ImportUploadForm({
   const [results, setResults] = useState<UploadResult[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
 
-  const defaultInstitutionId = institutions[0]?.id ?? '';
+  // Preselección (link "Importar →" de Resúmenes faltantes): la cuenta manda su
+  // institución y tipo. Los archivos nuevos y la barra bulk arrancan cargados con
+  // esto, así importar desde ahí no obliga a re-elegir la cuenta.
+  const {
+    institutionId: defaultInstitutionId,
+    type: defaultType,
+    accountId: defaultAccountId,
+  } = resolveInitialUploadConfig(accounts, {
+    initialAccountId,
+    initialInstitutionId,
+    fallbackInstitutionId: institutions[0]?.id ?? '',
+  });
+
+  // Config bulk "aplicar a todos" (visible con ≥2 archivos). Cada campo se
+  // propaga solo si su checkbox está tildado (propagación parcial).
+  const [bulk, setBulk] = useState<{ institutionId: string; type: ImportType; accountId: string }>({
+    institutionId: defaultInstitutionId,
+    type: defaultType,
+    accountId: defaultAccountId,
+  });
+  const [bulkFlags, setBulkFlags] = useState<BulkApplyFlags>({
+    institution: true,
+    type: true,
+    account: true,
+  });
+
+  const accountMeta = useMemo<AccountMeta>(
+    () =>
+      Object.fromEntries(
+        accounts.map((a) => [
+          a.id,
+          { institutionId: a.institutionId ?? '', importType: importTypeFromAccountType(a.type) },
+        ]),
+      ),
+    [accounts],
+  );
+
+  function updateBulk(patch: Partial<{ institutionId: string; type: ImportType; accountId: string }>) {
+    setBulk((b) => {
+      const updated = { ...b, ...patch };
+      // Cambiar institución invalida la cuenta elegida (mismo criterio por-archivo).
+      if (patch.institutionId && patch.institutionId !== b.institutionId) updated.accountId = '';
+      return updated;
+    });
+  }
+
+  function handleBulkAccountChange(accountId: string) {
+    const account = accounts.find((a) => a.id === accountId);
+    updateBulk(
+      account ? { accountId, type: importTypeFromAccountType(account.type) } : { accountId },
+    );
+  }
+
+  function applyBulk() {
+    if (!bulkFlags.institution && !bulkFlags.type && !bulkFlags.account) {
+      toast.error('Tildá al menos un campo para aplicar.');
+      return;
+    }
+    setFiles((prev) => applyBulkToEntries(prev, bulk, bulkFlags, accountMeta));
+    toast.success(`Aplicado a ${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`);
+  }
 
   function addFiles(fileList: FileList) {
     const newEntries: FileEntry[] = [];
@@ -87,8 +153,8 @@ export function ImportUploadForm({
         id: crypto.randomUUID(),
         file,
         institutionId: lastEntry?.institutionId ?? defaultInstitutionId,
-        type: lastEntry?.type ?? 'tc',
-        accountId: '',
+        type: lastEntry?.type ?? defaultType,
+        accountId: lastEntry?.accountId ?? defaultAccountId,
       });
     }
     setFiles((prev) => [...prev, ...newEntries]);
@@ -209,6 +275,123 @@ export function ImportUploadForm({
           }}
         />
       </div>
+
+      {/* Bulk "aplicar a todos" — solo con ≥2 archivos */}
+      {files.length >= 2 && (
+        <div className="space-y-3 rounded-md border border-dashed bg-muted/30 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Aplicar a todos los archivos</span>
+            <Button type="button" size="sm" onClick={applyBulk} disabled={isPending}>
+              Aplicar a {files.length}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Tildá qué campos propagar. Elegir una Cuenta ya define su institución y tipo.
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <label className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={bulkFlags.institution}
+                  onChange={(e) => setBulkFlags((f) => ({ ...f, institution: e.target.checked }))}
+                  disabled={isPending}
+                />
+                Institución
+              </label>
+              <Select
+                value={bulk.institutionId}
+                onValueChange={(v) => updateBulk({ institutionId: v })}
+                disabled={isPending || !bulkFlags.institution}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Institución" />
+                </SelectTrigger>
+                <SelectContent>
+                  {institutions.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={bulkFlags.type}
+                  onChange={(e) => setBulkFlags((f) => ({ ...f, type: e.target.checked }))}
+                  disabled={isPending}
+                />
+                Tipo
+              </label>
+              <Select
+                value={bulk.type}
+                onValueChange={(v) => updateBulk({ type: v as ImportType })}
+                disabled={isPending || !bulkFlags.type}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {IMPORT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {IMPORT_TYPE_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={bulkFlags.account}
+                  onChange={(e) => setBulkFlags((f) => ({ ...f, account: e.target.checked }))}
+                  disabled={isPending}
+                />
+                Cuenta
+              </label>
+              {(() => {
+                const bulkAccounts = accounts.filter((a) => a.institutionId === bulk.institutionId);
+                return (
+                  <Select
+                    value={bulk.accountId || '_none'}
+                    onValueChange={(v) => handleBulkAccountChange(v === '_none' ? '' : v)}
+                    disabled={isPending || !bulkFlags.account || bulkAccounts.length === 0}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder={bulkAccounts.length === 0 ? 'Sin cuentas' : 'Opcional'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">Sin especificar</SelectItem>
+                      {bulkAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {formatAccount(
+                            {
+                              institutionName: a.institutionName,
+                              type: a.type,
+                              cardBrand: a.cardBrand,
+                              name: a.name,
+                              ownerTag: a.ownerTag ?? '',
+                              currency: a.currencyDefault,
+                            },
+                            { withInstitution: false },
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Per-file configuration */}
       {files.length > 0 && (

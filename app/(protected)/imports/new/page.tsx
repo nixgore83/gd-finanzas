@@ -15,7 +15,13 @@ export const metadata = {
 // los 300s (igual que /imports/[id]); el default bajo de Hobby lo mataría a mitad.
 export const maxDuration = 300;
 
-export default async function NewImportPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function NewImportPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -48,6 +54,14 @@ export default async function NewImportPage() {
       .orderBy(asc(institutions.name), asc(accounts.type), asc(accounts.name)),
   ]);
 
+  // Preselección desde el link "Importar →" de Resúmenes faltantes. Se validan
+  // contra las listas cargadas (household-scoped) para no confiar en la URL.
+  const sp = await searchParams;
+  const rawAccountId = typeof sp.accountId === 'string' ? sp.accountId : undefined;
+  const rawInstitutionId = typeof sp.institutionId === 'string' ? sp.institutionId : undefined;
+  const initialAccountId = accountRows.find((a) => a.id === rawAccountId)?.id;
+  const initialInstitutionId = instRows.find((i) => i.id === rawInstitutionId)?.id;
+
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <div>
@@ -57,7 +71,12 @@ export default async function NewImportPage() {
           parsearlo con LLM y revisar las transacciones antes de confirmar.
         </p>
       </div>
-      <ImportUploadForm institutions={instRows} accounts={accountRows} />
+      <ImportUploadForm
+        institutions={instRows}
+        accounts={accountRows}
+        initialInstitutionId={initialInstitutionId}
+        initialAccountId={initialAccountId}
+      />
     </div>
   );
 }
