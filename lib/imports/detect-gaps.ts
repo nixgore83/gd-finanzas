@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions, accountSkippedMonths } from '@/db/schema';
 import { formatAccount } from '@/lib/accounts/format';
@@ -96,16 +96,57 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
     );
 
   if (watchedAccounts.length === 0) return [];
+  const watchedIds = watchedAccounts.map((a) => a.id);
 
-  // Meses marcados "sin movimientos" por el usuario → se excluyen de los gaps.
-  // Una sola query para todo el household; se agrupa por cuenta en memoria.
-  const skippedRows = await db
-    .select({
-      accountId: accountSkippedMonths.accountId,
-      yearMonth: accountSkippedMonths.yearMonth,
-    })
-    .from(accountSkippedMonths)
-    .where(eq(accountSkippedMonths.householdId, householdId));
+  // Un mes (YYYY-MM) desde el campo `date` (texto) del parsed_data de una línea.
+  const monthExpr = sql<string>`to_char((${importLines.parsedData}->>'date')::date, 'YYYY-MM')`;
+
+  // Tres queries acotadas al household (agrupadas por cuenta en memoria), en vez
+  // de 2 queries POR cuenta vigilada. Con muchas cuentas, el fan-out anterior
+  // (2×N queries concurrentes) saturaba el pipelining de postgres-js sobre las
+  // pocas conexiones del pooler (transaction mode) y wedgeaba una conexión → la
+  // request quedaba colgada hasta el timeout de 300s (incidente 2026-07-01).
+  const [skippedRows, periodRowsAll, coveredRowsAll] = await Promise.all([
+    // Meses marcados "sin movimientos" por el usuario → se excluyen de los gaps.
+    db
+      .select({
+        accountId: accountSkippedMonths.accountId,
+        yearMonth: accountSkippedMonths.yearMonth,
+      })
+      .from(accountSkippedMonths)
+      .where(eq(accountSkippedMonths.householdId, householdId)),
+    // Períodos declarados por los imports confirmados, por cuenta.
+    db
+      .select({
+        accountId: imports.accountId,
+        periodStart: imports.periodStart,
+        periodEnd: imports.periodEnd,
+      })
+      .from(imports)
+      .where(
+        and(
+          eq(imports.householdId, householdId),
+          eq(imports.status, 'confirmed'),
+          inArray(imports.accountId, watchedIds),
+        ),
+      ),
+    // Meses con líneas confirmadas (fallback si el import no declara período), por cuenta.
+    db
+      .select({ accountId: imports.accountId, month: monthExpr })
+      .from(importLines)
+      .innerJoin(imports, eq(imports.id, importLines.importId))
+      .where(
+        and(
+          eq(imports.householdId, householdId),
+          eq(imports.status, 'confirmed'),
+          inArray(imports.accountId, watchedIds),
+          sql`${importLines.transactionId} IS NOT NULL`,
+        ),
+      )
+      .groupBy(imports.accountId, monthExpr),
+  ]);
+
+  // Agrupar todo por cuenta en memoria.
   const skippedByAccount = new Map<string, Set<string>>();
   for (const r of skippedRows) {
     let set = skippedByAccount.get(r.accountId);
@@ -115,79 +156,59 @@ export async function detectImportGaps(householdId: string): Promise<ImportGap[]
     }
     set.add(r.yearMonth);
   }
+  const periodsByAccount = new Map<string, ImportPeriod[]>();
+  for (const r of periodRowsAll) {
+    if (!r.accountId) continue;
+    const list = periodsByAccount.get(r.accountId) ?? [];
+    list.push({ periodStart: r.periodStart, periodEnd: r.periodEnd });
+    periodsByAccount.set(r.accountId, list);
+  }
+  const monthsByAccount = new Map<string, string[]>();
+  for (const r of coveredRowsAll) {
+    if (!r.accountId) continue;
+    const list = monthsByAccount.get(r.accountId) ?? [];
+    list.push(r.month);
+    monthsByAccount.set(r.accountId, list);
+  }
 
   const today = new Date();
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  // Una query por cuenta vigilada, pero en paralelo (antes era secuencial y la
-  // latencia se acumulaba; en cold start podía empujar a /imports al timeout 504).
-  const perAccount = await Promise.all(
-    watchedAccounts.map(async (acc): Promise<ImportGap | null> => {
-      const [periodRows, coveredRows] = await Promise.all([
-        // 2a. Períodos declarados por los imports confirmados de la cuenta.
-        db
-          .select({ periodStart: imports.periodStart, periodEnd: imports.periodEnd })
-          .from(imports)
-          .where(
-            and(
-              eq(imports.householdId, householdId),
-              eq(imports.accountId, acc.id),
-              eq(imports.status, 'confirmed'),
-            ),
-          ),
-        // 2b. Meses con líneas confirmadas (fallback si el import no declara período).
-        db
-          .select({
-            month: sql<string>`to_char(
-              (${importLines.parsedData}->>'date')::date,
-              'YYYY-MM'
-            )`,
-          })
-          .from(importLines)
-          .innerJoin(imports, eq(imports.id, importLines.importId))
-          .where(
-            and(
-              eq(imports.householdId, householdId),
-              eq(imports.accountId, acc.id),
-              eq(imports.status, 'confirmed'),
-              sql`${importLines.transactionId} IS NOT NULL`,
-            ),
-          )
-          .groupBy(sql`to_char((${importLines.parsedData}->>'date')::date, 'YYYY-MM')`),
-      ]);
+  const gaps: ImportGap[] = [];
+  for (const acc of watchedAccounts) {
+    const covered = buildCoveredMonths(
+      periodsByAccount.get(acc.id) ?? [],
+      monthsByAccount.get(acc.id) ?? [],
+    );
+    const missing = computeMissingMonths(
+      covered,
+      currentMonth,
+      EARLIEST_TRACKED_MONTH,
+      skippedByAccount.get(acc.id) ?? new Set<string>(),
+    );
+    if (missing.length === 0) continue;
 
-      const covered = buildCoveredMonths(periodRows, coveredRows.map((r) => r.month));
-      const missing = computeMissingMonths(
-        covered,
-        currentMonth,
-        EARLIEST_TRACKED_MONTH,
-        skippedByAccount.get(acc.id) ?? new Set<string>(),
-      );
+    gaps.push({
+      accountId: acc.id,
+      // La institución se muestra aparte → acá solo producto + dueño + moneda.
+      accountName: formatAccount(
+        {
+          institutionName: acc.institutionName,
+          type: acc.type,
+          cardBrand: acc.cardBrand,
+          name: acc.name,
+          ownerTag: acc.ownerTag,
+          currency: acc.currencyDefault,
+        },
+        { withInstitution: false },
+      ),
+      institutionId: acc.institutionId,
+      institutionName: acc.institutionName,
+      missingMonths: missing,
+    });
+  }
 
-      if (missing.length === 0) return null;
-
-      return {
-        accountId: acc.id,
-        // La institución se muestra aparte → acá solo producto + dueño + moneda.
-        accountName: formatAccount(
-          {
-            institutionName: acc.institutionName,
-            type: acc.type,
-            cardBrand: acc.cardBrand,
-            name: acc.name,
-            ownerTag: acc.ownerTag,
-            currency: acc.currencyDefault,
-          },
-          { withInstitution: false },
-        ),
-        institutionId: acc.institutionId,
-        institutionName: acc.institutionName,
-        missingMonths: missing,
-      };
-    }),
-  );
-
-  return perAccount.filter((g): g is ImportGap => g !== null);
+  return gaps;
 }
 
 function generateMonthRange(from: string, to: string): string[] {
