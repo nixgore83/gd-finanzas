@@ -17,13 +17,14 @@ import { getDb } from '@/lib/db/client';
 import { accounts, categories, tags, transactionTags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { toCsv } from '@/lib/exports/csv';
+import { categoryFilterSchema } from '@/lib/transactions/category-filter';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const filtersSchema = z.object({
   kind: z.enum(['income', 'expense', 'transfer']).optional(),
   accountId: z.string().uuid().optional(),
-  categoryId: z.union([z.string().uuid(), z.literal('unclassified')]).optional(),
+  categoryId: categoryFilterSchema.optional(),
   tagId: z.string().uuid().optional(),
   from: z.string().regex(ISO_DATE_RE).optional(),
   to: z.string().regex(ISO_DATE_RE).optional(),
