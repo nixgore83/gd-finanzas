@@ -31,6 +31,23 @@ export type ParseImportInternalResult =
     };
 
 /**
+ * ¿El fallo de `decryptPDF` es fatal (marcar el import como error) o no?
+ * NO es fatal cuando:
+ *  - el PDF no está encriptado (no hay nada que desencriptar), o
+ *  - usa un algoritmo que el desencriptador no soporta (ej. AES-128 V=4/R=4 de
+ *    los resúmenes ICBC nuevos). En ese caso seguimos con los bytes ORIGINALES y
+ *    dejamos que el LLM lea el PDF directo — funciona cuando el user-password es
+ *    vacío (el PDF abre sin pedir clave), que es el caso típico.
+ * SÍ es fatal ante contraseña incorrecta (user-password real que no matchea).
+ */
+export function isFatalDecryptError(message: string): boolean {
+  const m = message.toLowerCase();
+  if (m.includes('not encrypted') || m.includes('no /encrypt dictionary')) return false;
+  if (m.includes('unsupported encryption')) return false;
+  return true;
+}
+
+/**
  * Core parsing logic without session requirement.
  * Used by both the server action (with session) and the cron (without session).
  */
@@ -143,12 +160,12 @@ export async function parseImportInternal(
         }
       }
     } catch (err) {
-      // Un PDF sin encriptar + contraseña (guardada o manual) no es un error:
-      // no hay nada que desencriptar, seguimos con los bytes originales.
+      // Un PDF sin encriptar, o con una encriptación que el desencriptador no
+      // soporta (ej. AES-128 de ICBC), no es un error acá: seguimos con los bytes
+      // ORIGINALES y dejamos que el LLM lea el PDF directo (anda si el user-password
+      // es vacío). Solo es fatal la contraseña incorrecta.
       const errMsg = (err as Error).message ?? '';
-      const notEncrypted =
-        /not encrypted/i.test(errMsg) || /No \/Encrypt dictionary/i.test(errMsg);
-      if (!notEncrypted) {
+      if (isFatalDecryptError(errMsg)) {
         console.error('[imports] pdf unlock failed', { importId });
         await db
           .update(imports)
@@ -163,6 +180,11 @@ export async function parseImportInternal(
           error: 'unknown',
           message: `PDF protegido: ${errMsg.slice(0, 100)}`,
         };
+      }
+      if (/unsupported encryption/i.test(errMsg)) {
+        // Diagnóstico: no pudimos desencriptar por algoritmo no soportado; mandamos
+        // el PDF tal cual al LLM. Si Claude no lo acepta, el parseo dará error propio.
+        console.warn('[imports] pdf encryption unsupported by decryptor — enviando sin desencriptar', { importId });
       }
     }
   }
