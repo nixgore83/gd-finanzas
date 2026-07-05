@@ -1,8 +1,5 @@
 import { getLicitacionesServiceEnv } from '@/lib/env';
-import {
-  DEFAULT_LICITACIONES_MODEL,
-  LICITACIONES_PDF_CONTENT_TYPE,
-} from '@/lib/schemas/licitaciones';
+import { DEFAULT_LICITACIONES_MODEL } from '@/lib/schemas/licitaciones';
 
 /**
  * Timeout de la llamada al microservicio, por debajo de la maxDuration de la ruta
@@ -12,7 +9,14 @@ import {
 const SERVICE_TIMEOUT_MS = 280_000;
 
 export type ProcesarInput = {
-  pdfs: Array<{ filename: string; bytes: Uint8Array }>;
+  /**
+   * Signed URLs de descarga (Supabase Storage) de cada PDF de entrada. Mandamos
+   * URLs y no bytes para que el body del request quede en KB: Vercel corta el
+   * body de una function en ~4.5 MB, y el multipart de los PDFs lo superaba (413).
+   * El micro baja los PDFs él mismo desde estas URLs (que expiran y no requieren
+   * credenciales de Supabase).
+   */
+  pdfUrls: string[];
   /** Override de la fecha del lunes (YYYY-MM-DD). Omitido = próximo lunes. */
   lunes?: string | null;
 };
@@ -46,10 +50,10 @@ function messageForHttpStatus(status: number): string {
 }
 
 /**
- * Llama al microservicio Python (`POST {URL}/procesar`) con los PDFs como
- * multipart y devuelve el Excel binario. Auth por `Authorization: Bearer`
+ * Llama al microservicio Python (`POST {URL}/procesar`) con las signed URLs de
+ * los PDFs como JSON y devuelve el Excel binario. Auth por `Authorization: Bearer`
  * (secreto compartido). No reintenta: el caller decide (el job queda 'error' y
- * Pau reintenta). Nunca loguea contenido de los PDFs ni montos.
+ * Pau reintenta). Nunca loguea las URLs (traen token firmado) ni montos.
  */
 export async function procesarLicitaciones(input: ProcesarInput): Promise<ProcesarResult> {
   const env = getLicitacionesServiceEnv();
@@ -61,18 +65,6 @@ export async function procesarLicitaciones(input: ProcesarInput): Promise<Proces
     };
   }
 
-  const form = new FormData();
-  for (const pdf of input.pdfs) {
-    // `slice()` devuelve una copia con su propio ArrayBuffer (no Shared, no view),
-    // que es un BlobPart válido y respeta el rango exacto de los bytes.
-    form.append(
-      'files',
-      new Blob([pdf.bytes.slice()], { type: LICITACIONES_PDF_CONTENT_TYPE }),
-      pdf.filename,
-    );
-  }
-  if (input.lunes) form.append('lunes', input.lunes);
-
   const url = `${env.LICITACIONES_SERVICE_URL.replace(/\/$/, '')}/procesar`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SERVICE_TIMEOUT_MS);
@@ -81,8 +73,11 @@ export async function procesarLicitaciones(input: ProcesarInput): Promise<Proces
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${env.LICITACIONES_SERVICE_SECRET}` },
-      body: form,
+      headers: {
+        Authorization: `Bearer ${env.LICITACIONES_SERVICE_SECRET}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pdf_urls: input.pdfUrls, lunes: input.lunes ?? null }),
       signal: controller.signal,
     });
   } catch (err) {

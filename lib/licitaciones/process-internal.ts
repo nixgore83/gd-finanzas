@@ -3,11 +3,13 @@ import { getDb } from '@/lib/db/client';
 import { licitacionesJobs } from '@/db/schema';
 import { LICITACIONES_XLSX_CONTENT_TYPE } from '@/lib/schemas/licitaciones';
 import { procesarLicitaciones } from './client';
-import {
-  buildOutputPath,
-  downloadLicitacionFile,
-  uploadLicitacionFile,
-} from './storage';
+import { buildOutputPath, generateSignedUrl, uploadLicitacionFile } from './storage';
+
+/**
+ * TTL de las signed URLs de los PDFs de entrada. El micro las baja al arrancar
+ * el request; con el timeout del cliente (280s) alcanza de sobra, damos margen.
+ */
+const INPUT_URL_TTL_SECONDS = 600;
 
 /**
  * Trabajo pesado del job, corre async (dentro de `after()`). Descarga los PDFs
@@ -46,23 +48,26 @@ export async function processLicitacionesJobInternal(
       .where(eq(licitacionesJobs.id, jobId));
   }
 
-  // 1. Descargar los PDFs de entrada desde Storage.
-  let pdfs: Array<{ filename: string; bytes: Uint8Array }>;
+  // 1. Firmar una URL de descarga por cada PDF de entrada. Mandamos URLs (no
+  //    bytes) al micro para que el body del request quede en KB y no choque con
+  //    el límite de ~4.5 MB de Vercel; el micro baja los PDFs desde estas URLs.
+  let pdfUrls: string[];
   try {
-    pdfs = await Promise.all(
-      job.inputFilePaths.map(async (path, i) => ({
-        filename: `input_${i}.pdf`,
-        bytes: await downloadLicitacionFile(path),
-      })),
+    pdfUrls = await Promise.all(
+      job.inputFilePaths.map(async (path) => {
+        const signed = await generateSignedUrl(path, INPUT_URL_TTL_SECONDS);
+        if (!signed) throw new Error('no signed url');
+        return signed;
+      }),
     );
   } catch {
-    console.error('[licitaciones] fallo al descargar PDFs de Storage', { jobId });
-    await fail('No se pudieron leer los PDFs subidos. Reintentá.');
+    console.error('[licitaciones] fallo al firmar URLs de los PDFs', { jobId });
+    await fail('No se pudieron preparar los PDFs subidos. Reintentá.');
     return;
   }
 
   // 2. Llamar al microservicio.
-  const result = await procesarLicitaciones({ pdfs, lunes: job.lunesOverride });
+  const result = await procesarLicitaciones({ pdfUrls, lunes: job.lunesOverride });
   if (!result.ok) {
     await fail(result.error);
     return;
