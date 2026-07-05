@@ -22,6 +22,30 @@ export type ProcesarResult =
   | { ok: false; error: string; code: 'not_configured' | 'http_error' | 'timeout' | 'network' };
 
 /**
+ * Traduce un status HTTP de error a un mensaje entendible para Pau, cuando la
+ * respuesta no trae JSON `{error}` (típico de un proxy/host que corta antes de
+ * llegar a FastAPI). El 413 lo tira un host que limita el body (Vercel ~4.5 MB);
+ * no debería pasar en Railway/Render, pero lo mapeamos por las dudas.
+ */
+function messageForHttpStatus(status: number): string {
+  switch (status) {
+    case 413:
+      return 'Los PDFs superan el límite de tamaño del servidor. Probá con una tanda más chica.';
+    case 401:
+    case 403:
+      return 'El servicio rechazó la autenticación. Avisá a Nico (revisar el secreto compartido).';
+    case 429:
+      return 'El servicio está saturado. Esperá un momento y reintentá.';
+    case 502:
+    case 503:
+    case 504:
+      return 'El servicio de procesamiento no está disponible ahora. Reintentá en unos minutos.';
+    default:
+      return `El servicio respondió un error (HTTP ${status}).`;
+  }
+}
+
+/**
  * Llama al microservicio Python (`POST {URL}/procesar`) con los PDFs como
  * multipart y devuelve el Excel binario. Auth por `Authorization: Bearer`
  * (secreto compartido). No reintenta: el caller decide (el job queda 'error' y
@@ -74,13 +98,14 @@ export async function procesarLicitaciones(input: ProcesarInput): Promise<Proces
   clearTimeout(timer);
 
   if (!res.ok) {
-    // El microservicio devuelve JSON {error} en fallos esperados.
-    let detail = `HTTP ${res.status}`;
+    // El microservicio devuelve JSON {error} en fallos esperados; si no viene
+    // (ej. 413 de un proxy antes de FastAPI), traducimos el status a algo claro.
+    let detail = messageForHttpStatus(res.status);
     try {
       const body = (await res.json()) as { error?: string };
       if (body?.error) detail = body.error;
     } catch {
-      /* respuesta no-JSON; nos quedamos con el status */
+      /* respuesta no-JSON; nos quedamos con el mensaje por status */
     }
     console.error('[licitaciones] microservicio respondió error', { status: res.status });
     return { ok: false, code: 'http_error', error: detail };
