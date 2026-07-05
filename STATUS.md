@@ -3,12 +3,29 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-06-26 por Claude
+**Última actualización:** 2026-07-05 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-07-05 — Fix: licitaciones fallaba con HTTP 413
+
+- **Síntoma:** una tanda de licitaciones (3 PDFs) quedaba en `error` con "HTTP 413" al procesar.
+- **Causa raíz (confirmada):** el microservicio `licitaciones-service` estaba deployado en **Vercel**,
+  cuyas functions rechazan requests con body **> ~4.5 MB** (413 en el edge, antes de FastAPI). Next le
+  reenvía los PDFs como multipart (`lib/licitaciones/client.ts`); la tanda pasó ese tope. El form y el
+  micro validan hasta 50 MB, o sea la plataforma cortaba antes que la app. **Divergencia fáctica:** el
+  plan (STATUS/`.env.example`) siempre dijo Railway/Render; el deploy real quedó en Vercel.
+- [x] **Micro (repo aparte, PR `nixgore83/licitaciones-service#1`):** agregados `Procfile` (Railway) y
+  `render.yaml` (Render, healthcheck `/health`), README de deploy reescrito. Sin cambios de código de app
+  (uvicorn + python-multipart ya estaban).
+- [x] **gd-finanzas (branch `fix/licitaciones-413-msg`):** `client.ts` ahora traduce el status HTTP a un
+  mensaje claro para Pau (413 → "tanda más chica", etc.) en vez de mostrar "HTTP 413" crudo. +2 tests.
+- **Pendiente (Nico, manual):** deployar el micro en Railway/Render, setear env vars, actualizar
+  `LICITACIONES_SERVICE_URL` en Vercel + redeploy; luego Pau da "Reintentar".
+- **PRD:** pendiente de sync (corregir "microservicio en Vercel" → Railway/Render por el límite de body).
 
 ### Sesión 2026-06-30 — Eliminación de Blindspots (Confirmación, Transferencias sin parear y Filtros)
 

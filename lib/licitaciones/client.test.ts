@@ -72,6 +72,33 @@ describe('procesarLicitaciones', () => {
     }
   });
 
+  it('http_error 413 sin JSON → mensaje de tamaño, no "HTTP 413" crudo', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('Payload Too Large', { status: 413 })),
+    );
+    const r = await procesarLicitaciones(onePdf);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('http_error');
+      expect(r.error).toMatch(/tamaño|tanda/i);
+      expect(r.error).not.toBe('HTTP 413');
+    }
+  });
+
+  it('http_error status no mapeado sin JSON → incluye el código', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('nope', { status: 418 })),
+    );
+    const r = await procesarLicitaciones(onePdf);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('http_error');
+      expect(r.error).toContain('418');
+    }
+  });
+
   it('timeout: AbortError → code timeout', async () => {
     vi.stubGlobal(
       'fetch',
