@@ -32,17 +32,9 @@ export async function uploadLicitacionFile(input: UploadInput): Promise<void> {
   if (error) throw error;
 }
 
-export async function downloadLicitacionFile(path: string): Promise<Uint8Array> {
-  const client = adminClient();
-  const { data, error } = await client.storage.from(BUCKET_NAME).download(path);
-  if (error) throw error;
-  if (!data) throw new Error('empty download');
-  const buf = await data.arrayBuffer();
-  return new Uint8Array(buf);
-}
-
 /**
- * Genera una signed URL time-limited para descargar el Excel resultante.
+ * Genera una signed URL time-limited para descargar un objeto del bucket
+ * (el Excel de salida, o los PDFs de entrada que el micro baja para procesar).
  * Devuelve null si falla la generación.
  */
 export async function generateSignedUrl(path: string, expiresIn = 3600): Promise<string | null> {

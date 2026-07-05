@@ -13,19 +13,25 @@
 ### Sesión 2026-07-05 — Fix: licitaciones fallaba con HTTP 413
 
 - **Síntoma:** una tanda de licitaciones (3 PDFs) quedaba en `error` con "HTTP 413" al procesar.
-- **Causa raíz (confirmada):** el microservicio `licitaciones-service` estaba deployado en **Vercel**,
-  cuyas functions rechazan requests con body **> ~4.5 MB** (413 en el edge, antes de FastAPI). Next le
-  reenvía los PDFs como multipart (`lib/licitaciones/client.ts`); la tanda pasó ese tope. El form y el
-  micro validan hasta 50 MB, o sea la plataforma cortaba antes que la app. **Divergencia fáctica:** el
-  plan (STATUS/`.env.example`) siempre dijo Railway/Render; el deploy real quedó en Vercel.
-- [x] **Micro (repo aparte, PR `nixgore83/licitaciones-service#1`):** agregados `Procfile` (Railway) y
-  `render.yaml` (Render, healthcheck `/health`), README de deploy reescrito. Sin cambios de código de app
-  (uvicorn + python-multipart ya estaban).
-- [x] **gd-finanzas (branch `fix/licitaciones-413-msg`):** `client.ts` ahora traduce el status HTTP a un
-  mensaje claro para Pau (413 → "tanda más chica", etc.) en vez de mostrar "HTTP 413" crudo. +2 tests.
-- **Pendiente (Nico, manual):** deployar el micro en Railway/Render, setear env vars, actualizar
-  `LICITACIONES_SERVICE_URL` en Vercel + redeploy; luego Pau da "Reintentar".
-- **PRD:** pendiente de sync (corregir "microservicio en Vercel" → Railway/Render por el límite de body).
+- **Causa raíz (confirmada):** el micro `licitaciones-service` corre en **Vercel**, cuyas functions
+  rechazan requests con body **> ~4.5 MB** (413 en el edge, antes de FastAPI). Next le reenviaba los PDFs
+  como **multipart** (`lib/licitaciones/client.ts`); la tanda pasó ese tope. Es el mismo límite que el PR
+  #60 ya había esquivado en la *subida* (Next→Storage), pero la pata *Next→micro* seguía mandando bytes.
+- **Fix elegido (con Nico): quedarse en Vercel, mandar signed URLs en vez de bytes.** Se evaluó mover el
+  micro a Railway/Render pero Nico no quiere otra suscripción. Como los PDFs ya viven en Storage, Next firma
+  una signed URL de descarga por PDF y manda un JSON chico `{ pdf_urls, lunes }`; el micro baja los PDFs él
+  mismo. El body Next→micro pasa a KB → el 4.5 MB deja de aplicar. El micro NO recibe credenciales de
+  Supabase (las URLs expiran y son GET público). Escala a los 50 MB que ya valida la app.
+- [x] **gd-finanzas (PR #68):** `client.ts` (contrato multipart→JSON con URLs), `process-internal.ts`
+  (firma URLs en vez de descargar bytes), `storage.ts` (se saca `downloadLicitacionFile`, sin uso). Además
+  `client.ts` traduce el status HTTP a mensaje claro (413/5xx) — venía del PR #67. Tests actualizados (13 verdes).
+- [x] **Micro (`licitaciones-service` PR #2):** `/procesar` pasa a body JSON `{ pdf_urls, lunes }`, baja los
+  PDFs con `urllib` (endpoint sync → threadpool), no loguea las URLs (token firmado). Revertidos
+  `Procfile`/`render.yaml` del PR #1 (se queda en Vercel). `py_compile` OK.
+- **Pendiente (Nico, manual):** confirmar que **ambos** proyectos Vercel redeployaron (el micro **primero**,
+  por el cambio de contrato) y que Pau dé "Reintentar". **`LICITACIONES_SERVICE_URL` NO cambia** (mismo
+  proyecto Vercel) → no hay que tocar env vars.
+- **PRD:** licitaciones (PRD propio) sincronizado — micro se queda en Vercel, fix por signed URLs.
 
 ### Sesión 2026-06-30 — Eliminación de Blindspots (Confirmación, Transferencias sin parear y Filtros)
 

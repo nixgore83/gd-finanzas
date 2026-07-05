@@ -14,7 +14,7 @@ function setEnv(over: Record<string, unknown> = {}) {
   } as unknown as ReturnType<typeof getLicitacionesServiceEnv>);
 }
 
-const onePdf = { pdfs: [{ filename: 'a.pdf', bytes: new Uint8Array([1, 2, 3]) }] };
+const onePdf = { pdfUrls: ['https://storage.test/signed/input_0.pdf?token=abc'] };
 
 beforeEach(() => {
   setEnv();
@@ -48,10 +48,16 @@ describe('procesarLicitaciones', () => {
       expect(Array.from(r.xlsx)).toEqual([9, 9, 9]);
       expect(r.model).toBe('claude-sonnet-4-5');
     }
-    // Verificá auth header + URL.
+    // Verificá URL + auth header + body JSON con las signed URLs (no multipart).
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://svc.test/procesar');
-    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${'x'.repeat(16)}`);
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe(`Bearer ${'x'.repeat(16)}`);
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(init.body as string)).toEqual({
+      pdf_urls: onePdf.pdfUrls,
+      lunes: '2026-05-04',
+    });
   });
 
   it('http_error: extrae {error} del body JSON', async () => {
