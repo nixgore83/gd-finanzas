@@ -18,7 +18,9 @@ const BUCKETS = [
   {
     name: 'imports',
     fileSizeLimit: 20 * 1024 * 1024,
-    allowedMimeTypes: ['application/pdf', 'text/csv', 'application/vnd.ms-excel'],
+    // XLSX_MIME es el MIME real de los .xlsx modernos (el que manda `contentTypeForExt`).
+    // Antes decía 'application/vnd.ms-excel' (el .xls viejo) → Storage rechazaba los .xlsx.
+    allowedMimeTypes: ['application/pdf', 'text/csv', XLSX_MIME],
   },
   {
     name: 'licitaciones',
@@ -44,16 +46,22 @@ async function main() {
   if (listErr) throw listErr;
 
   for (const bucket of BUCKETS) {
-    if (existing?.some((b) => b.name === bucket.name)) {
-      console.warn(`[storage] bucket "${bucket.name}" ya existe`);
-      continue;
-    }
-
-    const { error } = await admin.storage.createBucket(bucket.name, {
+    const opts = {
       public: false,
       fileSizeLimit: bucket.fileSizeLimit,
       allowedMimeTypes: [...bucket.allowedMimeTypes],
-    });
+    };
+
+    // Reconciliar SIEMPRE: si el bucket ya existe, actualizar su config (antes se salteaba,
+    // así que un cambio en allowedMimeTypes acá nunca llegaba al bucket vivo).
+    if (existing?.some((b) => b.name === bucket.name)) {
+      const { error } = await admin.storage.updateBucket(bucket.name, opts);
+      if (error) throw error;
+      console.warn(`[storage] bucket "${bucket.name}" actualizado (config reconciliada)`);
+      continue;
+    }
+
+    const { error } = await admin.storage.createBucket(bucket.name, opts);
     if (error) throw error;
 
     console.warn(`[storage] bucket "${bucket.name}" creado (privado)`);
