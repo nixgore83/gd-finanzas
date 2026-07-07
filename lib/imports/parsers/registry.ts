@@ -8,6 +8,7 @@ import { bnaTcParser } from './bna-tc';
 import { hsbcUsTcParser } from './hsbc-us-tc';
 import { hsbcUsBancoParser } from './hsbc-us-banco';
 import { mercadoPagoTcParser } from './mercado-pago-tc';
+import { mercadoPagoBancoParser } from './mercado-pago-banco';
 import { balanzBrokerParser } from './balanz-broker';
 import { cocosBrokerParser } from './cocos-broker';
 import type { Parser } from './types';
@@ -23,6 +24,7 @@ const PARSERS: Parser[] = [
   hsbcUsTcParser,
   hsbcUsBancoParser,
   mercadoPagoTcParser,
+  mercadoPagoBancoParser,
   balanzBrokerParser,
   cocosBrokerParser,
 ];

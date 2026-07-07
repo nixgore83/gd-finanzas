@@ -42,8 +42,10 @@ describe('resolveParser', () => {
     expect(resolveParser('MercadoPago', 'tc')?.id).toBe('mercado-pago-tc-v1');
   });
 
-  it('Mercado Pago banco → todavía no implementado', () => {
-    expect(resolveParser('Mercado Pago', 'banco')).toBeNull();
+  it('Mercado Pago banco encontrado', () => {
+    expect(resolveParser('Mercado Pago', 'banco')?.id).toBe('mercado-pago-banco-v1');
+    expect(resolveParser('mercado pago', 'banco')?.id).toBe('mercado-pago-banco-v1');
+    expect(resolveParser('MercadoPago', 'banco')?.id).toBe('mercado-pago-banco-v1');
   });
 
   it('Institución desconocida → null', () => {
@@ -62,5 +64,6 @@ describe('listParsers', () => {
     expect(ids).toContain('hsbc-us-tc-v2');
     expect(ids).toContain('hsbc-us-banco-v1');
     expect(ids).toContain('mercado-pago-tc-v1');
+    expect(ids).toContain('mercado-pago-banco-v1');
   });
 });
