@@ -3,12 +3,43 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-07-05 por Claude
+**Última actualización:** 2026-07-07 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-07-07 — Fix: imports ICBC parseaban 0 líneas en silencio (AES-128)
+
+- **Síntoma:** varios extractos ICBC (`EXT.DE.MOVIMIENTOS`, cuenta 0905/02100757/27) quedaban
+  `parsed` con **0 líneas**, sin `error_message` ni summary — verde y vacío. Las mismas cuentas
+  re-descargadas/re-guardadas (archivos `(1)`) sí extraían movimientos.
+- **Causa raíz (confirmada, código + DB):** dos bugs encadenados.
+  1. `@pdfsmaller/pdf-decrypt` no soporta el **AES-128 V=4/R=4** de los PDFs ICBC (tira
+     "unsupported encryption"). El código en `parse-internal.ts` trataba eso como no-fatal y
+     **mandaba los bytes todavía cifrados al LLM**. Claude no puede leer el PDF cifrado y devuelve
+     `{ lines: [] }` (obedeciendo la instrucción "SIN MOVIMIENTOS" del prompt).
+  2. El schema aceptaba `lines: []` sin problema → se marcaba `parsed` con 0 líneas y **sin error**.
+     El resultado era "éxito" silencioso.
+- **Fix:** nuevo helper `lib/imports/pdf-decrypt.ts` con cascada **pdf-decrypt → fallback mupdf**
+  (WASM). mupdf abre el PDF, autentica (o user-password vacío) y lo re-guarda **sin encriptación**
+  (`encrypt=none`). Además el helper **nunca devuelve bytes cifrados**: si no pudo desbloquear,
+  el caller marca `status='error'` con mensaje claro en vez de parsear 0 líneas fantasma.
+  Los PDFs ICBC ahora andan directo, sin re-guardar a mano.
+- [x] `lib/imports/pdf-decrypt.ts` (helper) + `lib/imports/pdf-decrypt.test.ts` (5 tests, fixture
+  AES-128/AES-256 generado con mupdf en runtime, sin datos reales). Se quitó `isFatalDecryptError`
+  (obsoleto: mupdf decide con autoridad wrong-password vs éxito) y su test.
+- [x] `next.config.ts`: `serverExternalPackages: ['mupdf']` (WASM, no bundlear). Build verde.
+- **Dependencia nueva:** `mupdf@^1.28.0` — justificada: única forma de descifrar AES-128 V=4/R=4
+  sin binarios externos (no corren en Vercel). Alinea con [[no-nuevas-suscripciones]] (resuelve
+  sobre Vercel, no suma hosting).
+- **Verificación:** `typecheck` + `test` (480 verdes) + `lint` + `build` OK.
+- **Pendiente (Nico):** tras deploy, re-parsear los imports ICBC que quedaron en 0 líneas
+  (`05-26`, `04-26`, `02-26 EXT.DE.MOVIMIENTOS-5727.pdf`) — ahora deberían extraer movimientos.
+- **Riesgo residual:** el WASM de mupdf cargando en la function serverless de Vercel no se puede
+  verificar 100% sin deploy; `serverExternalPackages` + output file tracing es la mitigación estándar.
+  Confirmar en el primer re-parse real en prod.
 
 ### Sesión 2026-07-05 — Fix: licitaciones fallaba con HTTP 413
 
