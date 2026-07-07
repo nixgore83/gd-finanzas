@@ -21,6 +21,7 @@ import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
 import { formatAccount } from '@/lib/accounts/format';
 import { getImportParserEnv } from '@/lib/env';
+import { unlockPdf } from '@/lib/imports/pdf-decrypt';
 
 export type ParseImportInternalResult =
   | { ok: true; lineCount: number }
@@ -29,23 +30,6 @@ export type ParseImportInternalResult =
       error: 'not_found' | 'invalid_state' | 'no_parser' | 'no_file' | 'llm' | 'unknown';
       message?: string;
     };
-
-/**
- * ¿El fallo de `decryptPDF` es fatal (marcar el import como error) o no?
- * NO es fatal cuando:
- *  - el PDF no está encriptado (no hay nada que desencriptar), o
- *  - usa un algoritmo que el desencriptador no soporta (ej. AES-128 V=4/R=4 de
- *    los resúmenes ICBC nuevos). En ese caso seguimos con los bytes ORIGINALES y
- *    dejamos que el LLM lea el PDF directo — funciona cuando el user-password es
- *    vacío (el PDF abre sin pedir clave), que es el caso típico.
- * SÍ es fatal ante contraseña incorrecta (user-password real que no matchea).
- */
-export function isFatalDecryptError(message: string): boolean {
-  const m = message.toLowerCase();
-  if (m.includes('not encrypted') || m.includes('no /encrypt dictionary')) return false;
-  if (m.includes('unsupported encryption')) return false;
-  return true;
-}
 
 /**
  * Core parsing logic without session requirement.
@@ -136,55 +120,40 @@ export async function parseImportInternal(
       ? 'xlsx'
       : 'pdf';
 
-  // Unlock protected PDF
+  // Unlock protected PDF.
+  // La desencriptación pasa por `unlockPdf` (pdf-decrypt → fallback mupdf para el
+  // AES-128 de ICBC). NUNCA mandamos bytes cifrados al LLM: si no se pudo desbloquear,
+  // marcamos error explícito en vez de "parsear" 0 líneas en silencio.
   const isPdf = ext === 'pdf';
   const pdfPassword = customPassword || row.accountPdfPassword || row.pdfPassword;
   if (isPdf && pdfPassword) {
-    try {
-      const { decryptPDF } = await import('@pdfsmaller/pdf-decrypt');
-      const decrypted = await decryptPDF(bytes, pdfPassword);
-      bytes = new Uint8Array(decrypted);
+    const unlock = await unlockPdf(bytes, pdfPassword);
+    if (!unlock.ok) {
+      console.error('[imports] pdf unlock failed', { importId, reason: unlock.reason });
+      const errorMessage =
+        unlock.reason === 'wrong_password'
+          ? 'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.'
+          : 'No se pudo desbloquear el PDF: encriptación no soportada. Volvé a guardar el PDF (imprimir a PDF / "Guardar como") y re-subilo.';
+      await db
+        .update(imports)
+        .set({ status: 'error', errorMessage })
+        .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
+      return { ok: false, error: 'unknown', message: `PDF protegido: ${unlock.reason}` };
+    }
+    bytes = unlock.bytes;
 
-      // Si la desencriptación fue exitosa y vino un password manual, persistirlo
-      if (customPassword && persistPassword) {
-        if (row.accountId) {
-          await db
-            .update(accounts)
-            .set({ pdfPassword: customPassword })
-            .where(eq(accounts.id, row.accountId));
-        } else if (row.institutionId) {
-          await db
-            .update(institutions)
-            .set({ pdfPassword: customPassword })
-            .where(eq(institutions.id, row.institutionId));
-        }
-      }
-    } catch (err) {
-      // Un PDF sin encriptar, o con una encriptación que el desencriptador no
-      // soporta (ej. AES-128 de ICBC), no es un error acá: seguimos con los bytes
-      // ORIGINALES y dejamos que el LLM lea el PDF directo (anda si el user-password
-      // es vacío). Solo es fatal la contraseña incorrecta.
-      const errMsg = (err as Error).message ?? '';
-      if (isFatalDecryptError(errMsg)) {
-        console.error('[imports] pdf unlock failed', { importId });
+    // Desencriptación exitosa + password manual → persistirlo para futuras importaciones.
+    if (customPassword && persistPassword) {
+      if (row.accountId) {
         await db
-          .update(imports)
-          .set({
-            status: 'error',
-            errorMessage:
-              'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.',
-          })
-          .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
-        return {
-          ok: false,
-          error: 'unknown',
-          message: `PDF protegido: ${errMsg.slice(0, 100)}`,
-        };
-      }
-      if (/unsupported encryption/i.test(errMsg)) {
-        // Diagnóstico: no pudimos desencriptar por algoritmo no soportado; mandamos
-        // el PDF tal cual al LLM. Si Claude no lo acepta, el parseo dará error propio.
-        console.warn('[imports] pdf encryption unsupported by decryptor — enviando sin desencriptar', { importId });
+          .update(accounts)
+          .set({ pdfPassword: customPassword })
+          .where(eq(accounts.id, row.accountId));
+      } else if (row.institutionId) {
+        await db
+          .update(institutions)
+          .set({ pdfPassword: customPassword })
+          .where(eq(institutions.id, row.institutionId));
       }
     }
   }
