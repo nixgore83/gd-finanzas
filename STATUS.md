@@ -10,6 +10,32 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-07-07 — Parser Mercado Pago cuenta (banco/billetera)
+
+- **Contexto:** faltaba el parser de "Mercado Pago · Banco" (el `tc` ya existía). El estado de cuenta MP
+  se baja como Excel (`account_statement-<uuid>.xlsx`) o PDF.
+- [x] **Nuevo `lib/imports/parsers/mercado-pago-banco.ts`** (`id: 'mercado-pago-banco-v1'`):
+  - **Excel determinístico** (`parseXlsx`, sin LLM) — camino principal. Header `RELEASE_DATE |
+    TRANSACTION_TYPE | REFERENCE_ID | TRANSACTION_NET_AMOUNT | PARTIAL_BALANCE`; fecha `DD-MM-YYYY`,
+    monto es-AR con signo, contraparte embebida en el tipo. Summary desde `CREDITS`/`DEBITS`.
+  - **PDF con LLM** (`systemPrompt`/`userPrompt`) como fallback (sin calibrar contra PDF real todavía).
+- **Reglas de clasificación (confirmadas con Nico):**
+  - `Transferencia enviada/recibida <Nombre>`: si el nombre es de un miembro del household (Nico/Pau) →
+    transfer neutra; si es tercero → gasto/ingreso real con `counterparty.name`. Detección por nombre
+    (`HOUSEHOLD_NAMES = ['nicolas mario gore', 'paula cecilia dalmasso']`) — análogo al `HOUSEHOLD_DNIS`
+    de galicia-banco; misma limitación (data en código, futuro = config/DB).
+  - `Ingreso de dinero` → transfer entrante a parear en revisión.
+  - `Pago automático Tarjeta de crédito` → transfer a "Mercado Pago Master".
+  - `Inversión X` → transfer saliente a revisar (no hay cuenta de inversiones MP modelada).
+  - `Rendimientos` → ingreso/Intereses. `Pago de servicio ARCA` → gasto/Impuestos.
+- [x] Wireado en `registry.ts` + tests de registry actualizados. 13 tests unitarios nuevos + validado
+  end-to-end contra el Excel real (32 líneas, clasificación correcta). Suite 493/493, typecheck + lint OK.
+- **Institución "Mercado Pago" ya sembrada** (no se tocó seed). Cuenta destino: ewallet "Mercado Pago".
+- **Pendiente / BACKLOG (idea de Nico):** auto-sync mensual del estado de cuenta MP. Bloqueo: no hay API
+  oficial para cuenta personal; scraping con login viola la política de credenciales (ver
+  [[galicia-api-no-viable]]). Vía viable = app de developer MP + OAuth + endpoints de reportes, cobertura
+  incierta. Es sub-hito propio de research, NO incluido acá. Evaluar más adelante.
+
 ### Sesión 2026-07-07 — Fix: imports ICBC parseaban 0 líneas en silencio (AES-128)
 
 - **Síntoma:** varios extractos ICBC (`EXT.DE.MOVIMIENTOS`, cuenta 0905/02100757/27) quedaban
