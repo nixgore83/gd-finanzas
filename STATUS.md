@@ -10,6 +10,63 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-07-22 — Auditoría de completitud de los datos cargados (sesión madre)
+
+Pedido de Nico: auditar si la info cargada está completa y listar lo que falta. Terminó destapando
+4 bugs (los 3 fixes de abajo + el de fechas de TC) y varias correcciones de datos en prod. Esta
+sección es el hilo conductor; los detalles técnicos de cada fix están en las secciones siguientes.
+
+- **Estado base al auditar:** 28 cuentas, 2223 transacciones (ene→jul 2026), 94 imports, fx_rates sin
+  huecos reales (los 13 días faltantes de 2026 son feriados AR), budgets completos los 12 meses.
+- [x] **Hallazgo principal — "faltan resúmenes de TC" era FALSO.** Los resúmenes estaban subidos; el
+  parser **colapsaba todas las fechas de consumo a la fecha de cierre**, así que junio aparecía casi
+  vacío y ~68 consumos quedaban apilados el 02/07. Fix en **PR #74** (ver sección propia). Firma para
+  detectarlo: un import con `period_start = period_end` y N líneas con la misma `date`.
+- [x] **Recuperación de los imports mal fechados.** 5 afectados; se borraron 106 transacciones (ninguna
+  tenía tags, deducible, notas ni recurrencia → no se perdió trabajo manual) y se re-parsearon 4 con el
+  prompt corregido. **BNA no necesitó re-parseo**: su archivo estaba confirmado 2 veces y la copia
+  `ee9aaf9d` ya tenía las fechas reales, así que alcanzó con borrar las redundantes.
+  Resultado: Amex jul pasó de **1 fecha a 24** y el total extraído dio **exacto** contra el resumen.
+- [x] **Duplicados de transacciones — 15 borradas.** De 38 grupos duplicados, **23 eran legítimos**
+  (mismo import ⇒ el extracto lista dos veces algo que pasó dos veces). Los 15 reales venían de
+  **confirmar el mismo archivo dos veces** (verificado por `file_hash`): BNA dic-25 ×9, Galicia Master
+  abr ×2 y ene ×1, ICBC ×3. Se borraron una a una y NO por import completo, porque cada import
+  duplicado tenía además 1 transacción única que se habría perdido.
+- [x] **Traspasos cross-moneda ICBC rotos (`TR.7782699`, `TR.7795790`).** La pata ARS estaba como
+  `expense` con signo invertido y había una **copia espuria ruteada a la Visa**. Se borraron las copias,
+  se convirtieron las patas a `transfer` y se parearon. Clave para no romper nada: `_build-transfer.ts:37`
+  define que `expense` usa magnitud positiva y `transfer` usa el signo, así que la dirección `out` se
+  conserva y **el saldo de la 0926 no cambió** (sigue reconciliada exacta en 391 movimientos).
+  Transferencias sin parear: 29 → 25. Las 25 restantes no tienen contra-pata en la base (transferencias
+  a terceros marcadas por patrón, o el otro lado nunca se importó).
+- [x] **Los 3 `EXT.DE.MOVIMIENTOS-5727` que daban 0 líneas: caso cerrado.** No era el descifrado. Estaban
+  **atados a la caja de ahorro 0926** en vez de a la cuenta corriente 5727. Al re-atarlos fallaron por
+  contraseña (la CC no tenía la suya), se le copió la de la 0926 y ahí parsearon **sin error pero con 0
+  líneas**, extrayendo correctamente `statement_account_ref = 0905/02100757/27` del encabezado. O sea el
+  PDF se lee bien y **no tiene movimientos**: son extractos de meses sin actividad de la CC — exactamente
+  el "gap fantasma" que Nico venía reportando. Corresponde borrarlos y marcar los meses con el chip "sin mov.".
+- [x] **Mercado Pago:** los 4 imports en `error` son **el mismo PDF** (`file_hash 80a9a18b…`) subido 4 veces,
+  3 como `tc` y 1 como `banco`. Falla porque viene por mail **con contraseña** (los que funcionaron en mayo
+  se bajaron de la web, sin cifrar). Ver PR #76.
+- [x] **Regla de negocio actualizada:** target de ahorro mensual **USD 5.700 → 6.000** (la DB ya tenía 6.000
+  desde 2026-05-18; `CLAUDE.md` y el PRD estaban viejos). PR #75. Total target sin cambios (USD 2.452.000).
+- [x] **Redacción de la regla de cuotas TC precisada** (PR #75). No había contradicción real: la app nunca
+  proyecta cuotas futuras; cada resumen aporta la cuota de ese mes, que es como la emite el banco.
+  Verificado sobre prod: 155 de 1447 movimientos de TC son cuotas, cada una con su número en su mes.
+- **PRD Notion:** changelog **v1.14** (auditoría) y **v1.15** (los 4 fixes + cambio de política de contraseñas).
+
+**Pendientes de esta auditoría (NO resueltos):**
+- [ ] **`deducible_ganancias` = 0 en las 2100 transacciones** y solo 3 tags con 4 usos → **el export contador
+  sale vacío**. La infra de captura existe desde el PR #50 pero nunca se usó. Es el gap más grande que queda
+  para la review de octubre.
+- [ ] **Patrimonio nunca cargado:** 0 `net_worth_snapshots`, 0 `holdings`.
+- [ ] **5 cuentas sin un solo movimiento:** Galicia Visa/Master/Inversiones de Pau, Efectivo USD, y
+  **Galicia Inversiones · Nico** (creada el 10/06 para colgarle los 8 movimientos FIMA — esa asociación
+  nunca se hizo). Decidir: cargarlas o archivarlas.
+- [ ] **Brokers desactualizados:** Balanz Internacional (últ. 30/04), Balanz Argentina y Cocos (marzo).
+- [ ] Confirmar en la UI los 3 imports re-parseados que quedaron en `parsed`.
+- [ ] Tablas de backup en prod: `_bak_fechas_20260722` (se conserva hasta confirmar esos 3 imports).
+
 ### Sesión 2026-07-22 — Fix: imports con el DOBLE de líneas (parseos concurrentes)
 
 - **Síntoma (prod):** 3 imports con exactamente 2× las líneas del resumen (cada movimiento
