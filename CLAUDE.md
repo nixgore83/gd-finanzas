@@ -75,7 +75,7 @@ Schema completo en §4 del PRD. Entidades core:
 - `budgets` — categoría × mes × año en USD, sobrescribe en cada revisión
 - `fx_rates` — BCRA minorista mid, cacheado
 - `imports` + `import_lines` — parsing con LLM, revisión humana obligatoria
-- `financial_goals` — fila única, target USD 5.700/mes ahorro, total USD 2.45M
+- `financial_goals` — fila única, target USD 6.000/mes ahorro, total USD 2.45M
 
 ---
 
@@ -224,7 +224,7 @@ Deadline funcional: **review de octubre 2026**, primera revisión semestral del 
 
 Validado con Pau el 2026-05-05.
 
-- Target ahorro mensual: **USD 5.700**
+- Target ahorro mensual: **USD 6.000** (confirmado por Nico 2026-07-22; antes 5.700)
 - Edad target IF: Nico 58 / Pau 60 (año 2041)
 - Número retiro: USD 2.230.000
 - Educación: USD 150.000 (3 hijos × USD 50k AR privada)
