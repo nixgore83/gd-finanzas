@@ -84,7 +84,13 @@ Schema completo en §4 del PRD. Entidades core:
 - **Dinero como `decimal(18,2)` en Postgres.** Nunca float. En TypeScript: usar string para serializar y `Decimal` (decimal.js o equivalente) para operar. Cualquier `number` en código que represente dinero es bug.
 - **FX al día de la transacción**, almacenado en la transacción y **inmutable** una vez guardada. Override manual permitido con `fx_rate_source = "manual_override"`.
 - **Transferencias entre cuentas no impactan ingreso/gasto.** Identificadas por `transfer_pair_id`.
-- **Cuotas TC:** cargo entero el día del consumo. **No** spreadear cuotas en V1.
+- **Cuotas TC: no se spreadean.** La app **nunca** proyecta cuotas futuras a partir de una
+  compra. En **carga manual**, un consumo en cuotas se registra entero el día del consumo.
+  En **imports**, cada resumen aporta únicamente **la cuota de ese mes** (así la emite el
+  banco), fechada al **cierre del resumen** — no a la fecha de la compra original. Esa es la
+  ÚNICA excepción a "la fecha es la del movimiento real"; el resto de las líneas de un
+  resumen llevan su fecha de consumo. (Confirmado con Nico 2026-07-22: aplicar la fecha de
+  cierre a líneas que no son cuota es un bug — ver PR #74.)
 - **Forecasts rolling 3 meses.** 4 estados explícitos.
 - **Auto-match previsiones:** OFF por default, toggle global.
 - **BCRA sin cotización del día (finde/feriado):** usar día previo + flag `fx_rate_source = "BCRA_last_available"`.
