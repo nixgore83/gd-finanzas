@@ -27,6 +27,7 @@ import {
 import { formatAccount } from '@/lib/accounts/format';
 import { getImportParserEnv } from '@/lib/env';
 import { unlockPdf } from '@/lib/imports/pdf-decrypt';
+import { decryptPdfPassword, encryptPdfPassword } from '@/lib/crypto/pdf-password';
 
 export type ParseImportInternalResult =
   | { ok: true; lineCount: number }
@@ -130,7 +131,30 @@ export async function parseImportInternal(
   // AES-128 de ICBC). NUNCA mandamos bytes cifrados al LLM: si no se pudo desbloquear,
   // marcamos error explícito en vez de "parsear" 0 líneas en silencio.
   const isPdf = ext === 'pdf';
-  const pdfPassword = customPassword || row.accountPdfPassword || row.pdfPassword;
+  // Las contraseñas guardadas están CIFRADAS en DB (AES-256-GCM, ver
+  // lib/crypto/pdf-password.ts). Se descifran acá, en el punto de uso, y nunca
+  // se loguean ni se devuelven al cliente.
+  let storedPdfPassword: string | null = null;
+  try {
+    storedPdfPassword =
+      decryptPdfPassword(row.accountPdfPassword) ?? decryptPdfPassword(row.pdfPassword);
+  } catch {
+    // Clave maestra ausente/inválida o payload corrupto → error explícito,
+    // nunca "parseamos" el PDF cifrado en silencio.
+    console.error('[imports] pdf password decrypt failed', { importId });
+    if (!customPassword) {
+      await db
+        .update(imports)
+        .set({
+          status: 'error',
+          errorMessage:
+            'No se pudo leer la contraseña guardada (PDF_PASSWORD_ENC_KEY ausente o inválida).',
+        })
+        .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
+      return { ok: false, error: 'unknown', message: 'pdf password decrypt failed' };
+    }
+  }
+  const pdfPassword = customPassword || storedPdfPassword;
   if (isPdf && pdfPassword) {
     const unlock = await unlockPdf(bytes, pdfPassword);
     if (!unlock.ok) {
@@ -147,18 +171,24 @@ export async function parseImportInternal(
     }
     bytes = unlock.bytes;
 
-    // Desencriptación exitosa + password manual → persistirlo para futuras importaciones.
+    // Desencriptación exitosa + password manual → persistirlo (CIFRADO) para
+    // futuras importaciones. Si falta la clave maestra no se persiste, pero el
+    // parseo sigue: la contraseña manual ya cumplió su función en esta corrida.
     if (customPassword && persistPassword) {
-      if (row.accountId) {
-        await db
-          .update(accounts)
-          .set({ pdfPassword: customPassword })
-          .where(eq(accounts.id, row.accountId));
-      } else if (row.institutionId) {
-        await db
-          .update(institutions)
-          .set({ pdfPassword: customPassword })
-          .where(eq(institutions.id, row.institutionId));
+      try {
+        const enc = encryptPdfPassword(customPassword);
+        if (row.accountId) {
+          await db.update(accounts).set({ pdfPassword: enc }).where(eq(accounts.id, row.accountId));
+        } else if (row.institutionId) {
+          await db
+            .update(institutions)
+            .set({ pdfPassword: enc })
+            .where(eq(institutions.id, row.institutionId));
+        }
+      } catch {
+        console.error('[imports] no se pudo guardar la contraseña (clave de cifrado)', {
+          importId,
+        });
       }
     }
   }

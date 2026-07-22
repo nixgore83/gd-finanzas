@@ -26,6 +26,10 @@ export const accounts = pgTable(
     archived: boolean('archived').notNull().default(false),
     expectsMonthlyImport: boolean('expects_monthly_import').notNull().default(false),
     gmailLabelId: text('gmail_label_id'),
+    // Contraseña del PDF del extracto, SIEMPRE CIFRADA (AES-256-GCM, payload
+    // `v1:<iv>:<tag>:<ct>` — ver lib/crypto/secret-box.ts). Nunca en texto plano,
+    // nunca al cliente, nunca en logs. Se descifra en el punto de uso con
+    // `decryptPdfPassword()` (clave maestra en la env var PDF_PASSWORD_ENC_KEY).
     pdfPassword: text('pdf_password'),
     // Nº de cuenta tal como aparece en el encabezado de los extractos (ej.
     // "0926/01109094/30"). Se "aprende" al importar: cuando el parser extrae el

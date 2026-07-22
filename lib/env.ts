@@ -107,6 +107,18 @@ export function getGoogleEnv(): GoogleEnv {
   return parsed.success ? parsed.data : {};
 }
 
+/**
+ * Clave maestra para cifrar/descifrar las contraseñas de PDF de extractos
+ * (`accounts.pdf_password` / `institutions.pdf_password`). 32 bytes en base64.
+ * Solo Vercel env vars — jamás en el repo ni en el cliente.
+ * Devuelve `undefined` si no está seteada; el consumidor decide si falla
+ * (`lib/crypto/pdf-password.ts` tira con mensaje explícito).
+ */
+export function getPdfPasswordEncKeyRaw(): string | undefined {
+  const raw = process.env.PDF_PASSWORD_ENC_KEY;
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw : undefined;
+}
+
 const licitacionesServiceEnvSchema = z.object({
   LICITACIONES_SERVICE_URL: z.string().url().optional(),
   LICITACIONES_SERVICE_SECRET: z.string().min(16).optional(),

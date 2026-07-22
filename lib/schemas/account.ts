@@ -77,6 +77,46 @@ export const accountInputSchema = refineAccount(baseAccountSchema);
 export type AccountInput = z.infer<typeof accountInputSchema>;
 
 /**
+ * Contraseña de PDF: campo **write-only**. El form nunca recibe el valor
+ * guardado, así que un input vacío significa "no tocar", no "borrar". La
+ * intención viaja explícita en `pdfPasswordAction`:
+ *
+ * - `keep`  → no se toca lo que haya en DB (default seguro).
+ * - `set`   → se guarda el valor nuevo (cifrado antes de persistir).
+ * - `clear` → se borra (única forma de dejarlo en null).
+ *
+ * `set` con valor vacío degrada a `keep` (el usuario abrió el campo y no escribió).
+ */
+export const PDF_PASSWORD_ACTIONS = ['keep', 'set', 'clear'] as const;
+
+const pdfPasswordFieldSchema = z.object({
+  pdfPasswordAction: z.enum(PDF_PASSWORD_ACTIONS).catch('keep'),
+  pdfPassword: z.string().max(200).catch(''),
+});
+
+export type PdfPasswordIntent =
+  | { mode: 'keep' }
+  | { mode: 'clear' }
+  | { mode: 'set'; value: string };
+
+/** Traduce el par (`pdfPasswordAction`, `pdfPassword`) del FormData a una intención. */
+export function parsePdfPasswordIntent(formData: FormData): PdfPasswordIntent {
+  const actionRaw = formData.get('pdfPasswordAction');
+  const valueRaw = formData.get('pdfPassword');
+  const parsed = pdfPasswordFieldSchema.parse({
+    pdfPasswordAction: typeof actionRaw === 'string' ? actionRaw : 'keep',
+    pdfPassword: typeof valueRaw === 'string' ? valueRaw : '',
+  });
+
+  if (parsed.pdfPasswordAction === 'clear') return { mode: 'clear' };
+  if (parsed.pdfPasswordAction === 'set') {
+    const value = parsed.pdfPassword.trim();
+    return value.length > 0 ? { mode: 'set', value } : { mode: 'keep' };
+  }
+  return { mode: 'keep' };
+}
+
+/**
  * Pasa de un FormData de la UI al input parseado. Centraliza las coerciones
  * (institutionId vacío → null, owner_tag string → enum) así no se repite en
  * cada server action.
