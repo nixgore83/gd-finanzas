@@ -1,4 +1,5 @@
 import { parserOutputSchema, type Parser } from './types';
+import { TC_DATE_RULES_BLOCK } from './tc-date-rules';
 
 const SYSTEM_PROMPT = `Sos un parser de resúmenes de tarjeta de crédito BNA (Banco Nación Argentina) Visa.
 Tu trabajo es extraer TODAS las transacciones individuales del PDF y devolver JSON estructurado.
@@ -17,7 +18,7 @@ FORMATO EXACTO DEL OUTPUT (los nombres de campo son obligatorios, en inglés tal
 }
 
 CAMPOS OBLIGATORIOS POR LÍNEA:
-- "date": fecha en formato YYYY-MM-DD.
+- "date": fecha en formato YYYY-MM-DD. Ver "REGLA DE FECHAS" más abajo: es la fecha real del consumo, NO la del cierre.
 - "description": detalle del comercio o concepto.
 - "amountOriginal": string numérico con punto decimal, POSITIVO siempre. El sentido lo da "kind".
 - "currencyOriginal": exactamente "ARS" o "USD".
@@ -28,11 +29,13 @@ REGLAS ESTRICTAS:
 - NUNCA incluyas números completos de tarjeta (PAN), CBU, alias, claves, ni datos personales sensibles.
 - Cada línea representa UNA transacción individual.
 - IGNORÁ totales de cierre, subtotales, saldos anteriores, mínimos, intereses globales, IVA, impuestos sobre intereses, pagos realizados ("SU PAGO EN PESOS", "SU PAGO EN DOLARES", "PAGO EN EFECTIVO", etc.), y cualquier fila que NO sea una transacción individual de consumo.
-- Cuotas: registrá UNA línea con el monto de la cuota del mes actual. Incluí la cuota en la descripción (ej: "ALGO C.03/06"). IMPORTANTE: la fecha de la cuota debe ser la FECHA DE CIERRE del resumen, NO la fecha original de compra.
+- Cuotas: registrá UNA línea con el monto de la cuota del mes actual. Incluí la cuota en la descripción (ej: "ALGO C.03/06"). La fecha, según la REGLA DE FECHAS de abajo.
 - Montos negativos o créditos → kind: "income", monto positivo.
 - Convertí formatos de monto argentinos: "45.000,00" → "45000.00".
 - Si hay secciones separadas por moneda (pesos / dólares), respetá la moneda de cada sección.
 - Extraé las transacciones de TODAS las páginas del PDF.
+
+${TC_DATE_RULES_BLOCK}
 
 SUBTOTALES DEL RESUMEN:
 Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:

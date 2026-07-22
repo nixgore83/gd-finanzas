@@ -19,6 +19,7 @@ import { SortableHeader } from '@/components/ui/sortable-header';
 import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
 import { makeReviewComparator, type ReviewSortField } from '@/lib/imports/review-sort';
 import { summarizeLineStatuses, importConfirmError } from '@/lib/imports/line-summary';
+import { DATE_COLLAPSE_LINE_MARKER } from '@/lib/imports/date-collapse';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
@@ -1395,7 +1396,18 @@ function LineRowEditor({
           />
         </td>
       )}
-      <td className="px-2 py-1.5 tabular-nums">{line.parsedData.date}</td>
+      <td className="px-2 py-1.5 tabular-nums">
+        {line.parsedData.notes?.includes(DATE_COLLAPSE_LINE_MARKER) ? (
+          <span
+            className="rounded bg-amber-100 px-1 text-amber-900"
+            title="El parser no pudo extraer la fecha real del consumo (todas las líneas quedaron con la misma fecha). Verificala contra el PDF antes de aceptar."
+          >
+            {line.parsedData.date} ⚠
+          </span>
+        ) : (
+          line.parsedData.date
+        )}
+      </td>
       <td className="px-2 py-1.5">
         {line.parsedData.description}
         <CounterpartyTag counterparty={line.parsedData.counterparty} className="mt-0.5" />
