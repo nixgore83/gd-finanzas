@@ -10,6 +10,27 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-07-22 — Fix: imports con el DOBLE de líneas (parseos concurrentes)
+
+- **Síntoma (prod):** 3 imports con exactamente 2× las líneas del resumen (cada movimiento
+  duplicado) y totales 2× el del extracto. Datos ya limpiados a mano.
+- **Causa raíz:** no había ningún lock. `parse-internal.ts` borraba las líneas sin
+  `transaction_id` al **principio** y recién después marcaba `status='parsing'` de forma
+  **incondicional** → dos ejecutores concurrentes del mismo import (doble click en "Parsear
+  pendientes", auto-parse al subir + click manual, cron Gmail) borraban los dos cuando aún no
+  había nada e insertaban los dos su tanda.
+- **Fix:** claim atómico (`lib/imports/parse-claim.ts`): `UPDATE ... SET status='parsing'
+  WHERE estado reparseable AND (status <> 'parsing' OR está stale) RETURNING`. Gana uno solo;
+  el resto se retira con `already_parsing`. `parseImport` (server action) hace el claim de
+  forma síncrona para el feedback de la UI y le pasa `alreadyClaimed` al internal. Un `parsing`
+  colgado se reclama solo pasado `PARSE_STALE_AFTER_MS` (6 min), sin depender del reaper.
+- **Defensa en profundidad:** el borrado de líneas viejas + el insert de las nuevas ahora
+  van en una sola transacción, al final (antes estaban separados por todo el parseo).
+- **Tests:** `lib/imports/parse-claim.test.ts` (forma del SQL del claim contra el dialecto real)
+  y `lib/imports/parse-internal.test.ts` (carrera de 2 parseos → 1 sola tanda; doble drenado;
+  `parseImport` pre-marcando `parsing` sigue funcionando; stale reclamable). Verificado que
+  fallan sin el fix.
+
 ### Sesión 2026-07-22 — Fix: PDFs protegidos sin contraseña cargada morían con un error críptico del LLM
 
 - **Síntoma:** 4 imports de Mercado Pago en `error`. Tres (`MELI.pdf`, `Resumen_MercadoPago_Julio2026.pdf`)

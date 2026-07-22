@@ -138,6 +138,9 @@ export function ImportsTable({ rows, criteria }: Props) {
       if (res.ok) {
         toast.success('Reparseo disparado');
         router.refresh();
+      } else if (res.error === 'already_parsing') {
+        toast.info('Ya hay un parseo en curso para este import. Esperá a que termine.');
+        router.refresh();
       } else {
         toast.error(`No se pudo reparsear: ${res.error}`);
       }
