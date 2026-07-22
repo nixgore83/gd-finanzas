@@ -3,12 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import { getDb } from '@/lib/db/client';
 import { accounts } from '@/db/schema';
-import { parseAccountFormData } from '@/lib/schemas/account';
+import { parseAccountFormData, parsePdfPasswordIntent } from '@/lib/schemas/account';
+import { encryptPdfPassword } from '@/lib/crypto/pdf-password';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 
 export type CreateAccountResult =
   | { ok: true; id: string }
-  | { ok: false; error: 'invalid_input' | 'session' | 'unknown'; fields?: Record<string, string> };
+  | {
+      ok: false;
+      error: 'invalid_input' | 'session' | 'crypto_key_missing' | 'unknown';
+      fields?: Record<string, string>;
+    };
 
 export async function createAccount(formData: FormData): Promise<CreateAccountResult> {
   let session;
@@ -29,14 +34,22 @@ export async function createAccount(formData: FormData): Promise<CreateAccountRe
     return { ok: false, error: 'invalid_input', fields };
   }
 
+  // Contraseña de PDF: se persiste SIEMPRE cifrada (AES-256-GCM). Sin la clave
+  // maestra, la creación falla explícita en vez de guardar el secreto en claro.
+  const pdfIntent = parsePdfPasswordIntent(formData);
+  let pdfPassword: string | null = null;
+  if (pdfIntent.mode === 'set') {
+    try {
+      pdfPassword = encryptPdfPassword(pdfIntent.value);
+    } catch {
+      // Sin detalles del secreto en el log: solo la causa operativa.
+      console.error('[accounts] create: PDF_PASSWORD_ENC_KEY ausente o inválida');
+      return { ok: false, error: 'crypto_key_missing' };
+    }
+  }
+
   const db = getDb();
   try {
-    const pdfPasswordRaw = formData.get('pdfPassword');
-    const pdfPassword =
-      typeof pdfPasswordRaw === 'string' && pdfPasswordRaw.length > 0
-        ? pdfPasswordRaw
-        : null;
-
     const [inserted] = await db
       .insert(accounts)
       .values({

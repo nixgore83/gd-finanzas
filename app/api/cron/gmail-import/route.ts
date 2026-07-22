@@ -13,6 +13,7 @@ import {
 import { createImportInternal } from '@/lib/imports/create-internal';
 import { parseImportInternal } from '@/lib/imports/parse-internal';
 import { routeAttachment, type RoutableAccount } from '@/lib/gmail/attachment-router';
+import { decryptPdfPassword } from '@/lib/crypto/pdf-password';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -144,17 +145,30 @@ export async function GET(request: Request) {
             }
           } else {
             // ── Multi-account label: route each attachment by content ──
+            // `pdfPassword` viene CIFRADA de la DB → se descifra acá, en el punto
+            // de uso. Si la clave maestra falta, seguimos sin contraseña (el PDF
+            // puede no estar protegido) en vez de voltear todo el cron.
             const routableAccounts: RoutableAccount[] = accountGroup
               .filter((a) => a.institutionId)
-              .map((a) => ({
-                id: a.id,
-                name: a.name,
-                type: a.type as RoutableAccount['type'],
-                cardBrand: a.cardBrand,
-                currencyDefault: a.currencyDefault as RoutableAccount['currencyDefault'],
-                institutionId: a.institutionId,
-                pdfPassword: a.pdfPassword,
-              }));
+              .map((a) => {
+                let pdfPassword: string | null = null;
+                try {
+                  pdfPassword = decryptPdfPassword(a.pdfPassword);
+                } catch {
+                  console.error('[cron/gmail-import] pdf password decrypt failed', {
+                    accountId: a.id,
+                  });
+                }
+                return {
+                  id: a.id,
+                  name: a.name,
+                  type: a.type as RoutableAccount['type'],
+                  cardBrand: a.cardBrand,
+                  currencyDefault: a.currencyDefault as RoutableAccount['currencyDefault'],
+                  institutionId: a.institutionId,
+                  pdfPassword,
+                };
+              });
 
             for (const att of attachments) {
               const isPdf = att.filename.toLowerCase().endsWith('.pdf');

@@ -65,7 +65,40 @@
   CLAUDE.md §Seguridad dice "nunca almacenar contraseñas / credenciales de acceso" y no hay excepción
   documentada para este caso (la única excepción escrita es la de contrapartes). Decidir: documentar la
   excepción, o cifrar/no persistir. Ver también `isPdf` en `imports/[id]/page.tsx:245` que trata un `.xlsx`
-  como PDF y muestra el campo de contraseña de más (cosmético).
+  como PDF y muestra el campo de contraseña de más (cosmético). **RESUELTO en la sección siguiente:
+  decisión de Nico (2026-07-22) = cifrar.**
+
+### Sesión 2026-07-22 — Cifrado de las contraseñas de PDF (fix de seguridad)
+
+- **Problema:** `accounts.pdf_password` e `institutions.pdf_password` se guardaban en **texto
+  plano** (viola `CLAUDE.md` §Seguridad). Agravante: el form de cuentas las devolvía al browser
+  como `defaultValue` de un `<Input>` sin `type="password"` — el secreto se veía en pantalla y
+  viajaba en el payload de la página. (El de instituciones no tiene form: solo se setean desde
+  el flujo de parseo.) **Decisión de Nico: cifrar** (no documentar excepción).
+- [x] **`lib/crypto/secret-box.ts`** — AES-256-GCM con `node:crypto` (sin dependencias nuevas).
+  IV aleatorio de 12 bytes por operación + auth tag; AAD = etiqueta de versión. Payload
+  versionado `v1:<iv_b64>:<tag_b64>:<ct_b64>` para poder rotar esquema. Funciones puras (la
+  clave entra por parámetro) → 19 tests: round-trip, IV distinto por corrida, clave equivocada,
+  tampering de ciphertext y de tag, payload mal formado, versión desconocida.
+- [x] **`lib/crypto/pdf-password.ts`** — binding con la env var `PDF_PASSWORD_ENC_KEY`
+  (32 bytes base64). Sin clave → **falla explícito** (`PdfPasswordKeyMissingError`), nunca
+  guarda en claro. Tolera valores legacy en texto plano hasta correr el backfill (warn sin
+  el valor). 7 tests.
+- [x] **Descifrado en el punto de uso:** `lib/imports/parse-internal.ts` (cambio mínimo: leer +
+  persistir cifrado) y `app/api/cron/gmail-import/route.ts` (al armar `RoutableAccount`).
+  `lib/gmail/attachment-router.ts` sigue recibiendo la contraseña en claro (no se tocó).
+- [x] **Form write-only** (`account-form.tsx`): el campo ya no recibe el valor guardado;
+  `type="password"`, vacío al cargar, indicador "hay una contraseña guardada" + botones
+  Reemplazar / Borrar. La intención viaja en `pdfPasswordAction` (`keep|set|clear`) validada con
+  Zod (`parsePdfPasswordIntent`): **un input vacío no borra** — solo `clear` borra. 6 tests.
+- [x] **Backfill** `npm run db:encrypt-pdf-passwords -- --apply` (idempotente, saltea `v1:`,
+  nunca imprime valores) + migración `0019_encrypt_pdf_passwords.sql` con CHECK
+  `pdf_password LIKE 'v1:%'` en ambas tablas. Orden: setear clave → backfill → migración.
+- **PENDIENTE DE NICO (no lo hago yo):** 1) generar la clave con
+  `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`, 2) setear
+  `PDF_PASSWORD_ENC_KEY` en Vercel (todos los entornos) y en `.env.local`, 3) correr el backfill,
+  4) aplicar la migración 0019. Rotar la clave invalida lo cifrado: habría que recargar las
+  contraseñas a mano.
 
 ### Sesión 2026-07-07 — Parser Mercado Pago cuenta (banco/billetera)
 

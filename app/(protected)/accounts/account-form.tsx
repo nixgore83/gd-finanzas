@@ -40,7 +40,13 @@ type ActionResult =
 type Props = {
   institutions: Institution[];
   action: (formData: FormData) => Promise<ActionResult>;
-  initial?: Partial<AccountInput> & { id?: string; pdfPassword?: string | null };
+  /**
+   * OJO: `initial` NUNCA lleva la contraseña de PDF. El secreto no sale del
+   * server — el form solo sabe si hay una guardada (`hasPdfPassword`).
+   */
+  initial?: Partial<AccountInput> & { id?: string };
+  /** true si la cuenta ya tiene una contraseña de PDF guardada (cifrada en DB). */
+  hasPdfPassword?: boolean;
   submitLabel: string;
   hiddenId?: string;
   title: string;
@@ -53,6 +59,7 @@ export function AccountForm({
   institutions,
   action,
   initial,
+  hasPdfPassword = false,
   submitLabel,
   hiddenId,
   title,
@@ -73,6 +80,13 @@ export function AccountForm({
     initial?.institutionId ?? NONE_VALUE,
   );
   const [ownerTag, setOwnerTag] = useState<string>(initial?.ownerTag ?? 'Hogar');
+
+  // Contraseña de PDF: write-only. Si ya hay una guardada, el input arranca
+  // oculto y vacío; el usuario elige explícitamente reemplazarla o borrarla.
+  // 'keep' | 'set' | 'clear' viaja al server en un hidden input.
+  const [pdfPasswordAction, setPdfPasswordAction] = useState<'keep' | 'set' | 'clear'>(
+    hasPdfPassword ? 'keep' : 'set',
+  );
 
   function handleSubmit(formData: FormData) {
     // Inyectar los valores controlados de los Selects en el FormData.
@@ -103,6 +117,10 @@ export function AccountForm({
       }
       if (result.error === 'not_found') {
         toast.error('La cuenta no existe o no es tuya');
+        return;
+      }
+      if (result.error === 'crypto_key_missing') {
+        toast.error('Falta configurar PDF_PASSWORD_ENC_KEY: no se puede guardar la contraseña');
         return;
       }
       toast.error('No pudimos guardar. Probá de nuevo.');
@@ -266,16 +284,85 @@ export function AccountForm({
 
           <div className="space-y-2">
             <Label htmlFor="pdfPassword">Contraseña PDF</Label>
-            <Input
-              id="pdfPassword"
-              name="pdfPassword"
-              maxLength={100}
-              defaultValue={initial?.pdfPassword ?? ''}
-              disabled={isPending}
-              placeholder="Opcional — para PDFs protegidos"
-            />
+            {/* Intención explícita: sin esto, un input vacío borraría la guardada. */}
+            <input type="hidden" name="pdfPasswordAction" value={pdfPasswordAction} />
+
+            {hasPdfPassword && pdfPasswordAction === 'keep' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Hay una contraseña guardada (no se muestra).
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => setPdfPasswordAction('set')}
+                >
+                  Reemplazar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => setPdfPasswordAction('clear')}
+                >
+                  Borrar
+                </Button>
+              </div>
+            )}
+
+            {hasPdfPassword && pdfPasswordAction === 'clear' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-destructive">
+                  Se va a borrar al guardar los cambios.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => setPdfPasswordAction('keep')}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            )}
+
+            {pdfPasswordAction === 'set' && (
+              <>
+                <Input
+                  id="pdfPassword"
+                  name="pdfPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  maxLength={200}
+                  defaultValue=""
+                  disabled={isPending}
+                  placeholder={
+                    hasPdfPassword
+                      ? 'Escribí la contraseña nueva'
+                      : 'Opcional — para PDFs protegidos'
+                  }
+                />
+                {hasPdfPassword && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => setPdfPasswordAction('keep')}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+              </>
+            )}
+
             <p className="text-xs text-muted-foreground">
-              Si el banco protege los resúmenes con contraseña, ingresala acá.
+              Si el banco protege los resúmenes con contraseña, ingresala acá. Se guarda
+              cifrada y no se vuelve a mostrar: dejar el campo vacío no la borra.
             </p>
           </div>
 
