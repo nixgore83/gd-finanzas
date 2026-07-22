@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
-import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, forecasts, imports, importLines, recurrences, tags, transactions, transactionTags } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
@@ -11,6 +11,8 @@ import { buildTransactionFields } from '@/app/actions/transactions/_build';
 import {
   buildTransferFields,
   buildSingleTransferLeg,
+  extractOperationRef,
+  selectOperationRefTransferMatch,
   selectSameCurrencyTransferMatch,
 } from '@/app/actions/transactions/_build-transfer';
 import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
@@ -334,6 +336,40 @@ export async function confirmImport(input: {
               parsed.data.amountOriginal,
               isOutgoing,
             );
+          }
+
+          // Fallback: match por NÚMERO DE OPERACIÓN. Las dos patas de un traspaso
+          // entre cuentas propias de ICBC comparten la referencia ("TR.7772754")
+          // aunque cambien de moneda y de monto (compra/venta de USD), que es
+          // justo donde el match por monto no llega. Como la referencia es un
+          // identificador fuerte del banco, se busca en TODAS las cuentas del
+          // household salvo la del extracto, sin filtrar por moneda ni monto.
+          if (!matchedCandidateId) {
+            const opRef = extractOperationRef(parsed.data.description);
+            if (opRef) {
+              const opCandidates = await tx
+                .select({
+                  id: transactions.id,
+                  description: transactions.description,
+                  amountOriginal: transactions.amountOriginal,
+                })
+                .from(transactions)
+                .where(
+                  and(
+                    eq(transactions.householdId, session.householdId),
+                    ne(transactions.accountId, input.accountId),
+                    eq(transactions.kind, 'transfer'),
+                    isNull(transactions.transferPairId),
+                    gte(transactions.date, shiftIsoDate(parsed.data.date, -MATCH_DATE_WINDOW_DAYS)),
+                    lte(transactions.date, shiftIsoDate(parsed.data.date, MATCH_DATE_WINDOW_DAYS)),
+                  ),
+                );
+              matchedCandidateId = selectOperationRefTransferMatch(
+                opCandidates,
+                opRef,
+                isOutgoing,
+              );
+            }
           }
 
           if (matchedCandidateId) {

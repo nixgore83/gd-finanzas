@@ -74,6 +74,39 @@ export function selectSameCurrencyTransferMatch(
   return within.length === 1 ? within[0]!.id : null;
 }
 
+/**
+ * Nro de operación bancaria embebido en el concepto, si lo hay. ICBC imprime la
+ * MISMA referencia en las dos patas de un traspaso entre cuentas propias
+ * ("TR.7772754  A 0905/11102104/13" en la de pesos y "TR.7772754 DE
+ * 0926/01109094/30" en la de dólares). Devuelve solo los dígitos.
+ */
+export function extractOperationRef(description: string): string | null {
+  const m = /\bTR\.\s*(\d{6,})\b/i.exec(description);
+  return m ? m[1]! : null;
+}
+
+/**
+ * Lógica pura de selección de candidato a parear por NÚMERO DE OPERACIÓN. A
+ * diferencia del match por monto, sirve cross-currency (una compra de USD tiene
+ * montos distintos en cada pata) porque la referencia es un identificador fuerte
+ * emitido por el banco. Exige dirección opuesta y EXACTAMENTE un candidato; ante
+ * cualquier ambigüedad devuelve null y el pareo queda manual.
+ * `isOutgoing` = la línea sale de la cuenta del import (la contraparte recibe).
+ */
+export function selectOperationRefTransferMatch(
+  candidates: ReadonlyArray<{ id: string; description: string; amountOriginal: string }>,
+  opRef: string,
+  isOutgoing: boolean,
+): string | null {
+  const wantDirection: 'out' | 'in' = isOutgoing ? 'in' : 'out';
+  const hits = candidates.filter(
+    (c) =>
+      extractOperationRef(c.description) === opRef &&
+      transferDirection('transfer', c.amountOriginal) === wantDirection,
+  );
+  return hits.length === 1 ? hits[0]!.id : null;
+}
+
 export async function buildTransferFields(
   input: TransferInput,
   householdId: string,
