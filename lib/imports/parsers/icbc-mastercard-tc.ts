@@ -1,4 +1,5 @@
 import { parserOutputSchema, type Parser } from './types';
+import { TC_DATE_RULES_BLOCK } from './tc-date-rules';
 
 const SYSTEM_PROMPT = `Sos un parser de resúmenes de tarjeta de crédito ICBC Mastercard.
 Tu trabajo es extraer TODAS las transacciones individuales del PDF y devolver JSON estructurado.
@@ -13,9 +14,9 @@ REGLAS ESTRICTAS:
 - NUNCA incluyas números completos de tarjeta (PAN), CBU, alias, claves, ni datos personales sensibles.
 - Extraé CADA línea individual del detalle — incluyendo las que están en páginas subsiguientes.
 - IGNORÁ: "SALDO ANTERIOR", "SU PAGO", "TRANSFERENC FINANC", "RESUMEN CONSOLIDADO", totales, subtotales, intereses de financiación, IVA, pago mínimo, saldo actual, comisiones y ajustes globales.
-- CUOTAS: registrá UNA línea con el monto de la cuota del mes actual. Incluí la cuota en la descripción (ej: "MERPAGO*ALGO C.03/06"). IMPORTANTE: la fecha de la cuota debe ser la FECHA DEL RESUMEN (la del mes actual que aparece en el encabezado como "Estado de cuenta al" o "Cierre"), NO la fecha original de compra.
+- CUOTAS: registrá UNA línea con el monto de la cuota del mes actual. Incluí la cuota en la descripción (ej: "MERPAGO*ALGO C.03/06"). La fecha, según la REGLA DE FECHAS de abajo.
 - Montos negativos en la columna PESOS son devoluciones → kind: "income", monto positivo.
-- Fechas en formato YYYY-MM-DD (convertí "28-Feb-26" → "2026-02-28").
+- Fechas en formato YYYY-MM-DD (convertí "28-Feb-26" → "2026-02-28"). Es la fecha real del consumo, NO la del cierre: ver REGLA DE FECHAS.
 - Montos como string numérico con punto decimal, siempre positivos. Convertí "53.050,00" → "53050.00".
 - "kind": "expense" para consumos, "income" para devoluciones / créditos.
 - "currencyOriginal": "ARS" para montos en la columna PESOS, "USD" para la columna DOLARES.
@@ -23,6 +24,8 @@ REGLAS ESTRICTAS:
 
 IMPORTANTE: Este formato suele tener muchas transacciones (40-80+). Leé TODAS las páginas del PDF de principio a fin. NO pares antes de llegar al final del detalle.
 Antes de armar el JSON, contá mentalmente cuántas filas de transacción ves en total. Si tu JSON tiene significativamente menos líneas que las que contaste, volvé a leer el PDF.
+
+${TC_DATE_RULES_BLOCK}
 
 SUBTOTALES DEL RESUMEN:
 Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:

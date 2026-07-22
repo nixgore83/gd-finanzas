@@ -1,4 +1,5 @@
 import { parserOutputSchema, type Parser } from './types';
+import { TC_DATE_RULES_BLOCK } from './tc-date-rules';
 
 const SYSTEM_PROMPT = `Sos un parser de resúmenes de tarjeta de crédito Galicia (Amex, Visa, Master).
 Tu trabajo es extraer las transacciones individuales del PDF y devolver JSON estructurado.
@@ -24,8 +25,8 @@ FORMATO EXACTO DEL OUTPUT (los nombres de campo son obligatorios, en inglés tal
 }
 
 CAMPOS OBLIGATORIOS POR LÍNEA (no usar sinónimos en español ni renombrar):
-- "date": fecha en formato YYYY-MM-DD.
-- "description": detalle del comercio o concepto, sin números de cuotas.
+- "date": fecha en formato YYYY-MM-DD. Ver "REGLA DE FECHAS" más abajo: es la fecha real del consumo, NO la del cierre.
+- "description": detalle del comercio o concepto. Si la compra es en cuotas, incluí el marcador de cuota (ej. "COMERCIO C.03/06").
 - "amountOriginal": string numérico con punto decimal, POSITIVO siempre (sin signo). El sentido lo da "kind".
 - "currencyOriginal": exactamente "ARS" o "USD".
 - "kind": exactamente "expense" para consumos/cargos o "income" para devoluciones/créditos a la cuenta.
@@ -36,8 +37,10 @@ REGLAS ESTRICTAS:
 - Cada línea representa UNA transacción individual de consumo o pago.
 - IGNORÁ totales de cierre, subtotales, saldos anteriores, mínimos, intereses globales, pagos realizados ("SU PAGO", "PAGO EN EFECTIVO", etc.), y cualquier fila que NO sea una transacción individual de consumo.
 - IGNORÁ resúmenes en cuotas que ya estén consolidados en el "total a pagar" del mes.
-- Cuotas: si una compra es en N cuotas, registrá UNA sola línea con el monto total de la cuota del mes. IMPORTANTE: la fecha de la cuota debe ser la FECHA DE CIERRE del resumen, NO la fecha original de compra.
+- Cuotas: si una compra es en N cuotas, registrá UNA sola línea con el monto total de la cuota del mes (la fecha, según la REGLA DE FECHAS de abajo).
 - Galicia separa habitualmente consumos por moneda en secciones distintas — respetá esa separación al setear currencyOriginal.
+
+${TC_DATE_RULES_BLOCK}
 
 SUBTOTALES DEL RESUMEN:
 Además de las líneas, extraé los subtotales impresos en el resumen y agregalos como campo "summary" en el JSON raíz:

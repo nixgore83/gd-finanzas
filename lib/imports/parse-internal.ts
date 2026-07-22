@@ -19,6 +19,11 @@ import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt'
 import { detectTransfers } from '@/lib/imports/detect-transfers';
 import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
+import {
+  DATE_COLLAPSE_LINE_MARKER,
+  dateCollapseMessage,
+  detectDateCollapse,
+} from '@/lib/imports/date-collapse';
 import { formatAccount } from '@/lib/accounts/format';
 import { getImportParserEnv } from '@/lib/env';
 import { unlockPdf } from '@/lib/imports/pdf-decrypt';
@@ -347,6 +352,22 @@ export async function parseImportInternal(
 
   const catByName = new Map(tree.map((c) => [c.name.toLowerCase(), c.id]));
 
+  // Sanidad de fechas (solo TC parseadas por LLM): si el modelo colapsó todas las
+  // fechas de consumo a una sola —típicamente la de cierre—, NO lo persistimos en
+  // silencio: se marca cada línea y el import entero para revisión humana.
+  // Ver lib/imports/date-collapse.ts.
+  const dateCollapse =
+    row.type === 'tc' && !result.model.startsWith('deterministic')
+      ? detectDateCollapse(lines)
+      : ({ collapsed: false } as const);
+  if (dateCollapse.collapsed) {
+    // Sin fechas ni montos en el log: solo el id y el conteo.
+    console.warn('[imports] date collapse detected', {
+      importId,
+      lines: dateCollapse.lineCount,
+    });
+  }
+
   const lineRows = await Promise.all(
     lines.map(async (line) => {
       // Historial por contraparte (categoría, etiqueta, deducible, tags, doméstico)
@@ -374,12 +395,20 @@ export async function parseImportInternal(
       const lineKey = `${line.date}|${line.description.toLowerCase()}|${line.amountOriginal}`;
       const isDuplicate = existingTxKeys.has(lineKey);
 
+      // Marcadores que la review UI lee de `notes` (`[DUPLICADA]`, `[FECHA SOSPECHOSA]`).
+      const flags: string[] = [];
+      if (isDuplicate) flags.push('[DUPLICADA] Ya existe como transacción en esta cuenta');
+      if (dateCollapse.collapsed) flags.push(`${DATE_COLLAPSE_LINE_MARKER} verificá la fecha contra el PDF`);
+      // `notes` tiene max 500 en parsedTxLineSchema (lo revalida update-line al editar).
+      const notes =
+        flags.length > 0
+          ? [...flags, lineData.notes].filter(Boolean).join(' · ').slice(0, 500)
+          : lineData.notes;
+
       return {
         importId,
         rawData: line,
-        parsedData: isDuplicate
-          ? { ...lineData, notes: `[DUPLICADA] Ya existe como transacción en esta cuenta` }
-          : lineData,
+        parsedData: notes === lineData.notes ? lineData : { ...lineData, notes },
         proposedCategoryId,
         status: isDuplicate ? ('rejected' as const) : ('pending' as const),
       };
@@ -413,9 +442,14 @@ export async function parseImportInternal(
       summary,
       statementAccountRef,
       errorMessage:
-        dupCount > 0
-          ? `${dupCount} líneas duplicadas rechazadas automáticamente (ya existen como transacciones). ${pendingCount} pendientes de revisión.`
-          : null,
+        [
+          dateCollapse.collapsed ? dateCollapseMessage(dateCollapse) : null,
+          dupCount > 0
+            ? `${dupCount} líneas duplicadas rechazadas automáticamente (ya existen como transacciones). ${pendingCount} pendientes de revisión.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' ') || null,
     })
     .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
 
