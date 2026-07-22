@@ -3,12 +3,48 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-07-07 por Claude
+**Última actualización:** 2026-07-22 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-07-22 — Fix: PDFs protegidos sin contraseña cargada morían con un error críptico del LLM
+
+- **Síntoma:** 4 imports de Mercado Pago en `error`. Tres (`MELI.pdf`, `Resumen_MercadoPago_Julio2026.pdf`)
+  con `LLM api_failure: ... 400 "The PDF specified is password protected"`; el cuarto (reparse con
+  contraseña manual) con `No se pudo desbloquear el PDF. Verificá la contraseña...`.
+- **Causa raíz (confirmada, código + DB):** `parse-internal.ts` solo intentaba desbloquear el PDF
+  **si había una contraseña configurada** (`if (isPdf && pdfPassword)`). Ni la cuenta ni la institución
+  Mercado Pago tienen `pdf_password` (verificado en prod) → los bytes **cifrados** se mandaban tal cual
+  a la API de Anthropic, que rechaza cualquier PDF con `/Encrypt` con un 400. El usuario veía un
+  `LLM api_failure` incomprensible en vez de "cargá la contraseña".
+- **Sobre los PDFs de MP (dato):** los 5 imports MP TC que sí funcionaron (may-26) eran
+  `credit-card-mp-statement*.pdf`, **bajados de la web/app y sin cifrar**. Los que fallan (`MELI.pdf`)
+  vienen **por mail y sí traen user-password real** (mupdf reporta `needsPassword()` true). No es un bug
+  de descifrado: falta el dato.
+- **Fix (`lib/imports/pdf-decrypt.ts` + `parse-internal.ts`):** nuevo `unlockPdfForImport(bytes, password)`
+  que se intenta **siempre** que el archivo sea PDF, con contraseña o sin ella:
+  - PDF con `/Encrypt` pero user-password vacío (solo owner-password) → ahora se descifra y se importa
+    (antes lo rechazaba Anthropic con el mismo 400, sin salida posible).
+  - PDF con contraseña real y ninguna guardada → error accionable `locked_no_password` ("ingresá la
+    contraseña acá abajo… si hay Excel/CSV, ese camino no la necesita"), no un error del LLM.
+  - Leniencia deliberada: si **no** hay contraseña declarada y mupdf ni siquiera puede abrir el archivo
+    (`unsupported`), NO es fatal — se sigue con los bytes originales (comportamiento previo, no rompe los
+    ~80 PDFs sin contraseña que hoy importan bien). Un PDF realmente cifrado reporta `wrong_password`,
+    nunca `unsupported`, así que se mantiene el contrato "nunca mandamos bytes cifrados al LLM".
+- [x] 7 tests nuevos en `pdf-decrypt.test.ts` (fixtures generados con mupdf en runtime, sin datos reales),
+  incluido el caso owner-password-only. Suite 509/509, typecheck + lint OK.
+- **Acción de Nico:** los `MELI.pdf` necesitan la contraseña con la que MP manda el resumen por mail
+  (para MP suele ser el DNI). Cargarla en la cuenta MP Master (`/accounts` → "Contraseña PDF") o al
+  reparsear, y reintentar. El import `banco` de julio ya quedó cubierto por el Excel (32 líneas).
+- **A discutir (seguridad, NO tocado):** `accounts.pdf_password` / `institutions.pdf_password` guardan la
+  contraseña **en texto plano** y el form de cuenta la devuelve al cliente en un `<Input>` común (visible).
+  CLAUDE.md §Seguridad dice "nunca almacenar contraseñas / credenciales de acceso" y no hay excepción
+  documentada para este caso (la única excepción escrita es la de contrapartes). Decidir: documentar la
+  excepción, o cifrar/no persistir. Ver también `isPdf` en `imports/[id]/page.tsx:245` que trata un `.xlsx`
+  como PDF y muestra el campo de contraseña de más (cosmético).
 
 ### Sesión 2026-07-07 — Parser Mercado Pago cuenta (banco/billetera)
 
