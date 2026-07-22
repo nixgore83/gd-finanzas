@@ -42,6 +42,46 @@ export async function unlockPdf(bytes: Uint8Array, password: string): Promise<Pd
   }
 }
 
+/**
+ * Motivo por el que un PDF no se pudo dejar listo para el parser.
+ * - `locked_no_password`: el PDF pide contraseña y NO teníamos ninguna configurada.
+ * - `wrong_password`: teníamos una contraseña y no abrió.
+ * - `unsupported`: ni mupdf pudo abrir el archivo (y el usuario declaró que está protegido).
+ */
+export type PdfUnlockForImportResult =
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; reason: 'locked_no_password' | 'wrong_password' | 'unsupported' };
+
+/**
+ * Deja un PDF listo para mandarle al parser (LLM), decidiendo qué es fatal y qué no.
+ *
+ * Se intenta desbloquear SIEMPRE, incluso sin contraseña configurada (`password` null),
+ * por dos motivos:
+ *  1. Hay resúmenes con diccionario /Encrypt pero user-password VACÍO (solo owner-password).
+ *     mupdf los abre sin problema, pero la API de Anthropic rechaza cualquier PDF con
+ *     /Encrypt con 400 "The PDF specified is password protected". Desencriptarlos acá los
+ *     vuelve importables.
+ *  2. Si el PDF sí tiene contraseña real y no la cargamos, queremos un error accionable
+ *     ("cargá la contraseña") y no un `LLM api_failure` críptico.
+ *
+ * Leniencia deliberada: si NO hay contraseña configurada y el archivo no se puede ni abrir
+ * (`unsupported`), NO es fatal: seguimos con los bytes originales y que el parser intente.
+ * Un PDF realmente cifrado que mupdf abre reporta `wrong_password`, nunca `unsupported`, así
+ * que el contrato "nunca mandamos bytes cifrados al LLM" se mantiene.
+ */
+export async function unlockPdfForImport(
+  bytes: Uint8Array,
+  password: string | null | undefined,
+): Promise<PdfUnlockForImportResult> {
+  const res = await unlockPdf(bytes, password ?? '');
+  if (res.ok) return res;
+  if (res.reason === 'wrong_password') {
+    return { ok: false, reason: password ? 'wrong_password' : 'locked_no_password' };
+  }
+  // `unsupported` sin contraseña declarada → no lo damos por perdido.
+  return password ? { ok: false, reason: 'unsupported' } : { ok: true, bytes };
+}
+
 async function unlockWithMupdf(bytes: Uint8Array, password: string): Promise<PdfUnlockResult> {
   const mupdf = await import('mupdf');
 

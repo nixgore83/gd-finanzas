@@ -26,7 +26,7 @@ import {
 } from '@/lib/imports/date-collapse';
 import { formatAccount } from '@/lib/accounts/format';
 import { getImportParserEnv } from '@/lib/env';
-import { unlockPdf } from '@/lib/imports/pdf-decrypt';
+import { unlockPdfForImport } from '@/lib/imports/pdf-decrypt';
 
 export type ParseImportInternalResult =
   | { ok: true; lineCount: number }
@@ -126,19 +126,24 @@ export async function parseImportInternal(
       : 'pdf';
 
   // Unlock protected PDF.
-  // La desencriptación pasa por `unlockPdf` (pdf-decrypt → fallback mupdf para el
+  // La desencriptación pasa por `unlockPdfForImport` (pdf-decrypt → fallback mupdf para el
   // AES-128 de ICBC). NUNCA mandamos bytes cifrados al LLM: si no se pudo desbloquear,
   // marcamos error explícito en vez de "parsear" 0 líneas en silencio.
+  // Se intenta SIEMPRE que sea PDF, aunque no haya contraseña configurada: los PDFs con
+  // /Encrypt (incluso con user-password vacío) los rechaza la API de Anthropic con un 400
+  // "password protected", que llegaba al usuario como un `LLM api_failure` incomprensible.
   const isPdf = ext === 'pdf';
   const pdfPassword = customPassword || row.accountPdfPassword || row.pdfPassword;
-  if (isPdf && pdfPassword) {
-    const unlock = await unlockPdf(bytes, pdfPassword);
+  if (isPdf) {
+    const unlock = await unlockPdfForImport(bytes, pdfPassword);
     if (!unlock.ok) {
       console.error('[imports] pdf unlock failed', { importId, reason: unlock.reason });
       const errorMessage =
-        unlock.reason === 'wrong_password'
-          ? 'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.'
-          : 'No se pudo desbloquear el PDF: encriptación no soportada. Volvé a guardar el PDF (imprimir a PDF / "Guardar como") y re-subilo.';
+        unlock.reason === 'locked_no_password'
+          ? 'El PDF está protegido con contraseña y no hay ninguna guardada para esta cuenta. Ingresala en "Contraseña de desencriptación" acá abajo y volvé a parsear (o cargala en la cuenta). Si el banco también ofrece el resumen en Excel/CSV, ese camino no necesita contraseña.'
+          : unlock.reason === 'wrong_password'
+            ? 'No se pudo desbloquear el PDF. Verificá la contraseña en la institución o cuenta.'
+            : 'No se pudo desbloquear el PDF: encriptación no soportada. Volvé a guardar el PDF (imprimir a PDF / "Guardar como") y re-subilo.';
       await db
         .update(imports)
         .set({ status: 'error', errorMessage })
