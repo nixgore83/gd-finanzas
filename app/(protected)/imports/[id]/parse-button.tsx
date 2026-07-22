@@ -59,6 +59,9 @@ export function ParseButton({
             if (res.ok) {
               toast.success('Parseando en segundo plano… refrescá en un rato para ver las líneas');
               router.refresh();
+            } else if (res.error === 'already_parsing') {
+              toast.info('Ya hay un parseo en curso para este import. Esperá a que termine.');
+              router.refresh();
             } else {
               toast.error(`Error: ${res.error}`);
               router.refresh();

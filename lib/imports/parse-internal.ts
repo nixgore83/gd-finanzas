@@ -5,6 +5,7 @@ import { accounts, imports, importLines, institutions, transactions } from '@/db
 import { downloadImportFile } from '@/lib/imports/storage';
 import { readXlsxRows } from '@/lib/imports/xlsx';
 import { resolveParser } from '@/lib/imports/parsers/registry';
+import { claimImportForParse, isReparseableStatus } from '@/lib/imports/parse-claim';
 import { runParser, LlmError } from '@/lib/imports/llm';
 import { CsvFormatError, type ParsedTxLine, type ParserOutput } from '@/lib/imports/parsers/types';
 import { suggestCategoryForDescription } from '@/lib/imports/category-suggest';
@@ -32,9 +33,30 @@ export type ParseImportInternalResult =
   | { ok: true; lineCount: number }
   | {
       ok: false;
-      error: 'not_found' | 'invalid_state' | 'no_parser' | 'no_file' | 'llm' | 'unknown';
+      error:
+        | 'not_found'
+        | 'invalid_state'
+        | 'already_parsing'
+        | 'no_parser'
+        | 'no_file'
+        | 'llm'
+        | 'unknown';
       message?: string;
     };
+
+export type ParseImportInternalOptions = {
+  /** Contraseña manual para desbloquear el PDF (tiene prioridad sobre la guardada). */
+  customPassword?: string;
+  /** Persistir `customPassword` en la cuenta/institución si desbloqueó bien. */
+  persistPassword?: boolean;
+  /**
+   * El caller YA ganó el claim atómico (`claimImportForParse`) antes de invocar.
+   * Lo usa `parseImport`, que reclama de forma síncrona para darle feedback
+   * inmediato a la UI y recién después agenda el trabajo con `after()`. Sin este
+   * flag el claim se haría dos veces y el segundo perdería contra el primero.
+   */
+  alreadyClaimed?: boolean;
+};
 
 /**
  * Core parsing logic without session requirement.
@@ -43,9 +65,9 @@ export type ParseImportInternalResult =
 export async function parseImportInternal(
   importId: string,
   householdId: string,
-  customPassword?: string,
-  persistPassword?: boolean,
+  options: ParseImportInternalOptions = {},
 ): Promise<ParseImportInternalResult> {
+  const { customPassword, persistPassword, alreadyClaimed } = options;
   const db = getDb();
 
   const [row] = await db
@@ -70,14 +92,13 @@ export async function parseImportInternal(
     .limit(1);
 
   if (!row) return { ok: false, error: 'not_found' };
-  // 'parsing' DEBE estar incluido: el parseo async (`parseImport`/`parseImportSync`)
-  // marca status='parsing' ANTES de invocar a parseImportInternal (para feedback en
-  // la UI), así que al llegar acá el estado ya es 'parsing'. Sin esto, todo parse
-  // disparado por esa vía devolvía 'invalid_state' y quedaba colgado en 'parsing'
-  // (el cron de Gmail no, porque llama a parseImportInternal directo). También
-  // permite reintentar un import realmente trabado en 'parsing'.
-  const reparseable = ['uploaded', 'parsing', 'error', 'parsed', 'reviewing'];
-  if (!reparseable.includes(row.status)) {
+  // 'parsing' está en REPARSEABLE_STATUSES a propósito: `parseImport` marca
+  // status='parsing' ANTES de invocar a parseImportInternal (para feedback en la
+  // UI), así que al llegar acá por esa vía el estado ya es 'parsing'; y un import
+  // realmente trabado en 'parsing' tiene que poder reintentarse. Este chequeo es
+  // solo un descarte temprano: quién puede arrancar el trabajo lo decide el claim
+  // atómico de más abajo.
+  if (!isReparseableStatus(row.status)) {
     return { ok: false, error: 'invalid_state' };
   }
   if (!row.fileUrl) return { ok: false, error: 'no_file' };
@@ -94,16 +115,20 @@ export async function parseImportInternal(
     };
   }
 
-  // Re-parse: delete unlinked import_lines
-  await db
-    .delete(importLines)
-    .where(and(eq(importLines.importId, importId), isNull(importLines.transactionId)));
-
-  // status → parsing (+ timestamp para detectar parseos cortados / stale)
-  await db
-    .update(imports)
-    .set({ status: 'parsing', parsingStartedAt: sql`now()`, errorMessage: null })
-    .where(and(eq(imports.id, importId), eq(imports.householdId, householdId)));
+  // CLAIM ATÓMICO: status → 'parsing' (+ timestamp) sólo si nadie más lo está
+  // parseando. Es el lock que impide que dos ejecutores concurrentes (doble click
+  // en "Parsear pendientes", auto-parse al subir + click manual, cron + usuario)
+  // corran los dos y dupliquen las líneas. Ver lib/imports/parse-claim.ts.
+  // El borrado de las líneas viejas NO va acá: ocurre junto al insert, en una sola
+  // transacción, para que ni siquiera un claim fallido pueda dejar el import sin
+  // líneas (defensa en profundidad).
+  if (!alreadyClaimed) {
+    const won = await claimImportForParse(db, importId, householdId);
+    if (!won) {
+      console.warn('[imports] parse skipped: ya hay un parseo en curso', { importId });
+      return { ok: false, error: 'already_parsing' };
+    }
+  }
 
   let bytes: Uint8Array;
   try {
@@ -420,9 +445,21 @@ export async function parseImportInternal(
     }),
   );
 
-  if (lineRows.length > 0) {
-    await db.insert(importLines).values(lineRows);
-  }
+  // Reemplazo ATÓMICO de las líneas del import: borrar las no confirmadas (las que
+  // tienen `transaction_id` son intocables) e insertar la tanda nueva en la MISMA
+  // transacción. Antes el borrado ocurría al principio de la función, decenas de
+  // segundos antes del insert: dos ejecutores concurrentes borraban los dos cuando
+  // todavía no había nada e insertaban los dos → 2× líneas. Con el claim ya no
+  // debería haber dos ejecutores, pero esto lo hace inofensivo si igual los hubiera,
+  // y de paso no destruye las líneas viejas cuando el parseo falla a mitad de camino.
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(importLines)
+      .where(and(eq(importLines.importId, importId), isNull(importLines.transactionId)));
+    if (lineRows.length > 0) {
+      await tx.insert(importLines).values(lineRows);
+    }
+  });
 
   const dupCount = lineRows.filter((l) => l.status === 'rejected').length;
   const pendingCount = lineRows.filter((l) => l.status === 'pending').length;
