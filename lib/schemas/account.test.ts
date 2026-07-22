@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accountInputSchema, parseAccountFormData } from './account';
+import { accountInputSchema, parseAccountFormData, parsePdfPasswordIntent } from './account';
 
 const valid = {
   name: 'Galicia Amex',
@@ -104,5 +104,56 @@ describe('parseAccountFormData', () => {
     fd.set('name', 'Sin tipo');
     const result = parseAccountFormData(fd);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('parsePdfPasswordIntent', () => {
+  // Valores SINTÉTICOS. El campo es write-only: el form nunca recibe la guardada.
+  function fd(entries: Record<string, string>): FormData {
+    const f = new FormData();
+    for (const [k, v] of Object.entries(entries)) f.set(k, v);
+    return f;
+  }
+
+  it('sin campos → keep (no toca lo guardado)', () => {
+    expect(parsePdfPasswordIntent(fd({}))).toEqual({ mode: 'keep' });
+  });
+
+  it('un input vacío NUNCA borra la contraseña guardada', () => {
+    expect(parsePdfPasswordIntent(fd({ pdfPasswordAction: 'keep', pdfPassword: '' }))).toEqual({
+      mode: 'keep',
+    });
+    // Incluso si la UI mandó `set` pero el usuario no escribió nada.
+    expect(parsePdfPasswordIntent(fd({ pdfPasswordAction: 'set', pdfPassword: '' }))).toEqual({
+      mode: 'keep',
+    });
+    expect(parsePdfPasswordIntent(fd({ pdfPasswordAction: 'set', pdfPassword: '   ' }))).toEqual({
+      mode: 'keep',
+    });
+  });
+
+  it('set con valor → set (trimmeado)', () => {
+    expect(
+      parsePdfPasswordIntent(fd({ pdfPasswordAction: 'set', pdfPassword: '  valor-test  ' })),
+    ).toEqual({ mode: 'set', value: 'valor-test' });
+  });
+
+  it('clear → borra, aunque venga con valor', () => {
+    expect(parsePdfPasswordIntent(fd({ pdfPasswordAction: 'clear' }))).toEqual({ mode: 'clear' });
+    expect(parsePdfPasswordIntent(fd({ pdfPasswordAction: 'clear', pdfPassword: 'x' }))).toEqual({
+      mode: 'clear',
+    });
+  });
+
+  it('acción desconocida degrada a keep (default no destructivo)', () => {
+    expect(
+      parsePdfPasswordIntent(fd({ pdfPasswordAction: 'delete-everything', pdfPassword: 'x' })),
+    ).toEqual({ mode: 'keep' });
+  });
+
+  it('un valor absurdamente largo no rompe: cae a keep', () => {
+    expect(
+      parsePdfPasswordIntent(fd({ pdfPasswordAction: 'set', pdfPassword: 'x'.repeat(500) })),
+    ).toEqual({ mode: 'keep' });
   });
 });

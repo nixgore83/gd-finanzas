@@ -67,8 +67,9 @@ export default async function EditAccountPage({ params }: { params: RouteParams 
           institutionId: account.institutionId,
           ownerTag: account.ownerTag as 'Nico' | 'Pau' | 'Hogar',
           expectsMonthlyImport: account.expectsMonthlyImport,
-          pdfPassword: account.pdfPassword,
         }}
+        // Solo el booleano: la contraseña (cifrada en DB) nunca viaja al cliente.
+        hasPdfPassword={account.pdfPassword !== null}
         submitLabel="Guardar cambios"
         title="Editar cuenta"
         description={`Editando ${displayName}.`}
