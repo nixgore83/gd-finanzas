@@ -56,6 +56,8 @@ type Initial = {
   accountToId: string;
   amountFrom: string;
   amountTo: string;
+  currencyFrom?: 'ARS' | 'USD';
+  currencyTo?: 'ARS' | 'USD';
   description: string;
   notes: string | null;
   tagIds?: string[];
@@ -116,7 +118,16 @@ export function TransferForm({
     [accounts, accountToId],
   );
 
-  const sameCurrency = fromAcc && toAcc && fromAcc.currencyDefault === toAcc.currencyDefault;
+  // La moneda es del MOVIMIENTO, no de la cuenta: la de la cuenta solo la
+  // pre-selecciona. Una TC argentina es bimonetaria y se paga en ARS o en USD.
+  const [currencyFrom, setCurrencyFrom] = useState<'ARS' | 'USD'>(
+    initial?.currencyFrom ?? fromAcc?.currencyDefault ?? 'ARS',
+  );
+  const [currencyTo, setCurrencyTo] = useState<'ARS' | 'USD'>(
+    initial?.currencyTo ?? toAcc?.currencyDefault ?? 'ARS',
+  );
+
+  const sameCurrency = currencyFrom === currencyTo;
 
   const [amountFrom, setAmountFrom] = useState<string>(initial?.amountFrom ?? '');
   const [amountTo, setAmountTo] = useState<string>(initial?.amountTo ?? '');
@@ -130,9 +141,25 @@ export function TransferForm({
     if (sameCurrency && !amountToTouched) setAmountTo(value);
   }
 
+  // Al cambiar de cuenta, pre-seleccionamos su moneda default (sigue siendo
+  // editable: la cuenta propone, el movimiento dispone).
+  function handleAccountFromChange(id: string) {
+    setAccountFromId(id);
+    const acc = accounts.find((a) => a.id === id);
+    if (acc) setCurrencyFrom(acc.currencyDefault);
+  }
+
+  function handleAccountToChange(id: string) {
+    setAccountToId(id);
+    const acc = accounts.find((a) => a.id === id);
+    if (acc) setCurrencyTo(acc.currencyDefault);
+  }
+
   function handleSubmit(formData: FormData) {
     formData.set('accountFromId', accountFromId);
     formData.set('accountToId', accountToId);
+    formData.set('currencyFrom', currencyFrom);
+    formData.set('currencyTo', currencyTo);
     formData.delete('tagIds');
     selectedTagIds.forEach((id) => formData.append('tagIds', id));
     if (hiddenId) formData.set('id', hiddenId);
@@ -200,7 +227,7 @@ export function TransferForm({
               <Label htmlFor="accountFromId">Desde</Label>
               <Select
                 value={accountFromId}
-                onValueChange={setAccountFromId}
+                onValueChange={handleAccountFromChange}
                 disabled={isPending || disableAccounts}
               >
                 <SelectTrigger
@@ -226,7 +253,7 @@ export function TransferForm({
               <Label htmlFor="accountToId">Hacia</Label>
               <Select
                 value={accountToId}
-                onValueChange={setAccountToId}
+                onValueChange={handleAccountToChange}
                 disabled={isPending || disableAccounts}
               >
                 <SelectTrigger
@@ -251,46 +278,82 @@ export function TransferForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="amountFrom">Monto que sale {fromAcc && `(${fromAcc.currencyDefault})`}</Label>
-              <Input
-                id="amountFrom"
-                name="amountFrom"
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                disabled={isPending}
-                value={amountFrom}
-                onChange={(e) => handleAmountFromChange(e.target.value)}
-                placeholder="0.00"
-                aria-invalid={errors.amountFrom ? true : undefined}
-              />
+              <Label htmlFor="amountFrom">Monto que sale</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="amountFrom"
+                  name="amountFrom"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  disabled={isPending}
+                  value={amountFrom}
+                  onChange={(e) => handleAmountFromChange(e.target.value)}
+                  placeholder="0.00"
+                  aria-invalid={errors.amountFrom ? true : undefined}
+                />
+                <Select
+                  value={currencyFrom}
+                  onValueChange={(v) => setCurrencyFrom(v as 'ARS' | 'USD')}
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="currencyFrom" className="w-24" aria-label="Moneda que sale">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {fromAcc && currencyFrom !== fromAcc.currencyDefault && (
+                <p className="text-xs text-muted-foreground">
+                  Distinta de la moneda default de la cuenta ({fromAcc.currencyDefault}). OK si es
+                  una TC bimonetaria o una caja en la otra moneda.
+                </p>
+              )}
               {errors.amountFrom && (
                 <p className="text-sm text-destructive">{errors.amountFrom}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amountTo">Monto que entra {toAcc && `(${toAcc.currencyDefault})`}</Label>
-              <Input
-                id="amountTo"
-                name="amountTo"
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                disabled={isPending}
-                value={amountTo}
-                onChange={(e) => {
-                  setAmountTo(e.target.value);
-                  setAmountToTouched(true);
-                }}
-                placeholder="0.00"
-                aria-invalid={errors.amountTo ? true : undefined}
-              />
-              {!sameCurrency && fromAcc && toAcc && (
+              <Label htmlFor="amountTo">Monto que entra</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="amountTo"
+                  name="amountTo"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  disabled={isPending}
+                  value={amountTo}
+                  onChange={(e) => {
+                    setAmountTo(e.target.value);
+                    setAmountToTouched(true);
+                  }}
+                  placeholder="0.00"
+                  aria-invalid={errors.amountTo ? true : undefined}
+                />
+                <Select
+                  value={currencyTo}
+                  onValueChange={(v) => setCurrencyTo(v as 'ARS' | 'USD')}
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="currencyTo" className="w-24" aria-label="Moneda que entra">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {!sameCurrency && (
                 <p className="text-xs text-muted-foreground">
-                  Cross-currency: cargá el monto efectivamente recibido en {toAcc.currencyDefault}.
+                  Cross-currency: cargá el monto efectivamente recibido en {currencyTo}.
                 </p>
               )}
               {errors.amountTo && <p className="text-sm text-destructive">{errors.amountTo}</p>}

@@ -10,6 +10,33 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-08-11 — La moneda de una pata de transferencia sale del movimiento, no de la cuenta
+
+Detectado por Nico importando el extracto **Galicia USD**: los `PAGO TARJETA VISA/MASTER/AMEX` vienen
+en USD pero las TC están cargadas con `currency_default = 'ARS'` ("¿por qué las TC tienen moneda?").
+Las TC argentinas son **bimonetarias** — un mismo resumen tiene sección ARS y sección USD — así que
+una sola moneda por cuenta no alcanza.
+
+- **Bug (latente, no había disparado todavía).** `buildSingleTransferLeg` / `buildTransferFields`
+  denominaban la pata con la `currency_default` de la cuenta, ignorando la moneda de la línea. Un
+  `SU PAGO` de USD 1,01 en el resumen de la Master se habría guardado como **ARS 1,01** con conversión
+  errada. Las líneas normales de income/expense nunca tuvieron el problema (usan la moneda de la línea).
+- [x] **Fix.** Nuevo helper puro `computeLegAmounts(amount, currency, rate, sign)` en `_build-transfer.ts`;
+  ambos builders aceptan la moneda explícita y caen a la de la cuenta solo como fallback. `confirm.ts`
+  pasa `parsed_data.currencyOriginal` en la pata propia y en las dos del branch same-currency.
+- [x] **Matcher.** La búsqueda de contraparte a parear ahora filtra por `currency_original`: una cuenta
+  puede tener patas sin parear en ambas monedas y el match por monto habría pareado USD 1,01 con ARS 1,01.
+- [x] **Form manual.** Selector de moneda por pata (default = el de la cuenta, editable);
+  `currencyFrom`/`currencyTo` opcionales en `transferInputSchema`. El edit conserva la moneda de cada pata.
+- **`currency_default` se queda**, pero como lo que dice el nombre: default de carga y moneda de
+  referencia de la cuenta, no regla. El gate "crear las 2 patas vs solo la propia" sigue usándola como
+  heurística conservadora (si no coincide, asumimos conversión y no inventamos la otra pata).
+- **Datos en prod: sin corrupción.** 217 patas de transfer importadas, 0 con moneda distinta a la de su
+  `import_line`. El bug nunca llegó a escribir mal.
+- **Sin migraciones.** Suite 583 → **594**.
+- **Pendiente a decidir con Nico:** si el gate de "crear ambas patas" debería reconocer que una TC acepta
+  las dos monedas (hoy un pago TC en USD deja la pata del banco sin parear hasta importar el resumen).
+
 ### Sesión 2026-07-22 — Auditoría de completitud de los datos cargados (sesión madre)
 
 Pedido de Nico: auditar si la info cargada está completa y listar lo que falta. Terminó destapando

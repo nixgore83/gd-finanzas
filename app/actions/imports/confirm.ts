@@ -244,6 +244,10 @@ export async function confirmImport(input: {
                 date: parsed.data.date,
                 accountId: input.accountId,
                 amount: parsed.data.amountOriginal,
+                // La moneda sale de la LÍNEA, no de la cuenta: los resúmenes de
+                // TC son bimonetarios (un pago/consumo en USD sobre una tarjeta
+                // cuya `currency_default` es ARS tiene que quedar en USD).
+                currency: parsed.data.currencyOriginal,
                 direction: ownDirection,
                 description: parsed.data.description,
                 notes: parsed.data.notes ?? null,
@@ -296,6 +300,10 @@ export async function confirmImport(input: {
             lineErrors.push({ lineId: line.id, reason: 'cuenta contraparte inválida' });
             continue;
           }
+          // ¿La contraparte opera en la moneda de esta línea? Gate conservador:
+          // si su `currency_default` no coincide, asumimos conversión (compra de
+          // dólares) y NO inventamos la otra pata. Es un default de cuenta, no la
+          // moneda del movimiento: la pata propia siempre va en la de la línea.
           const sameCurrency = cpAcc.currency === parsed.data.currencyOriginal;
 
           // APRENDER: la contraparte (CBU/CUIT/alias) de esta línea refiere a la
@@ -327,6 +335,10 @@ export async function confirmImport(input: {
                   eq(transactions.accountId, transferAccountId),
                   eq(transactions.kind, 'transfer'),
                   isNull(transactions.transferPairId),
+                  // Una misma cuenta puede tener patas en ambas monedas (TC
+                  // bimonetaria): matchear por monto sin filtrar moneda parearía
+                  // USD 1,01 con ARS 1,01.
+                  eq(transactions.currencyOriginal, parsed.data.currencyOriginal),
                   gte(transactions.date, shiftIsoDate(parsed.data.date, -MATCH_DATE_WINDOW_DAYS)),
                   lte(transactions.date, shiftIsoDate(parsed.data.date, MATCH_DATE_WINDOW_DAYS)),
                 ),
@@ -401,6 +413,10 @@ export async function confirmImport(input: {
                 accountToId,
                 amountFrom: parsed.data.amountOriginal,
                 amountTo: parsed.data.amountOriginal,
+                // Ambas patas en la moneda de la línea (mismo monto a los dos
+                // lados: por eso este branch solo corre cuando no hay conversión).
+                currencyFrom: parsed.data.currencyOriginal,
+                currencyTo: parsed.data.currencyOriginal,
                 description: parsed.data.description,
                 notes: parsed.data.notes ?? null,
                 fxRateOverride: null,

@@ -1,11 +1,53 @@
 import { describe, it, expect } from 'vitest';
+import Decimal from 'decimal.js';
 import {
+  computeLegAmounts,
   transferDirection,
   resignAmount,
   extractOperationRef,
   selectOperationRefTransferMatch,
   selectSameCurrencyTransferMatch,
 } from './_build-transfer';
+
+describe('computeLegAmounts', () => {
+  const rate = new Decimal('1000');
+
+  it('pata USD: amount_usd es el monto tal cual, ars se multiplica', () => {
+    expect(computeLegAmounts(new Decimal('20'), 'USD', rate, 1)).toEqual({
+      amountOriginal: '20.00',
+      amountUsd: '20.00',
+      amountArs: '20000.00',
+    });
+  });
+
+  it('pata ARS: amount_ars es el monto tal cual, usd se divide', () => {
+    expect(computeLegAmounts(new Decimal('50000'), 'ARS', rate, 1)).toEqual({
+      amountOriginal: '50000.00',
+      amountUsd: '50.00',
+      amountArs: '50000.00',
+    });
+  });
+
+  it('sign -1 (sale de la cuenta) niega las tres columnas', () => {
+    expect(computeLegAmounts(new Decimal('20'), 'USD', rate, -1)).toEqual({
+      amountOriginal: '-20.00',
+      amountUsd: '-20.00',
+      amountArs: '-20000.00',
+    });
+  });
+
+  it('toma la magnitud: un monto ya negativo no invierte el signo pedido', () => {
+    expect(computeLegAmounts(new Decimal('-20'), 'USD', rate, 1).amountOriginal).toBe('20.00');
+  });
+
+  it('REGRESIÓN: un pago en USD sobre una TC "ARS" NO se denomina en ARS', () => {
+    // El bug: la pata usaba la currency_default de la cuenta (ARS) y guardaba
+    // USD 1,01 como ARS 1,01 → amount_usd 0,00. La moneda es la del movimiento.
+    const leg = computeLegAmounts(new Decimal('1.01'), 'USD', rate, -1);
+    expect(leg.amountUsd).toBe('-1.01');
+    expect(leg.amountArs).toBe('-1010.00');
+  });
+});
 
 describe('transferDirection', () => {
   it('income siempre entra, expense siempre sale', () => {

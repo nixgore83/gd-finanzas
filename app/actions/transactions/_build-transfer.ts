@@ -32,6 +32,36 @@ function signed(value: Decimal, sign: 1 | -1): string {
   return toMoneyString(sign === -1 ? value.negated() : value);
 }
 
+export type LegAmounts = {
+  amountOriginal: string;
+  amountUsd: string;
+  amountArs: string;
+};
+
+/**
+ * Conversión pura de UNA pata de transferencia. La moneda que manda es la **del
+ * movimiento**, no la `currency_default` de la cuenta: las TC argentinas son
+ * bimonetarias (un mismo resumen tiene sección ARS y sección USD) y cualquier
+ * cuenta puede recibir un movimiento denominado en la otra moneda. La moneda de
+ * la cuenta solo se usa como fallback cuando el caller no sabe la del movimiento.
+ * `sign` = -1 si la pata sale de la cuenta, 1 si entra.
+ */
+export function computeLegAmounts(
+  amount: Decimal,
+  currency: 'ARS' | 'USD',
+  rate: Decimal,
+  sign: 1 | -1,
+): LegAmounts {
+  const abs = amount.abs();
+  const usdRaw = currency === 'USD' ? abs : abs.div(rate);
+  const arsRaw = currency === 'ARS' ? abs : abs.mul(rate);
+  return {
+    amountOriginal: signed(abs, sign),
+    amountUsd: signed(usdRaw, sign),
+    amountArs: signed(arsRaw, sign),
+  };
+}
+
 /**
  * Dirección de un movimiento respecto de su cuenta: 'out' = sale, 'in' = entra.
  * income/expense usan magnitud positiva + kind; transfer usa el signo del monto.
@@ -162,16 +192,15 @@ export async function buildTransferFields(
   }
 
   const rate = new Decimal(fxRateUsed);
-  const amountFrom = new Decimal(input.amountFrom);
-  const amountTo = new Decimal(input.amountTo);
+
+  // Moneda explícita de cada pata (la del movimiento) con fallback a la de la
+  // cuenta. Ver `computeLegAmounts`: la cuenta define un default, no una regla.
+  const currencyFrom = input.currencyFrom ?? fromAcc.currencyDefault;
+  const currencyTo = input.currencyTo ?? toAcc.currencyDefault;
 
   // Cada pata convierte su propio monto a USD/ARS con la misma `rate` BCRA.
-  const fromUsdRaw =
-    fromAcc.currencyDefault === 'USD' ? amountFrom : amountFrom.div(rate);
-  const fromArsRaw =
-    fromAcc.currencyDefault === 'ARS' ? amountFrom : amountFrom.mul(rate);
-  const toUsdRaw = toAcc.currencyDefault === 'USD' ? amountTo : amountTo.div(rate);
-  const toArsRaw = toAcc.currencyDefault === 'ARS' ? amountTo : amountTo.mul(rate);
+  const fromAmounts = computeLegAmounts(new Decimal(input.amountFrom), currencyFrom, rate, -1);
+  const toAmounts = computeLegAmounts(new Decimal(input.amountTo), currencyTo, rate, 1);
 
   const pairId = existingPairId ?? randomUUID();
 
@@ -180,10 +209,8 @@ export async function buildTransferFields(
     accountId: fromAcc.id,
     categoryId: null,
     kind: 'transfer',
-    amountOriginal: signed(amountFrom, -1),
-    currencyOriginal: fromAcc.currencyDefault,
-    amountUsd: signed(fromUsdRaw, -1),
-    amountArs: signed(fromArsRaw, -1),
+    ...fromAmounts,
+    currencyOriginal: currencyFrom,
     fxRateUsed,
     fxRateSource,
     description: input.description,
@@ -196,10 +223,8 @@ export async function buildTransferFields(
     accountId: toAcc.id,
     categoryId: null,
     kind: 'transfer',
-    amountOriginal: signed(amountTo, 1),
-    currencyOriginal: toAcc.currencyDefault,
-    amountUsd: signed(toUsdRaw, 1),
-    amountArs: signed(toArsRaw, 1),
+    ...toAmounts,
+    currencyOriginal: currencyTo,
     fxRateUsed,
     fxRateSource,
     description: input.description,
@@ -219,6 +244,12 @@ export type SingleTransferLegInput = {
   accountId: string;
   /** Magnitud positiva (el monto de la línea, sin signo). */
   amount: string;
+  /**
+   * Moneda DEL MOVIMIENTO. Si se omite cae a la `currency_default` de la cuenta,
+   * pero el caller que la conoce (ej. una línea de import) debe pasarla: una TC
+   * "ARS" recibe pagos y consumos en USD y la pata tiene que quedar en USD.
+   */
+  currency?: 'ARS' | 'USD';
   /** 'out' = sale de la cuenta (negativo), 'in' = entra (positivo). */
   direction: 'out' | 'in';
   description: string;
@@ -271,23 +302,20 @@ export async function buildSingleTransferLeg(
   }
 
   const rate = new Decimal(fxRateUsed);
-  const amount = new Decimal(input.amount).abs();
-  const usdRaw = acc.currencyDefault === 'USD' ? amount : amount.div(rate);
-  const arsRaw = acc.currencyDefault === 'ARS' ? amount : amount.mul(rate);
+  const currency = input.currency ?? acc.currencyDefault;
   const sign: 1 | -1 = input.direction === 'out' ? -1 : 1;
+  const amounts = computeLegAmounts(new Decimal(input.amount), currency, rate, sign);
 
   return {
     ok: true,
-    currency: acc.currencyDefault,
+    currency,
     leg: {
       date: input.date,
       accountId: acc.id,
       categoryId: null,
       kind: 'transfer',
-      amountOriginal: signed(amount, sign),
-      currencyOriginal: acc.currencyDefault,
-      amountUsd: signed(usdRaw, sign),
-      amountArs: signed(arsRaw, sign),
+      ...amounts,
+      currencyOriginal: currency,
       fxRateUsed,
       fxRateSource,
       description: input.description,
