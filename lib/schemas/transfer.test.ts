@@ -24,6 +24,23 @@ describe('transferInputSchema', () => {
     expect(out.fxRateOverride).toBeNull();
   });
 
+  it('currencyFrom/currencyTo son opcionales → null (el builder cae al default de la cuenta)', () => {
+    const out = transferInputSchema.parse(valid);
+    expect(out.currencyFrom).toBeNull();
+    expect(out.currencyTo).toBeNull();
+    expect(transferInputSchema.parse({ ...valid, currencyFrom: '' }).currencyFrom).toBeNull();
+  });
+
+  it('acepta moneda explícita por pata, distinta de la otra', () => {
+    const out = transferInputSchema.parse({ ...valid, currencyFrom: 'USD', currencyTo: 'ARS' });
+    expect(out.currencyFrom).toBe('USD');
+    expect(out.currencyTo).toBe('ARS');
+  });
+
+  it('rechaza monedas fuera del enum', () => {
+    expect(() => transferInputSchema.parse({ ...valid, currencyFrom: 'EUR' })).toThrow();
+  });
+
   it('rechaza accounts iguales', () => {
     expect(() =>
       transferInputSchema.parse({ ...valid, accountToId: UUID_A }),
@@ -103,6 +120,28 @@ describe('parseTransferFormData', () => {
     if (out.success) {
       expect(out.data.notes).toBeNull();
       expect(out.data.fxRateOverride).toBeNull();
+      // Campos ausentes en el FormData → null, no error.
+      expect(out.data.currencyFrom).toBeNull();
+      expect(out.data.currencyTo).toBeNull();
+    }
+  });
+
+  it('lee currencyFrom/currencyTo del FormData', () => {
+    const fd = new FormData();
+    fd.set('date', valid.date);
+    fd.set('accountFromId', valid.accountFromId);
+    fd.set('accountToId', valid.accountToId);
+    fd.set('amountFrom', '1.01');
+    fd.set('amountTo', '1.01');
+    fd.set('currencyFrom', 'USD');
+    fd.set('currencyTo', 'USD');
+    fd.set('description', 'PAGO TARJETA MASTER');
+
+    const out = parseTransferFormData(fd);
+    expect(out.success).toBe(true);
+    if (out.success) {
+      expect(out.data.currencyFrom).toBe('USD');
+      expect(out.data.currencyTo).toBe('USD');
     }
   });
 

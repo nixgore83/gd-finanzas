@@ -146,7 +146,12 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     }
 
     const legs = await db
-      .select({ id: transactions.id, accountId: transactions.accountId, amountOriginal: transactions.amountOriginal })
+      .select({
+        id: transactions.id,
+        accountId: transactions.accountId,
+        amountOriginal: transactions.amountOriginal,
+        currencyOriginal: transactions.currencyOriginal,
+      })
       .from(transactions)
       .where(
         and(
@@ -194,6 +199,10 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
             accountToId: toLeg.accountId,
             amountFrom: amountFromAbs,
             amountTo: amountToAbs,
+            // Cada pata conserva SU moneda (puede diferir del default de la
+            // cuenta): re-editar no debe re-denominarla.
+            currencyFrom: fromLeg.currencyOriginal,
+            currencyTo: toLeg.currencyOriginal,
             description: tx.description,
             notes: tx.notes,
             tagIds: currentTagIds,

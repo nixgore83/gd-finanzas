@@ -21,12 +21,24 @@ import { tagIdsSchema } from './tag';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Moneda explícita de una pata. Opcional: si no viene (o viene vacía), el
+ * builder cae a la `currency_default` de la cuenta. Existe porque la moneda de
+ * un movimiento NO se deduce de la cuenta — una TC argentina es bimonetaria y
+ * opera ARS y USD sobre la misma cuenta.
+ */
+const legCurrencySchema = z
+  .union([z.enum(['ARS', 'USD']), z.literal(''), z.null(), z.undefined()])
+  .transform((v) => (v === 'ARS' || v === 'USD' ? v : null));
+
 const baseTransferSchema = z.object({
   date: z.string().regex(ISO_DATE_RE, { message: 'Fecha inválida (YYYY-MM-DD)' }),
   accountFromId: z.string().uuid({ message: 'Cuenta origen requerida' }),
   accountToId: z.string().uuid({ message: 'Cuenta destino requerida' }),
   amountFrom: positiveMoneySchema,
   amountTo: positiveMoneySchema,
+  currencyFrom: legCurrencySchema,
+  currencyTo: legCurrencySchema,
   description: z
     .string()
     .trim()
@@ -77,6 +89,8 @@ export function parseTransferFormData(formData: FormData) {
     accountToId: formData.get('accountToId'),
     amountFrom: formData.get('amountFrom'),
     amountTo: formData.get('amountTo'),
+    currencyFrom: formData.get('currencyFrom'),
+    currencyTo: formData.get('currencyTo'),
     description: formData.get('description'),
     notes,
     fxRateOverride: formData.get('fxRateOverride'),
