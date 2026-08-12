@@ -10,6 +10,30 @@
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
+### Sesión 2026-08-12 — El gate de transferencias: buscar match siempre, inventar contraparte casi nunca
+
+Continuación del pendiente que dejó la sesión anterior ("¿el gate debería reconocer que una TC acepta
+las dos monedas?"). **La respuesta obvia era la incorrecta.** Abrir el gate de "crear ambas patas"
+para las TC reintroduce el duplicado que el match-al-confirmar vino a resolver: la pata sintética de
+la tarjeta queda **pareada**, así que cuando después se importa el resumen y llega el `SU PAGO`, no
+encuentra candidato libre y crea el par de nuevo.
+
+El problema real era otro: había **un solo gate haciendo dos trabajos**. La búsqueda de candidato a
+parear colgaba de la `currency_default` de la contraparte, y por eso un pago de TC en USD nunca
+encontraba su contraparte si el resumen de la tarjeta se importaba **primero** (quedaban 2 patas
+sueltas que no se pareaban nunca). En el orden inverso sí funcionaba — de ahí que no se hubiera visto.
+
+- [x] **Buscar match: siempre.** La query ya filtra por `currency_original` (PR #82), que es el filtro
+  correcto; el default de la cuenta no aportaba nada. Con esto el pago de TC en USD se parea solo en
+  cualquiera de los dos órdenes de importación.
+- [x] **Inventar la contraparte: solo si opera en la moneda de la línea.** Extraído a un predicado puro
+  documentado, `shouldSynthesizeCounterpartyLeg(cpDefault, lineCcy)`, con el razonamiento del duplicado
+  en el docstring y en los tests para que no se "arregle" de nuevo en el futuro.
+- **Que una pata quede sin parear hasta que llegue el otro extracto es el estado correcto**, no un bug.
+- **Datos en prod:** las patas sueltas actuales no tienen contrapata en la base (cruzadas por moneda,
+  monto ±1% y fecha ±7d) → nada retroactivo para parear. El cambio aplica a confirms futuros.
+- **Sin migraciones.** Suite 594 → **597**.
+
 ### Sesión 2026-08-11 — La moneda de una pata de transferencia sale del movimiento, no de la cuenta
 
 Detectado por Nico importando el extracto **Galicia USD**: los `PAGO TARJETA VISA/MASTER/AMEX` vienen

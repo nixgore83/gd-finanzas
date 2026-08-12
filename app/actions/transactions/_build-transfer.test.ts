@@ -7,7 +7,27 @@ import {
   extractOperationRef,
   selectOperationRefTransferMatch,
   selectSameCurrencyTransferMatch,
+  shouldSynthesizeCounterpartyLeg,
 } from './_build-transfer';
+
+describe('shouldSynthesizeCounterpartyLeg', () => {
+  it('inventa la contraparte cuando opera en la moneda de la línea', () => {
+    expect(shouldSynthesizeCounterpartyLeg('ARS', 'ARS')).toBe(true);
+    expect(shouldSynthesizeCounterpartyLeg('USD', 'USD')).toBe(true);
+  });
+
+  it('no la inventa si opera en otra moneda (compra de dólares: los montos difieren)', () => {
+    expect(shouldSynthesizeCounterpartyLeg('ARS', 'USD')).toBe(false);
+    expect(shouldSynthesizeCounterpartyLeg('USD', 'ARS')).toBe(false);
+  });
+
+  it('pago de TC en USD sobre una tarjeta "ARS": NO inventa (evita el duplicado)', () => {
+    // La TC es bimonetaria y sí puede recibir el pago en USD, pero su resumen se
+    // importa: inventarle la pata la dejaría pareada y el `SU PAGO` del resumen
+    // crearía el par de nuevo. Queda sin parear y se parea al llegar el resumen.
+    expect(shouldSynthesizeCounterpartyLeg('ARS', 'USD')).toBe(false);
+  });
+});
 
 describe('computeLegAmounts', () => {
   const rate = new Decimal('1000');
