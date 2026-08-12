@@ -105,6 +105,27 @@ export function selectSameCurrencyTransferMatch(
 }
 
 /**
+ * ¿El confirm debe INVENTAR la pata de la contraparte cuando no encontró
+ * ninguna para parear? Solo si la contraparte opera nativamente en la moneda de
+ * la línea (su `currency_default` coincide).
+ *
+ * Es deliberadamente conservador, y en particular NO se abre para tarjetas de
+ * crédito aunque sean bimonetarias. Inventar la pata de una TC que después se
+ * importa produce el duplicado exacto que el match-al-confirmar vino a evitar:
+ * la pata sintética queda pareada, así que cuando llega el `SU PAGO` del resumen
+ * no encuentra candidato libre y crea el par de nuevo. Que la pata propia quede
+ * sin parear hasta que llegue el otro extracto es el estado correcto: ahí se
+ * parea sola (la búsqueda de candidato sí filtra por la moneda del movimiento,
+ * no por el default de la cuenta).
+ */
+export function shouldSynthesizeCounterpartyLeg(
+  counterpartyCurrencyDefault: 'ARS' | 'USD',
+  lineCurrency: 'ARS' | 'USD',
+): boolean {
+  return counterpartyCurrencyDefault === lineCurrency;
+}
+
+/**
  * Nro de operación bancaria embebido en el concepto, si lo hay. ICBC imprime la
  * MISMA referencia en las dos patas de un traspaso entre cuentas propias
  * ("TR.7772754  A 0905/11102104/13" en la de pesos y "TR.7772754 DE

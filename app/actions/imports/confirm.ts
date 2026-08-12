@@ -14,6 +14,7 @@ import {
   extractOperationRef,
   selectOperationRefTransferMatch,
   selectSameCurrencyTransferMatch,
+  shouldSynthesizeCounterpartyLeg,
 } from '@/app/actions/transactions/_build-transfer';
 import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
 import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
@@ -221,11 +222,13 @@ export async function confirmImport(input: {
         // (el otro lado ya existe como transacción). Para no duplicar, intentamos
         // PAREAR la pata propia con una pata-transfer sin parear de la contraparte
         // en vez de crear las dos patas siempre.
-        //  - 1 candidato same-currency (monto+fecha) → parear (no crear sintética).
-        //  - same-currency sin candidato → crear ambas patas (FCI, pago TC, cash:
-        //    el otro lado no se importa). Comportamiento histórico.
-        //  - cross-currency o ambiguo → crear SOLO la pata propia sin parear;
-        //    se linkea a mano (no se puede matchear cross-ccy por monto).
+        //  - 1 candidato en la MONEDA DE LA LÍNEA (monto+fecha) → parear (no crear
+        //    sintética). Se busca siempre, sea cual sea el default de la cuenta.
+        //  - sin candidato y la contraparte opera en esa moneda → crear ambas patas
+        //    (FCI, cash: el otro lado no se importa). Comportamiento histórico.
+        //  - sin candidato y la contraparte opera en otra → crear SOLO la pata
+        //    propia sin parear: o llega el otro extracto y se parea sola, o se
+        //    linkea a mano (compra de dólares: los montos difieren y no se matchea).
         if (parsed.data.isTransfer) {
           const transferAccountId = parsed.data.transferAccountId;
           if (!transferAccountId) {
@@ -300,11 +303,12 @@ export async function confirmImport(input: {
             lineErrors.push({ lineId: line.id, reason: 'cuenta contraparte inválida' });
             continue;
           }
-          // ¿La contraparte opera en la moneda de esta línea? Gate conservador:
-          // si su `currency_default` no coincide, asumimos conversión (compra de
-          // dólares) y NO inventamos la otra pata. Es un default de cuenta, no la
-          // moneda del movimiento: la pata propia siempre va en la de la línea.
-          const sameCurrency = cpAcc.currency === parsed.data.currencyOriginal;
+          // Solo decide si INVENTAMOS la pata de la contraparte cuando no hay
+          // candidato. Buscar candidato se intenta siempre (ver abajo).
+          const synthesizeCounterpartyLeg = shouldSynthesizeCounterpartyLeg(
+            cpAcc.currency,
+            parsed.data.currencyOriginal,
+          );
 
           // APRENDER: la contraparte (CBU/CUIT/alias) de esta línea refiere a la
           // cuenta destino elegida → guardar sus refs para auto-resolver la cuenta
@@ -320,35 +324,37 @@ export async function confirmImport(input: {
             }
           }
 
-          // Buscar candidato a parear en la contraparte (solo same-currency).
+          // Buscar candidato a parear en la contraparte. Se intenta SIEMPRE, sin
+          // mirar la `currency_default` de la cuenta: quien acota el match es el
+          // filtro por `currency_original` de la query (la moneda del movimiento).
+          // Antes esto colgaba del default de la cuenta y el pago de una TC en USD
+          // no encontraba nunca su contraparte: el `SU PAGO` del resumen de una
+          // tarjeta "ARS" es una pata USD perfectamente pareable.
           // La query trae patas-transfer sin parear de la contraparte en la ventana
           // de fechas; el filtro de dirección/monto y la decisión (1 solo match) es
           // lógica pura testeable (`selectSameCurrencyTransferMatch`).
-          let matchedCandidateId: string | null = null;
-          if (sameCurrency) {
-            const candidates = await tx
-              .select({ id: transactions.id, amountOriginal: transactions.amountOriginal })
-              .from(transactions)
-              .where(
-                and(
-                  eq(transactions.householdId, session.householdId),
-                  eq(transactions.accountId, transferAccountId),
-                  eq(transactions.kind, 'transfer'),
-                  isNull(transactions.transferPairId),
-                  // Una misma cuenta puede tener patas en ambas monedas (TC
-                  // bimonetaria): matchear por monto sin filtrar moneda parearía
-                  // USD 1,01 con ARS 1,01.
-                  eq(transactions.currencyOriginal, parsed.data.currencyOriginal),
-                  gte(transactions.date, shiftIsoDate(parsed.data.date, -MATCH_DATE_WINDOW_DAYS)),
-                  lte(transactions.date, shiftIsoDate(parsed.data.date, MATCH_DATE_WINDOW_DAYS)),
-                ),
-              );
-            matchedCandidateId = selectSameCurrencyTransferMatch(
-              candidates,
-              parsed.data.amountOriginal,
-              isOutgoing,
+          const candidates = await tx
+            .select({ id: transactions.id, amountOriginal: transactions.amountOriginal })
+            .from(transactions)
+            .where(
+              and(
+                eq(transactions.householdId, session.householdId),
+                eq(transactions.accountId, transferAccountId),
+                eq(transactions.kind, 'transfer'),
+                isNull(transactions.transferPairId),
+                // Una misma cuenta puede tener patas en ambas monedas (TC
+                // bimonetaria): matchear por monto sin filtrar moneda parearía
+                // USD 1,01 con ARS 1,01.
+                eq(transactions.currencyOriginal, parsed.data.currencyOriginal),
+                gte(transactions.date, shiftIsoDate(parsed.data.date, -MATCH_DATE_WINDOW_DAYS)),
+                lte(transactions.date, shiftIsoDate(parsed.data.date, MATCH_DATE_WINDOW_DAYS)),
+              ),
             );
-          }
+          let matchedCandidateId: string | null = selectSameCurrencyTransferMatch(
+            candidates,
+            parsed.data.amountOriginal,
+            isOutgoing,
+          );
 
           // Fallback: match por NÚMERO DE OPERACIÓN. Las dos patas de un traspaso
           // entre cuentas propias de ICBC comparten la referencia ("TR.7772754")
@@ -402,7 +408,7 @@ export async function confirmImport(input: {
             continue;
           }
 
-          if (sameCurrency) {
+          if (synthesizeCounterpartyLeg) {
             // Sin match y misma moneda → crear ambas patas (el otro lado no se importa).
             const accountFromId = isOutgoing ? input.accountId : transferAccountId;
             const accountToId = isOutgoing ? transferAccountId : input.accountId;
@@ -471,7 +477,9 @@ export async function confirmImport(input: {
             continue;
           }
 
-          // Cross-currency sin match → solo pata propia, sin parear (linkeo manual).
+          // La contraparte opera en otra moneda y no hubo match → solo pata propia,
+          // sin parear. Se parea cuando se importe el otro extracto (pago de TC en
+          // USD) o a mano si nunca llega (compra de dólares).
           const ownId = await insertOwnLeg(null);
           if (!ownId) continue;
           createdCount += 1;
