@@ -48,6 +48,20 @@ describe('resolveParser', () => {
     expect(resolveParser('MercadoPago', 'banco')?.id).toBe('mercado-pago-banco-v1');
   });
 
+  it('Banco Industrial (BIND) TC y banco encontrados', () => {
+    expect(resolveParser('Banco Industrial', 'tc')?.id).toBe('bind-tc-v1');
+    expect(resolveParser('banco industrial', 'banco')?.id).toBe('bind-banco-v1');
+    expect(resolveParser('  Banco Industrial  ', 'tc')?.id).toBe('bind-tc-v1');
+    // Alias corto por si la institución se carga como "BIND".
+    expect(resolveParser('BIND', 'tc')?.id).toBe('bind-tc-v1');
+  });
+
+  it('BIND no se pisa con las otras instituciones', () => {
+    // "Banco Industrial" no debe matchear el parser de BNA ni al revés.
+    expect(resolveParser('BNA', 'tc')?.id).toBe('bna-tc-v1');
+    expect(resolveParser('Banco Industrial', 'broker')).toBeNull();
+  });
+
   it('Institución desconocida → null', () => {
     expect(resolveParser('Patagonia', 'tc')).toBeNull();
   });
@@ -65,5 +79,12 @@ describe('listParsers', () => {
     expect(ids).toContain('hsbc-us-banco-v1');
     expect(ids).toContain('mercado-pago-tc-v1');
     expect(ids).toContain('mercado-pago-banco-v1');
+    expect(ids).toContain('bind-tc-v1');
+    expect(ids).toContain('bind-banco-v1');
+  });
+
+  it('no hay ids duplicados', () => {
+    const ids = listParsers().map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

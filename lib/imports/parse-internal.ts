@@ -17,6 +17,7 @@ import {
 } from '@/lib/imports/counterparty-suggest';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
+import { buildTargetAccountBlock } from '@/lib/imports/target-account-block';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
 import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
@@ -85,6 +86,7 @@ export async function parseImportInternal(
       accountName: accounts.name,
       accountCurrency: accounts.currencyDefault,
       accountOwnerTag: accounts.ownerTag,
+      accountNumber: accounts.accountNumber,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
@@ -230,7 +232,8 @@ export async function parseImportInternal(
 
   const tree = await loadCategoryTree(householdId);
   const categoryBlock = buildCategoryPromptBlock(tree);
-  const enrichedSystemPrompt = parser.systemPrompt + '\n\n' + categoryBlock;
+  const enrichedSystemPrompt =
+    parser.systemPrompt + '\n\n' + categoryBlock + buildTargetAccountBlock(row.accountNumber);
 
   const isCsv = ext === 'csv';
   const isXlsx = ext === 'xlsx';
@@ -531,7 +534,16 @@ export async function parseImportInternal(
   // Persistir el período cubierto por el extracto (para ordenar/filtrar en la lista).
   await computeImportPeriod(db, importId);
 
-  revalidatePath(`/imports/${importId}`);
-  revalidatePath('/imports');
+  // Invalidar la caché es un extra: el parseo YA está persistido. Fuera de una
+  // request de Next (script de carga masiva, cron ejecutado a mano)
+  // `revalidatePath` tira "static generation store missing", y dejar que eso
+  // propague convertía un parseo exitoso en un error — con las líneas ya
+  // escritas en la DB.
+  try {
+    revalidatePath(`/imports/${importId}`);
+    revalidatePath('/imports');
+  } catch {
+    // Sin contexto de Next no hay caché que invalidar.
+  }
   return { ok: true, lineCount: lineRows.length };
 }
