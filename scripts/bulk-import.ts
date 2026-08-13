@@ -110,7 +110,10 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 async function firstPageText(bytes: Uint8Array): Promise<string | null> {
   try {
     const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: bytes });
+    // COPIA obligatoria: pdf.js toma posesión del buffer y lo deja DETACHED, así
+    // que pasarle `bytes` directo dejaba al caller sin datos para subir el
+    // archivo ("Cannot perform Construct on a detached ArrayBuffer" al hashear).
+    const parser = new PDFParse({ data: new Uint8Array(bytes) });
     const res = await parser.getText({ first: 1 });
     await parser.destroy();
     return res.text || null;

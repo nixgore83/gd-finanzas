@@ -534,7 +534,16 @@ export async function parseImportInternal(
   // Persistir el período cubierto por el extracto (para ordenar/filtrar en la lista).
   await computeImportPeriod(db, importId);
 
-  revalidatePath(`/imports/${importId}`);
-  revalidatePath('/imports');
+  // Invalidar la caché es un extra: el parseo YA está persistido. Fuera de una
+  // request de Next (script de carga masiva, cron ejecutado a mano)
+  // `revalidatePath` tira "static generation store missing", y dejar que eso
+  // propague convertía un parseo exitoso en un error — con las líneas ya
+  // escritas en la DB.
+  try {
+    revalidatePath(`/imports/${importId}`);
+    revalidatePath('/imports');
+  } catch {
+    // Sin contexto de Next no hay caché que invalidar.
+  }
   return { ok: true, lineCount: lineRows.length };
 }
