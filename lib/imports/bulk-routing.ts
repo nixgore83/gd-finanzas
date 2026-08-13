@@ -42,6 +42,17 @@ export type RouteTarget = {
    * no alcanzan.
    */
   accountHint?: string;
+  /**
+   * La moneda NO se puede deducir del nombre del archivo: hay que leerla del PDF.
+   * Caso real: los "EXTRACTOS CONSOLIDADOS - CAJA DE AHORRO DD-MM-YYYY" de
+   * Galicia usan el MISMO patrón de nombre para la caja en pesos y la de
+   * dólares; sólo el encabezado ("Caja de Ahorro en Pesos" / "en Dólares") las
+   * distingue. `currency` queda como valor declarado (sirve de placeholder
+   * estable para el dedup) y el script lo corrige con el contenido antes de
+   * resolver la cuenta. Si el PDF no se puede leer, NO se adivina: va a
+   * CONFLICTO.
+   */
+  currencyByContent?: boolean;
 };
 
 /** Fecha del extracto derivada del nombre del archivo. */
@@ -301,6 +312,7 @@ export const ROUTE_RULES: RouteRule[] = [
         ownerTag: 'Nico',
         accountType: 'bank_savings',
         currency: 'ARS',
+        currencyByContent: true,
       },
     ],
   },
@@ -316,6 +328,7 @@ export const ROUTE_RULES: RouteRule[] = [
         ownerTag: 'Pau',
         accountType: 'bank_savings',
         currency: 'ARS',
+        currencyByContent: true,
       },
     ],
   },

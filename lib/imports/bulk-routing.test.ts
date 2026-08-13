@@ -214,6 +214,28 @@ describe('routeFile', () => {
     }
   });
 
+  it('los consolidados de Galicia no fijan la moneda por nombre', () => {
+    // El MISMO patrón de nombre se usa para la caja en pesos y la de dólares:
+    // "CAJA DE AHORRO 02-01-2026" resultó ser USD y "02-07-2026" ARS. Fijar la
+    // moneda desde la regla ruteaba plata a la cuenta equivocada, así que estas
+    // reglas tienen que delegarla al contenido del PDF.
+    for (const id of ['nico-galicia-ca-consolidado', 'pau-galicia-ca']) {
+      const rule = ROUTE_RULES.find((r) => r.id === id);
+      expect(rule, id).toBeDefined();
+      expect(rule!.targets[0]?.currencyByContent, id).toBe(true);
+    }
+  });
+
+  it('las reglas con cuenta inequívoca NO delegan la moneda al contenido', () => {
+    // Delegar de más obligaría a leer el PDF sin necesidad y marcaría CONFLICTO
+    // cuando no se puede leer.
+    for (const id of ['nico-visa-icbc', 'pau-visa-bind', 'nico-icbc-ca-usd-0413']) {
+      const rule = ROUTE_RULES.find((r) => r.id === id);
+      expect(rule, id).toBeDefined();
+      expect(rule!.targets.every((t) => !t.currencyByContent), id).toBe(true);
+    }
+  });
+
   it('toda regla tiene id único y al menos un target', () => {
     const ids = ROUTE_RULES.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);

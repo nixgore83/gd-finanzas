@@ -3,6 +3,9 @@ import { join, relative, basename } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { loadEnv } from './_env';
 import { contentTypeForExt, extractExtension } from '../lib/schemas/import';
+import type { CURRENCIES } from '../lib/schemas/account';
+
+type Currency = (typeof CURRENCIES)[number];
 import {
   accountNumberMatchesHint,
   buildPlan,
@@ -76,8 +79,14 @@ type Row = {
 /** Estados que se suben. SIN_FECHA sube igual: se dedupea sólo por hash. */
 const UPLOADABLE: ReadonlySet<Status> = new Set<Status>(['NUEVO', 'SIN_FECHA']);
 
+/** Carpeta donde `organize-statements` guarda las copias sobrantes. */
+const DUPES_FOLDER = '_duplicados';
+
 function walk(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
+    // Las copias sobrantes ya están representadas por el archivo que ganó; no
+    // son candidatas a subir.
+    if (entry === DUPES_FOLDER) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) walk(full, acc);
     else if (/\.(pdf|csv|xlsx)$/i.test(entry)) acc.push(full);
@@ -116,6 +125,20 @@ const HOLDER_PATTERNS: Record<string, RegExp> = {
 };
 
 /**
+ * Moneda declarada en el encabezado de una caja de ahorro de Galicia. Devuelve
+ * null si el PDF no lo dice o si dice las dos cosas (consolidado con ambas
+ * cuentas) — en esos casos no se adivina.
+ */
+function currencyFromContent(text: string | null): Currency | null {
+  if (!text) return null;
+  const pesos = /caja de ahorro en pesos/i.test(text);
+  const usd = /caja de ahorro en d[oó]lares/i.test(text);
+  if (pesos && !usd) return 'ARS';
+  if (usd && !pesos) return 'USD';
+  return null;
+}
+
+/**
  * Contradicción explícita entre lo que dice el PDF y la cuenta que dedujo la
  * regla. Devuelve el motivo, o null si no hay contradicción (incluye el caso
  * "no se pudo verificar", que NO es contradicción).
@@ -133,18 +156,10 @@ function contentConflict(text: string | null, target: RouteTarget): string | nul
     }
   }
 
-  // Moneda de una caja de ahorro Galicia: el encabezado la nombra explícitamente.
-  if (target.accountType === 'bank_savings') {
-    const dice_pesos = /caja de ahorro en pesos/i.test(text);
-    const dice_usd = /caja de ahorro en d[oó]lares/i.test(text);
-    if (dice_pesos && !dice_usd && target.currency !== 'ARS') {
-      return 'el PDF dice "Caja de Ahorro en Pesos" y la regla ruteó a USD';
-    }
-    if (dice_usd && !dice_pesos && target.currency !== 'USD') {
-      return 'el PDF dice "Caja de Ahorro en Dólares" y la regla ruteó a ARS';
-    }
-  }
-
+  // La moneda NO se chequea acá: cuando el nombre no la determina, la regla
+  // marca `currencyByContent` y el target se corrige con el contenido antes de
+  // resolver la cuenta (ver resolveCurrency). Tratarla como contradicción
+  // rechazaba extractos perfectamente válidos.
   return null;
 }
 
@@ -274,10 +289,31 @@ async function main() {
       continue;
     }
 
-    const target = entry.target;
-    if (!target) {
+    const declared = entry.target;
+    if (!declared) {
       rows.push({ ...base, status: 'SIN_RUTEO' });
       continue;
+    }
+
+    const isPdf = entry.relPath.toLowerCase().endsWith('.pdf');
+    const pageText = isPdf ? await firstPageText(bytes) : null;
+
+    // Moneda resuelta por contenido cuando el nombre del archivo no la
+    // determina (consolidados de Galicia: mismo patrón para pesos y dólares).
+    let target = declared;
+    if (declared.currencyByContent) {
+      const ccy = currencyFromContent(pageText);
+      if (!ccy) {
+        rows.push({
+          ...base,
+          status: 'CONFLICTO',
+          detail: 'no pude leer la moneda del PDF; no se adivina',
+        });
+        continue;
+      }
+      target = { ...declared, currency: ccy };
+      base.target = target;
+      base.accountLabel = label(target);
     }
 
     const acct = accountRows.find((a) => accountMatches(a, target));
@@ -292,9 +328,7 @@ async function main() {
     }
 
     // Verificación por contenido (best-effort, sin LLM).
-    const conflict = entry.relPath.toLowerCase().endsWith('.pdf')
-      ? contentConflict(await firstPageText(bytes), target)
-      : null;
+    const conflict = contentConflict(pageText, target);
     if (conflict) {
       rows.push({ ...base, status: 'CONFLICTO', accountId: acct.id, institutionId: acct.institutionId, detail: conflict });
       continue;
