@@ -5,6 +5,8 @@ import { icbcMastercardTcParser } from './icbc-mastercard-tc';
 import { icbcTcParser } from './icbc-tc';
 import { icbcBancoParser } from './icbc-banco';
 import { bnaTcParser } from './bna-tc';
+import { bindTcParser } from './bind-tc';
+import { bindBancoParser } from './bind-banco';
 import { hsbcUsTcParser } from './hsbc-us-tc';
 import { hsbcUsBancoParser } from './hsbc-us-banco';
 import { mercadoPagoTcParser } from './mercado-pago-tc';
@@ -21,6 +23,8 @@ const PARSERS: Parser[] = [
   icbcTcParser,
   icbcBancoParser,
   bnaTcParser,
+  bindTcParser,
+  bindBancoParser,
   hsbcUsTcParser,
   hsbcUsBancoParser,
   mercadoPagoTcParser,
