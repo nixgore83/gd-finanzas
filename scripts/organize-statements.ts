@@ -1,4 +1,12 @@
-import { readdirSync, mkdirSync, renameSync, statSync, existsSync, readFileSync } from 'node:fs';
+import {
+  readdirSync,
+  mkdirSync,
+  renameSync,
+  rmdirSync,
+  statSync,
+  existsSync,
+  readFileSync,
+} from 'node:fs';
 import { join, relative, basename, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
@@ -58,6 +66,37 @@ function walk(dir: string, acc: string[] = []): string[] {
 
 function sha256(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+/** Primer nombre libre en `folder` a partir de `file`: "x.pdf" → "x (copia 2).pdf". */
+function freeName(folder: string, file: string): string {
+  const dot = file.lastIndexOf('.');
+  const stem = dot === -1 ? file : file.slice(0, dot);
+  const ext = dot === -1 ? '' : file.slice(dot);
+  let candidate = join(folder, file);
+  let n = 2;
+  while (existsSync(candidate)) {
+    candidate = join(folder, `${stem} (copia ${n})${ext}`);
+    n++;
+  }
+  return candidate;
+}
+
+/**
+ * Borra las carpetas que quedaron SIN NADA adentro tras los movimientos. Es la
+ * única eliminación que hace el script y no puede perder datos: una carpeta
+ * vacía no tiene archivos. Nunca toca la raíz.
+ */
+function pruneEmptyDirs(root: string, current: string = root, out: string[] = []): string[] {
+  for (const entry of readdirSync(current)) {
+    const full = join(current, entry);
+    if (statSync(full).isDirectory()) pruneEmptyDirs(root, full, out);
+  }
+  if (current !== root && readdirSync(current).length === 0) {
+    rmdirSync(current);
+    out.push(relative(root, current));
+  }
+  return out;
 }
 
 function main(): void {
@@ -147,23 +186,35 @@ function main(): void {
     const from = join(DIR, m.from);
     const to = join(DIR, m.to);
 
+    let dest = to;
     if (existsSync(to)) {
-      // Mismo contenido → ya estaba; distinto → choque real, no se pisa.
-      if (sha256(from) === sha256(to)) {
-        console.warn(`[organize] = ya existe idéntico, se saltea: ${m.to}`);
-      } else {
+      if (sha256(from) !== sha256(to)) {
+        // Choque real: dos archivos distintos con el mismo nombre. No se pisa.
         console.warn(`[organize] ✖ CHOQUE (destino ocupado con otro contenido): ${m.to}`);
+        skipped++;
+        continue;
       }
-      skipped++;
-      continue;
+      // Mismo contenido: el archivo es redundante, pero NO se borra. Se guarda
+      // junto al que ya está, con un nombre libre, para que la carpeta de origen
+      // quede limpia sin perder nada.
+      //
+      // Ojo: `to` YA apunta a `_duplicados/...` cuando el archivo venía marcado
+      // como copia sobrante. Volver a anteponer DUPES_FOLDER acá generaba
+      // `_duplicados/_duplicados/...` (bug real, visto en la primera corrida).
+      dest = freeName(dirname(to), basename(to));
     }
 
-    mkdirSync(dirname(to), { recursive: true });
-    renameSync(from, to);
+    mkdirSync(dirname(dest), { recursive: true });
+    renameSync(from, dest);
     moved++;
   }
 
-  console.warn(`\n[organize] listo — ${moved} movidos, ${skipped} salteados. Nada borrado.`);
+  const vaciadas = pruneEmptyDirs(DIR);
+
+  console.warn(`\n[organize] listo — ${moved} movidos, ${skipped} salteados. Ningún archivo borrado.`);
+  if (vaciadas.length > 0) {
+    console.warn(`[organize] carpetas vacías eliminadas: ${vaciadas.join(', ')}`);
+  }
 }
 
 try {

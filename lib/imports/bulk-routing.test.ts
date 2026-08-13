@@ -172,6 +172,48 @@ describe('routeFile', () => {
     expect(routeFile('Otra carpeta\\algo.pdf')).toBeNull();
   });
 
+  it('REGRESIÓN: sigue ruteando DESPUÉS de reorganizar la carpeta', () => {
+    // organize-statements mueve los archivos a la carpeta canónica de su regla.
+    // Si las reglas sólo conocieran la carpeta ORIGINAL, reorganizar dejaría
+    // todo sin ruteo y el import no encontraría nada — la reorganización
+    // rompería justo lo que viene a ordenar.
+    expect(routeFile('TC\\Visa Galicia Pau\\RESUMEN_VISA23_7_2026pdf.pdf')?.targets[0]).toMatchObject({
+      institutionName: 'Galicia',
+      ownerTag: 'Pau',
+      cardBrand: 'visa',
+    });
+    expect(routeFile(`TC\\Visa BIND Pau\\${CUIL}_Visa_20260723.pdf`)?.targets[0]).toMatchObject({
+      institutionName: 'Banco Industrial',
+      ownerTag: 'Pau',
+    });
+    expect(
+      routeFile('Cuentas\\Galicia Nico\\RESUMEN_EXTRACTOS CONSOLIDADOS - CAJA DE AHORRO 02-07-2026.pdf')
+        ?.targets[0],
+    ).toMatchObject({ institutionName: 'Galicia', ownerTag: 'Nico' });
+    expect(
+      routeFile('Cuentas\\Galicia Pau\\RESUMEN_EXTRACTOS CONSOLIDADOS - Caja de ahorro-2026-05-22.pdf')
+        ?.targets[0],
+    ).toMatchObject({ institutionName: 'Galicia', ownerTag: 'Pau' });
+    expect(routeFile(`Cuentas\\BIND Pau\\${CUIL}_Cuentas bantotal_20260630.pdf`)?.targets).toHaveLength(2);
+  });
+
+  it('reorganizar es idempotente: un archivo ya en su carpeta no se vuelve a mover', () => {
+    // El destino de la regla que matchea tiene que ser la carpeta donde ya está.
+    const cases = [
+      'TC\\Visa Galicia Pau\\RESUMEN_VISA23_7_2026pdf.pdf',
+      `TC\\Visa BIND Pau\\${CUIL}_Visa_20260723.pdf`,
+      'Cuentas\\Galicia Nico\\RESUMEN_EXTRACTOS CONSOLIDADOS - CAJA DE AHORRO 02-07-2026.pdf',
+      'TC\\Amex Galicia\\Amex galicia 2026 06.pdf',
+      'Cuentas\\ICBC\\EXT.DE.MOVIMIENTOS-5727.PDF',
+    ];
+    for (const c of cases) {
+      const rule = routeFile(c);
+      expect(rule, c).not.toBeNull();
+      const currentFolder = c.slice(0, c.lastIndexOf('\\')).replace(/\\/g, '/');
+      expect(rule!.folder, c).toBe(currentFolder);
+    }
+  });
+
   it('toda regla tiene id único y al menos un target', () => {
     const ids = ROUTE_RULES.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);

@@ -208,6 +208,24 @@ const inFolder = (folder: string, filePattern: RegExp) => (p: string) => {
   const file = p.slice(p.lastIndexOf('/') + 1);
   return filePattern.test(file);
 };
+/** Matchea si CUALQUIERA de los matchers matchea. */
+const anyOf =
+  (...matchers: Array<(p: string) => boolean>) =>
+  (p: string) =>
+    matchers.some((m) => m(p));
+
+/**
+ * Una regla de carpeta mixta tiene que reconocer DOS ubicaciones: la original
+ * (mezclada, ej. "TC/Visa Pau") y la canónica a la que `organize-statements` la
+ * mueve (ej. "TC/Visa BIND Pau"). Sin esto, reorganizar la carpeta dejaba los
+ * archivos sin ruteo y el import no los encontraba — la reorganización rompía
+ * justamente lo que venía a ordenar.
+ */
+const inFolderOrCanonical = (
+  sourceFolder: string,
+  filePattern: RegExp,
+  canonicalFolder: string,
+) => anyOf(inFolder(sourceFolder, filePattern), startsWith(`${canonicalFolder}/`));
 
 /**
  * Reglas en orden: la PRIMERA que matchea gana. Las carpetas mixtas
@@ -221,7 +239,7 @@ export const ROUTE_RULES: RouteRule[] = [
   {
     id: 'pau-visa-galicia',
     folder: 'TC/Visa Galicia Pau',
-    match: inFolder('tc/visa pau/', /^resumen_visa/i),
+    match: inFolderOrCanonical('tc/visa pau/', /^resumen_visa/i, 'tc/visa galicia pau'),
     targets: [tcTarget(GALICIA, 'Pau', 'visa')],
   },
   {
@@ -229,19 +247,19 @@ export const ROUTE_RULES: RouteRule[] = [
     // matchea el CUIL como \d{11} a propósito: un CUIL real no va en el repo.
     id: 'pau-visa-bind',
     folder: 'TC/Visa BIND Pau',
-    match: inFolder('tc/visa pau/', /^\d{11}_visa/i),
+    match: inFolderOrCanonical('tc/visa pau/', /^\d{11}_visa/i, 'tc/visa bind pau'),
     targets: [tcTarget(BIND, 'Pau', 'visa')],
   },
   {
     id: 'pau-visa-galicia-dup',
     folder: 'TC/Visa Galicia Pau',
-    match: inFolder('pau/', /^resumen_visa/i),
+    match: inFolderOrCanonical('pau/', /^resumen_visa/i, 'tc/visa galicia pau'),
     targets: [tcTarget(GALICIA, 'Pau', 'visa')],
   },
   {
     id: 'pau-visa-bind-dup',
     folder: 'TC/Visa BIND Pau',
-    match: inFolder('pau/', /^\d{11}_visa/i),
+    match: inFolderOrCanonical('pau/', /^\d{11}_visa/i, 'tc/visa bind pau'),
     targets: [tcTarget(BIND, 'Pau', 'visa')],
   },
   {
@@ -249,7 +267,7 @@ export const ROUTE_RULES: RouteRule[] = [
     // La sub-cuenta EUR existe pero está "SIN MOVIMIENTOS", así que no se modela.
     id: 'pau-bind-cuentas',
     folder: 'Cuentas/BIND Pau',
-    match: inFolder('pau/', /^\d{11}_cuentas bantotal/i),
+    match: inFolderOrCanonical('pau/', /^\d{11}_cuentas bantotal/i, 'cuentas/bind pau'),
     targets: [
       {
         institutionName: BIND,
@@ -275,7 +293,7 @@ export const ROUTE_RULES: RouteRule[] = [
     // vuelve a chequear el titular antes de subir.
     id: 'nico-galicia-ca-consolidado',
     folder: 'Cuentas/Galicia Nico',
-    match: inFolder('pau/', /^resumen_extractos consolidados - caja de ahorro \d{2}-\d{2}-\d{4}/i),
+    match: inFolderOrCanonical('pau/', /^resumen_extractos consolidados - caja de ahorro \d{2}-\d{2}-\d{4}/i, 'cuentas/galicia nico'),
     targets: [
       {
         institutionName: GALICIA,
@@ -290,7 +308,7 @@ export const ROUTE_RULES: RouteRule[] = [
     // "Caja de ahorro-YYYY-MM-DD" → titular PAULA DALMASSO (verificado).
     id: 'pau-galicia-ca',
     folder: 'Cuentas/Galicia Pau',
-    match: inFolder('pau/', /^resumen_extractos consolidados - caja de ahorro-\d{4}-\d{2}-\d{2}/i),
+    match: inFolderOrCanonical('pau/', /^resumen_extractos consolidados - caja de ahorro-\d{4}-\d{2}-\d{2}/i, 'cuentas/galicia pau'),
     targets: [
       {
         institutionName: GALICIA,
