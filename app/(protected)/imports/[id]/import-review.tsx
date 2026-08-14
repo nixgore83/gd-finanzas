@@ -18,6 +18,7 @@ import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { SortableHeader } from '@/components/ui/sortable-header';
 import { applySortClick, type SortCriterion } from '@/lib/sorting/criteria';
 import { makeReviewComparator, type ReviewSortField } from '@/lib/imports/review-sort';
+import { describeDateRange, hasDateRange, matchesDateRange } from '@/lib/imports/date-range-filter';
 import { summarizeLineStatuses, importConfirmError } from '@/lib/imports/line-summary';
 import { DATE_COLLAPSE_LINE_MARKER } from '@/lib/imports/date-collapse';
 import type { CategoryNode } from '@/lib/categories/tree';
@@ -138,6 +139,10 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   const [catFilter, setCatFilter] = useState<'all' | 'uncat' | 'categorized' | 'transfer'>('all');
   const [kindFilter, setKindFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
+  // Rango de fechas: los resúmenes arrastran movimientos del ejercicio anterior
+  // (ver lib/imports/date-range-filter.ts). Vacío = sin acotar por ese lado.
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(0);
 
   const lineSummary = useMemo(
@@ -217,12 +222,13 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
       }
       if (kindFilter !== 'all' && p.kind !== kindFilter) return false;
       if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+      if (!matchesDateRange(p.date, dateFrom, dateTo)) return false;
       if (catFilter === 'uncat' && (l.proposedCategoryId !== null || p.isTransfer)) return false;
       if (catFilter === 'categorized' && l.proposedCategoryId === null) return false;
       if (catFilter === 'transfer' && !p.isTransfer) return false;
       return true;
     };
-  }, [textFilter, kindFilter, statusFilter, catFilter]);
+  }, [textFilter, kindFilter, statusFilter, catFilter, dateFrom, dateTo]);
 
   const filteredLines = useMemo(() => lines.filter(matchesFilter), [lines, matchesFilter]);
 
@@ -267,12 +273,16 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); setPinnedIds(null); }
   function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); setPinnedIds(null); }
   function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); setPinnedIds(null); }
+  function applyDateFrom(v: string) { setDateFrom(v); setPage(0); setPinnedIds(null); }
+  function applyDateTo(v: string) { setDateTo(v); setPage(0); setPinnedIds(null); }
 
   function clearFilters() {
     setTextFilter('');
     setCatFilter('all');
     setKindFilter('all');
     setStatusFilter('all');
+    setDateFrom('');
+    setDateTo('');
     setPage(0);
     setPinnedIds(null);
   }
@@ -511,6 +521,35 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
     });
   }
 
+  /**
+   * Rechaza/acepta SOLO las líneas seleccionadas. Distinto de `doBulk`, que
+   * actúa sobre todas las pendientes del import ignorando filtro y selección:
+   * con eso no había forma de descartar un subconjunto (ej. el arrastre de 2025
+   * de un extracto mixto) sin ir de a una.
+   */
+  function doBulkSelectedStatus(status: 'accepted' | 'rejected') {
+    if (selectedIds.size === 0) {
+      toast.info('No hay líneas seleccionadas');
+      return;
+    }
+    const ids = selectedLines.filter((l) => l.transactionId === null).map((l) => l.id);
+    if (ids.length === 0) {
+      toast.info('Las seleccionadas ya están confirmadas');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await setLineStatus({ importId, lineIds: ids, status });
+      if (res.ok) {
+        toast.success(`${status === 'accepted' ? 'Aceptadas' : 'Rechazadas'} · ${res.updated}`);
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
   function doBulk(status: 'accepted' | 'rejected') {
     const ids = lines.filter((l) => l.status === 'pending').map((l) => l.id);
     if (ids.length === 0) {
@@ -717,6 +756,34 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             <FilterChip active={statusFilter === 'accepted'} onClick={() => applyStatusFilter('accepted')}>Aceptadas</FilterChip>
             <FilterChip active={statusFilter === 'edited'} onClick={() => applyStatusFilter('edited')}>Editadas</FilterChip>
             <FilterChip active={statusFilter === 'rejected'} onClick={() => applyStatusFilter('rejected')}>Rechazadas</FilterChip>
+          </FilterGroup>
+          <FilterGroup label="Fecha del movimiento">
+            <input
+              type="date"
+              aria-label="Desde"
+              className="h-7 rounded-md border bg-background px-2 text-xs"
+              value={dateFrom}
+              onChange={(e) => applyDateFrom(e.target.value)}
+            />
+            <span className="text-xs text-muted-foreground">→</span>
+            <input
+              type="date"
+              aria-label="Hasta"
+              className="h-7 rounded-md border bg-background px-2 text-xs"
+              value={dateTo}
+              onChange={(e) => applyDateTo(e.target.value)}
+            />
+            {hasDateRange(dateFrom, dateTo) && (
+              <FilterChip
+                active
+                onClick={() => {
+                  applyDateFrom('');
+                  applyDateTo('');
+                }}
+              >
+                {describeDateRange(dateFrom, dateTo)} ✕
+              </FilterChip>
+            )}
           </FilterGroup>
         </div>
         {!readOnly && selectableFilteredIds.length > 0 && (
@@ -996,16 +1063,32 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
               <label className="block text-xs font-medium text-blue-900">Estado</label>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={doBulkBackToPending}
-                disabled={isPending}
-                className="bg-background"
-              >
-                Volver a pendiente
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={doBulkBackToPending}
+                  disabled={isPending}
+                  className="bg-background"
+                >
+                  Volver a pendiente
+                </Button>
+                {/* Rechaza SOLO lo seleccionado. El "Rechazar todas las pending"
+                    de arriba ignora filtro y selección, así que no servía para
+                    descartar un subconjunto (ej. el arrastre del año anterior). */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => doBulkSelectedStatus('rejected')}
+                  disabled={isPending}
+                  className="bg-background"
+                  title="Descarta las líneas seleccionadas: no se convierten en transacciones. Reversible con 'Volver a pendiente'."
+                >
+                  Rechazar seleccionadas
+                </Button>
+              </div>
             </div>
           </div>
           <Button
