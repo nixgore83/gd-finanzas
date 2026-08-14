@@ -49,6 +49,11 @@ export const imports = pgTable(
     // Nº de cuenta propia extraído del encabezado del extracto por el parser.
     // Se usa para auto-sugerir la cuenta destino (match contra accounts.account_number).
     statementAccountRef: text('statement_account_ref'),
+    // Titular tal cual figura en el encabezado del extracto (lo que dice el
+    // archivo, no la config de la app). Solo informativo: sirve para detectar
+    // imports mal ruteados a ojo. Nullable: no todos los parsers lo extraen y un
+    // import sin parsear todavía no lo tiene.
+    statementHolder: text('statement_holder'),
     summary: jsonb('summary').$type<{
       totalExpense?: string;
       totalIncome?: string;
