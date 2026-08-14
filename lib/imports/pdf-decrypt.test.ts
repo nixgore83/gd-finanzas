@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as mupdf from 'mupdf';
-import { unlockPdf, unlockPdfForImport } from './pdf-decrypt';
+import { unlockPdf, unlockPdfForImport, stripPdfPreamble } from './pdf-decrypt';
 
 // Genera un PDF de 1 página con texto conocido, opcionalmente encriptado.
 // `encryptOption` es la cadena de opciones de mupdf (ej. "encrypt=aes-128,user-password=x").
@@ -155,5 +155,60 @@ describe('unlockPdfForImport', () => {
     const res = await unlockPdfForImport(new Uint8Array([1, 2, 3, 4, 5]), 'x');
 
     expect(res).toEqual({ ok: false, reason: 'unsupported' });
+  });
+});
+
+describe('stripPdfPreamble', () => {
+  const header = (): number[] => [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x36]; // "%PDF-1.6"
+
+  it('REGRESIÓN: descarta el salto de línea suelto de los extractos HSBC US', () => {
+    // Caso real: byte 0 = 0x0A y el header arranca en el offset 1. mupdf y
+    // pdf-parse lo abren igual, pero la API de Anthropic lo rechaza con
+    // "The PDF specified was not valid".
+    const withPreamble = new Uint8Array([0x0a, ...header()]);
+    const out = stripPdfPreamble(withPreamble);
+    expect(out[0]).toBe(0x25);
+    expect(Array.from(out)).toEqual(header());
+  });
+
+  it('deja intacto un PDF que ya arranca en %PDF', () => {
+    const clean = new Uint8Array(header());
+    const out = stripPdfPreamble(clean);
+    expect(out).toBe(clean); // misma referencia: no copia de más
+  });
+
+  it('tolera varios bytes de preámbulo', () => {
+    const out = stripPdfPreamble(new Uint8Array([0x0d, 0x0a, 0x20, ...header()]));
+    expect(Array.from(out)).toEqual(header());
+  });
+
+  it('no toca un archivo sin header %PDF', () => {
+    // Si no es un PDF, no hay nada que sanear con confianza: se devuelve igual
+    // y que falle más adelante con su propio error.
+    const notPdf = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]); // ZIP
+    expect(stripPdfPreamble(notPdf)).toBe(notPdf);
+  });
+
+  it('no busca el header más allá del margen tolerado', () => {
+    // 2000 bytes de basura y recién después "%PDF": eso no es un PDF con
+    // preámbulo, es otra cosa que lo contiene. No se recorta.
+    const far = new Uint8Array([...new Array<number>(2000).fill(0x20), ...header()]);
+    expect(stripPdfPreamble(far)).toBe(far);
+  });
+
+  it('no rompe con archivos más cortos que el header', () => {
+    const tiny = new Uint8Array([0x25, 0x50]);
+    expect(stripPdfPreamble(tiny)).toBe(tiny);
+    expect(stripPdfPreamble(new Uint8Array())).toEqual(new Uint8Array());
+  });
+});
+
+describe('unlockPdfForImport — saneo del preámbulo', () => {
+  it('desbloquea un PDF válido que venía con un byte de más adelante', async () => {
+    const pdf = makePdf('');
+    const dirty = new Uint8Array([0x0a, ...pdf]);
+    const res = await unlockPdfForImport(dirty, null);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.bytes[0]).toBe(0x25);
   });
 });

@@ -13,7 +13,7 @@ function getClient(): Anthropic {
 export class LlmError extends Error {
   constructor(
     message: string,
-    public code: 'invalid_json' | 'schema_invalid' | 'api_failure' | 'empty',
+    public code: 'invalid_json' | 'schema_invalid' | 'api_failure' | 'empty' | 'truncated',
     public override cause?: unknown,
   ) {
     super(message);
@@ -68,12 +68,29 @@ function extractJson(text: string): unknown {
 const PARSE_LLM_TIMEOUT_MS = 220_000;
 
 /**
+ * Techo de tokens de SALIDA por llamada.
+ *
+ * Por qué 64k y no 16k: con 16k, cuatro extractos largos (los ICBC de la caja
+ * 0926 y las cajas de ahorro de Pau) cortaban el JSON a la mitad y el import
+ * moría con `invalid_json` — un truncamiento silencioso disfrazado de error de
+ * parseo. `claude-sonnet-4-6` admite hasta 128k de salida; 64k deja margen de
+ * sobra para un resumen largo sin acercarse al tope.
+ *
+ * Esto NO encarece los parseos normales: se paga por token generado, no por el
+ * límite. Sólo levanta el techo para los que hoy no entran.
+ *
+ * Va de la mano con el streaming (ver abajo): por encima de ~16k, la llamada
+ * no-streaming del SDK corta por timeout HTTP antes de terminar de generar.
+ */
+const PARSE_MAX_OUTPUT_TOKENS = 64_000;
+
+/**
  * Llama al modelo con un mensaje compuesto (PDF + texto) o solo texto, valida
  * con Zod, y reintenta UNA vez si el JSON viene roto.
  */
 export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>> {
   const client = getClient();
-  const maxTokens = input.maxTokens ?? 16000;
+  const maxTokens = input.maxTokens ?? PARSE_MAX_OUTPUT_TOKENS;
 
   async function callOnce(extraInstruction?: string): Promise<LlmRunResult<T>> {
     const content: Anthropic.Messages.ContentBlockParam[] = [];
@@ -100,7 +117,13 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
 
     let response: Anthropic.Messages.Message;
     try {
-      response = await client.messages.create(
+      // STREAMING, no `messages.create`: por encima de ~16k tokens de salida la
+      // llamada no-streaming del SDK aborta por timeout HTTP antes de que el
+      // modelo termine de generar. En streaming la conexión se mantiene viva
+      // con cada chunk, que es lo que habilita el techo de 64k de arriba.
+      // `finalMessage()` devuelve el Message completo, así que el resto de la
+      // función (stop_reason, usage, content) no cambia.
+      const stream = client.messages.stream(
         {
           model: input.modelId,
           max_tokens: maxTokens,
@@ -109,6 +132,7 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
         },
         { timeout: PARSE_LLM_TIMEOUT_MS, maxRetries: 0 },
       );
+      response = await stream.finalMessage();
     } catch (err) {
       // Extraer info útil del error del SDK (sin loggear el body crudo, que
       // podría contener prompt/contenido). Surface status + tipo + modelo.
@@ -133,12 +157,21 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
       throw new LlmError(`Anthropic API call failed (${detail})`, 'api_failure', err);
     }
 
+    // Un truncamiento SIEMPRE rompe el JSON (queda partido a la mitad), así que
+    // hasta ahora se veía como `invalid_json`: un error de parseo que mandaba a
+    // buscar el problema en el prompt en vez de en el límite de tokens. Cortar
+    // acá con un mensaje explícito ahorra ese desvío — fue lo que hizo fallar 4
+    // extractos largos en la carga masiva de 2026-08.
     if (response.stop_reason === 'max_tokens') {
-      console.warn('[llm] response truncated by max_tokens', {
+      console.error('[llm] response truncated by max_tokens', {
         model: input.modelId,
         maxTokens,
         outputTokens: response.usage.output_tokens,
       });
+      throw new LlmError(
+        `El extracto es más largo que el límite de salida del parser (${maxTokens} tokens): la respuesta quedó cortada. Subí PARSE_MAX_OUTPUT_TOKENS o partí el archivo por período.`,
+        'truncated',
+      );
     }
 
     const text = response.content
