@@ -1,9 +1,13 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions, tags, transactions } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
+import { Hair, Label, Num } from '@/components/ui/typography';
+import { formatAccount } from '@/lib/accounts/format';
+import { formatPeriodRange } from '@/lib/imports/period';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { resolveParser } from '@/lib/imports/parsers/registry';
@@ -56,6 +60,10 @@ export default async function ImportDetailPage({
   const { id } = await params;
 
   const db = getDb();
+  // La institución del import y la de su cuenta destino no son necesariamente la
+  // misma fila (el usuario puede elegir cualquier cuenta), así que la cuenta trae
+  // su propia institución por un join aparte.
+  const accountInstitutions = alias(institutions, 'account_institutions');
   const [row] = await db
     .select({
       id: imports.id,
@@ -70,6 +78,9 @@ export default async function ImportDetailPage({
       fileName: imports.fileName,
       summary: imports.summary,
       statementAccountRef: imports.statementAccountRef,
+      statementHolder: imports.statementHolder,
+      periodStart: imports.periodStart,
+      periodEnd: imports.periodEnd,
       parsingStartedAt: imports.parsingStartedAt,
       errorMessage: imports.errorMessage,
       transactionCount: imports.transactionCount,
@@ -77,10 +88,17 @@ export default async function ImportDetailPage({
       createdAt: imports.createdAt,
       pdfPassword: institutions.pdfPassword,
       accountPdfPassword: accounts.pdfPassword,
+      accountType: accounts.type,
+      accountCardBrand: accounts.cardBrand,
+      accountLabel: accounts.name,
+      accountOwnerTag: accounts.ownerTag,
+      accountCurrency: accounts.currencyDefault,
+      accountInstitutionName: accountInstitutions.name,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
     .leftJoin(accounts, eq(accounts.id, imports.accountId))
+    .leftJoin(accountInstitutions, eq(accountInstitutions.id, accounts.institutionId))
     .where(and(eq(imports.id, id), eq(imports.householdId, session.householdId)))
     .limit(1);
 
@@ -142,6 +160,20 @@ export default async function ImportDetailPage({
     ? accountRows.find((a) => a.accountNumber && a.accountNumber === row.statementAccountRef)?.id ?? null
     : null;
 
+  // Cuenta destino elegida al subir. Se arma con `formatAccount` (mismo nombre
+  // legible que el resto de la app) porque `accounts.name` suele venir vacío.
+  const destinationAccount =
+    row.accountId && row.accountType
+      ? formatAccount({
+          institutionName: row.accountInstitutionName,
+          type: row.accountType,
+          cardBrand: row.accountCardBrand,
+          name: row.accountLabel,
+          ownerTag: row.accountOwnerTag ?? '',
+          currency: row.accountCurrency ?? 'ARS',
+        })
+      : null;
+
   const hasParser =
     row.institutionName !== null && resolveParser(row.institutionName, row.type) !== null;
 
@@ -180,36 +212,71 @@ export default async function ImportDetailPage({
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 rounded-md border bg-card p-4 text-sm md:grid-cols-3">
-        <div>
-          <dt className="text-muted-foreground">Institución</dt>
-          <dd className="font-medium">{row.institutionName ?? '—'}</dd>
+      <div className="space-y-4 rounded-md border bg-card p-4 text-sm">
+        {/* Bloque 1: lo que eligió el usuario al subir + estado del import. */}
+        <dl className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground">Institución</dt>
+            <dd className="font-medium">{row.institutionName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Tipo</dt>
+            <dd className="font-medium">{IMPORT_TYPE_LABELS[row.type]}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Estado</dt>
+            <dd className="font-medium">{STATUS_LABELS[row.status] ?? row.status}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Cuenta destino</dt>
+            <dd className="font-medium">{destinationAccount ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Parser</dt>
+            <dd className="font-medium">{row.parserModel}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Subido</dt>
+            <dd className="font-medium">{formatDate(row.createdAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Confirmado</dt>
+            <dd className="font-medium">{formatDate(row.confirmedAt)}</dd>
+          </div>
+          <div className="col-span-2 md:col-span-3">
+            <dt className="text-muted-foreground">Hash SHA-256</dt>
+            <dd className="font-mono text-xs">{row.fileHash || '—'}</dd>
+          </div>
+        </dl>
+
+        {/* Bloque 2: lo que dice el archivo. Separado a propósito de lo de arriba:
+            el período sale de las líneas parseadas y el nº de cuenta / titular del
+            encabezado del extracto. Vacíos hasta que el import se parsea. */}
+        <Hair />
+        <div className="space-y-3">
+          <Label>Según el archivo</Label>
+          <dl className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div>
+              <dt className="text-muted-foreground">Período</dt>
+              <dd className="font-medium">{formatPeriodRange(row.periodStart, row.periodEnd)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Nº de cuenta</dt>
+              <dd className="font-medium">
+                {row.statementAccountRef ? (
+                  <Num>{row.statementAccountRef}</Num>
+                ) : (
+                  '—'
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Titular</dt>
+              <dd className="font-medium">{row.statementHolder ?? '—'}</dd>
+            </div>
+          </dl>
         </div>
-        <div>
-          <dt className="text-muted-foreground">Tipo</dt>
-          <dd className="font-medium">{IMPORT_TYPE_LABELS[row.type]}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Estado</dt>
-          <dd className="font-medium">{STATUS_LABELS[row.status] ?? row.status}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Parser</dt>
-          <dd className="font-medium">{row.parserModel}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Subido</dt>
-          <dd className="font-medium">{formatDate(row.createdAt)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Confirmado</dt>
-          <dd className="font-medium">{formatDate(row.confirmedAt)}</dd>
-        </div>
-        <div className="col-span-2 md:col-span-3">
-          <dt className="text-muted-foreground">Hash SHA-256</dt>
-          <dd className="font-mono text-xs">{row.fileHash || '—'}</dd>
-        </div>
-      </dl>
+      </div>
 
       {row.errorMessage && (
         <div

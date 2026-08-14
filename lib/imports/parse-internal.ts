@@ -506,10 +506,13 @@ export async function parseImportInternal(
     }
   ).summary ?? null;
 
-  // Nº de cuenta propia del extracto (encabezado) → para auto-sugerir la cuenta destino.
-  const statementAccountRef = (
-    result.data as { statementAccount?: { number?: string } }
-  ).statementAccount?.number ?? null;
+  // Encabezado del extracto: nº de cuenta propia (→ auto-sugerir la cuenta destino)
+  // y titular (→ mostrarlo en el detalle, para cotejar contra la cuenta elegida).
+  const statementAccount = (
+    result.data as { statementAccount?: { number?: string; holder?: string } }
+  ).statementAccount;
+  const statementAccountRef = statementAccount?.number ?? null;
+  const statementHolder = statementAccount?.holder ?? null;
 
   await db
     .update(imports)
@@ -519,6 +522,7 @@ export async function parseImportInternal(
       transactionCount: confirmedDescs.size + lineRows.length,
       summary,
       statementAccountRef,
+      statementHolder,
       errorMessage:
         [
           dateCollapse.collapsed ? dateCollapseMessage(dateCollapse) : null,

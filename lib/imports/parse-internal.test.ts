@@ -96,6 +96,9 @@ type FakeImportRow = {
   parsingStartedAt: Date | null;
   createdAt: Date;
   errorMessage: string | null;
+  // Encabezado del extracto, escrito por el parseo (no forma parte del row inicial).
+  statementAccountRef?: string | null;
+  statementHolder?: string | null;
 };
 
 type FakeLine = {
@@ -283,7 +286,7 @@ class FakeInsert {
 
 let parseCsvCalls = 0;
 
-function fakeParser(): Parser {
+function fakeParser(statementAccount?: ParserOutput['statementAccount']): Parser {
   return {
     id: 'fake',
     institutionMatch: () => true,
@@ -294,6 +297,7 @@ function fakeParser(): Parser {
     parseCsv: (): ParserOutput => {
       parseCsvCalls++;
       return {
+        statementAccount,
         lines: [
           {
             date: '2026-07-01',
@@ -338,6 +342,30 @@ describe('parseImportInternal — claim atómico', () => {
     expect(db.insertBatches).toBe(1);
     expect(db.lines).toHaveLength(1);
     expect(db.row.status).toBe('parsed');
+  });
+
+  it('persiste nº de cuenta Y titular del encabezado del extracto', async () => {
+    // El titular venía saliendo del parser (`statementAccount.holder`) y se
+    // descartaba: sólo se guardaba el número. Ahora los dos van a `imports`
+    // para mostrarlos en el detalle. Datos sintéticos.
+    mocks.resolveParser.mockReturnValue(
+      fakeParser({ number: '0905/02100757/27', holder: 'TITULAR SINTETICO' }),
+    );
+    const db = newDb();
+
+    await parseImportInternal(IMPORT_ID, HOUSEHOLD_ID);
+
+    expect(db.row.statementAccountRef).toBe('0905/02100757/27');
+    expect(db.row.statementHolder).toBe('TITULAR SINTETICO');
+  });
+
+  it('extracto sin encabezado legible → nº y titular quedan en null', async () => {
+    const db = newDb();
+
+    await parseImportInternal(IMPORT_ID, HOUSEHOLD_ID);
+
+    expect(db.row.statementAccountRef).toBeNull();
+    expect(db.row.statementHolder).toBeNull();
   });
 
   it('REGRESIÓN: dos parseos concurrentes del mismo import → una sola tanda de líneas', async () => {
