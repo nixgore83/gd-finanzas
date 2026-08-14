@@ -25,12 +25,17 @@ import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
 import { sameCounterpartyIdentity } from '@/lib/imports/counterparty-identity';
 import { mergeCounterpartyLabels } from '@/lib/imports/counterparty-labels';
+import {
+  bulkTransferAccountSelection,
+  counterpartyAccountOptions,
+} from '@/lib/imports/bulk-transfer-account';
 import { setLineStatus } from '@/app/actions/imports/set-line-status';
 import { updateImportLine } from '@/app/actions/imports/update-line';
 import { bulkSetCategory } from '@/app/actions/imports/bulk-set-category';
 import { bulkSetCounterpartyLabel } from '@/app/actions/imports/bulk-set-counterparty-label';
 import { bulkSetCurrency } from '@/app/actions/imports/bulk-set-currency';
 import { bulkSetTransfer } from '@/app/actions/imports/bulk-set-transfer';
+import { bulkSetTransferAccount } from '@/app/actions/imports/bulk-set-transfer-account';
 import { bulkSetDeducible } from '@/app/actions/imports/bulk-set-deducible';
 import { bulkSetTags } from '@/app/actions/imports/bulk-set-tags';
 import {
@@ -125,6 +130,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   const [bulkCurrency, setBulkCurrency] = useState<'ARS' | 'USD' | ''>('');
   const [bulkTagIds, setBulkTagIds] = useState<Set<string>>(new Set());
   const [bulkCounterpartyLabel, setBulkCounterpartyLabel] = useState('');
+  const [bulkTransferAccountId, setBulkTransferAccountId] = useState('');
 
   // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
   // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
@@ -165,6 +171,26 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   const bulkCategoryOptions = useMemo(
     () => (uniformKind ? tree.filter((c) => c.kind === uniformKind) : []),
     [tree, uniformKind],
+  );
+
+  // Contracuenta en lote. A diferencia de la categoría, NO depende de
+  // `uniformKind`: la contraparte es "la otra cuenta" y la dirección la da el
+  // kind de cada línea, así que una selección mixta income+expense es válida.
+  const bulkTransferSelection = useMemo(
+    () =>
+      bulkTransferAccountSelection(
+        selectedLines.map((l) => ({ id: l.id, kind: l.parsedData.kind })),
+      ),
+    [selectedLines],
+  );
+
+  const bulkTransferAccountOptions = useMemo<ComboOption[]>(
+    () =>
+      counterpartyAccountOptions(accounts, accountId).map((a) => ({
+        id: a.id,
+        label: accountLabel(a),
+      })),
+    [accounts, accountId],
   );
 
   // Etiquetas para el combobox de contraparte: historial primero (su casing es
@@ -350,6 +376,42 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
         );
         setSelectedIds(new Set());
         router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
+  // Contracuenta (cuenta contraparte de la transferencia) en lote. Asignarla
+  // implica marcar las líneas como transferencia; `clear` solo borra la cuenta.
+  // Deliberadamente SIN chequeo de `uniformKind`: ver `bulkTransferSelection`.
+  function doBulkTransferAccount(op: 'set' | 'clear') {
+    if (selectedIds.size === 0) {
+      toast.error('No hay líneas seleccionadas');
+      return;
+    }
+    if (op === 'set' && !bulkTransferAccountId) {
+      toast.error('Elegí una contracuenta');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await bulkSetTransferAccount({
+        importId,
+        lineIds: bulkTransferSelection.ids,
+        transferAccountId: op === 'set' ? bulkTransferAccountId : null,
+      });
+      if (res.ok) {
+        toast.success(
+          op === 'set'
+            ? `Contracuenta asignada a ${res.updated} ${res.updated === 1 ? 'línea' : 'líneas'}`
+            : `Contracuenta quitada de ${res.updated} ${res.updated === 1 ? 'línea' : 'líneas'}`,
+        );
+        setSelectedIds(new Set());
+        setBulkTransferAccountId('');
+        router.refresh();
+      } else if (res.error === 'same_account') {
+        toast.error('Esa es la cuenta del extracto: una transferencia a sí misma no existe');
       } else {
         toast.error(`Error: ${res.error}`);
       }
@@ -732,8 +794,11 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             </p>
             {uniformKind === null ? (
               <p className="text-xs text-blue-800">
-                Mezcla de ingresos y gastos. Filtrá por tipo antes de asignar
-                categoría en lote.
+                Mezcla de {bulkTransferSelection.incomeCount} ingreso
+                {bulkTransferSelection.incomeCount === 1 ? '' : 's'} y{' '}
+                {bulkTransferSelection.expenseCount} gasto
+                {bulkTransferSelection.expenseCount === 1 ? '' : 's'}. Filtrá por tipo antes de
+                asignar categoría en lote; la contracuenta sí acepta la mezcla.
               </p>
             ) : (
               <p className="text-xs text-blue-800">
@@ -809,6 +874,42 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                 </Button>
               </div>
             </div>
+          </div>
+          {/* Contracuenta = cuenta CONTRAPARTE de la transferencia. Ojo: no
+              confundir con "Cuenta del extracto", que es la cuenta propia a la
+              que pertenecen todas las líneas. */}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-blue-900">
+                Contracuenta (transferencia)
+              </label>
+              <Combobox
+                options={bulkTransferAccountOptions}
+                value={bulkTransferAccountId}
+                onChange={setBulkTransferAccountId}
+                disabled={isPending}
+                placeholder="Buscar cuenta…"
+                widthClassName="w-56"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => doBulkTransferAccount('set')}
+              disabled={isPending || !bulkTransferAccountId}
+            >
+              Aplicar contracuenta
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => doBulkTransferAccount('clear')}
+              disabled={isPending}
+              className="bg-background"
+            >
+              Quitar contracuenta
+            </Button>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
@@ -1102,7 +1203,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
           <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="accountId">
-              Cuenta destino (común a todas las líneas)
+              Cuenta del extracto (común a todas las líneas)
             </label>
             <Select
               value={accountId}
@@ -1472,7 +1573,7 @@ function LineRowEditor({
           ) : (
             // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
             // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
-            <span className="text-muted-foreground">Cuenta destino sin asignar</span>
+            <span className="text-muted-foreground">Contracuenta sin asignar</span>
           )
         ) : readOnly || line.transactionId || editing ? (
           categoryName ?? <span className="text-muted-foreground">—</span>
@@ -1707,14 +1808,12 @@ function LineRowEditor({
                 </Field>
               )}
               {draft.isTransfer && (
-                <Field label="Cuenta destino (transfer)">
+                <Field label="Contracuenta (transferencia)">
                   <Combobox
-                    options={accounts
-                      .filter((a) => a.id !== currentAccountId)
-                      .map((a) => ({
-                        id: a.id,
-                        label: accountLabel(a),
-                      }))}
+                    options={counterpartyAccountOptions(accounts, currentAccountId).map((a) => ({
+                      id: a.id,
+                      label: accountLabel(a),
+                    }))}
                     value={draft.transferAccountId ?? ''}
                     onChange={(id) => setDraft({ ...draft, transferAccountId: id || undefined })}
                     placeholder="Buscar cuenta…"
@@ -1757,7 +1856,7 @@ function LineRowEditor({
                 <span className="font-medium">{transferMatch.accountLabel}</span>{' '}
                 ({transferMatch.date} · {transferMatch.amountOriginal}).
                 <span className="block text-xs text-emerald-800">
-                  Cuenta destino pre-cargada — al confirmar, ambas patas se parean en vez de
+                  Contracuenta pre-cargada — al confirmar, ambas patas se parean en vez de
                   duplicarse.{' '}
                   <a
                     href={`/transactions/${transferMatch.transactionId}`}
