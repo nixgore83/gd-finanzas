@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, importLines, institutions, tags, transactions } from '@/db/schema';
@@ -8,6 +8,7 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { Hair, Label, Num } from '@/components/ui/typography';
 import { formatAccount } from '@/lib/accounts/format';
 import { formatPeriodRange } from '@/lib/imports/period';
+import { findAlreadyImported } from '@/lib/imports/duplicate-detection';
 import { IMPORT_TYPE_LABELS } from '@/lib/schemas/import';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { resolveParser } from '@/lib/imports/parsers/registry';
@@ -115,6 +116,45 @@ export default async function ImportDetailPage({
     .from(importLines)
     .where(eq(importLines.importId, row.id))
     .orderBy(asc(importLines.createdAt));
+
+  // Movimientos que YA existen en la cuenta destino y podrían duplicarse al
+  // confirmar. Se comparan sólo contra transacciones de OTRO origen: que un
+  // extracto liste dos veces algo que pasó dos veces no es duplicación.
+  // Ver lib/imports/duplicate-detection.ts para el porqué del algoritmo.
+  const alreadyImportedIds = await (async (): Promise<string[]> => {
+    if (!row.accountId) return [];
+    const pending = lines
+      .filter((l) => l.transactionId === null && l.status !== 'rejected')
+      .map((l) => {
+        // `parsed_data` es jsonb → `unknown`. Sólo se necesitan estos dos campos
+        // y el detector tolera que vengan nulos o mal formados.
+        const p = l.parsedData as { date?: string; amountOriginal?: string };
+        return { id: l.id, date: p.date, amount: p.amountOriginal };
+      });
+    if (pending.length === 0) return [];
+
+    const existing = await db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        amount: transactions.amountOriginal,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.householdId, session.householdId),
+          eq(transactions.accountId, row.accountId),
+          // Distinto origen: la duplicación aparece cuando el mismo movimiento
+          // entra por dos archivos, no dentro del mismo.
+          or(
+            isNull(transactions.importBatchId),
+            ne(transactions.importBatchId, row.id),
+          ),
+        ),
+      );
+
+    return [...findAlreadyImported(pending, existing)];
+  })();
 
   const tree = await loadCategoryTree(session.householdId);
   const tagRows = await db
@@ -371,6 +411,7 @@ export default async function ImportDetailPage({
             proposedCategoryId: l.proposedCategoryId,
             status: l.status,
             transactionId: l.transactionId,
+            alreadyImported: alreadyImportedIds.includes(l.id),
           }))}
           tree={tree}
           tags={tagRows}
