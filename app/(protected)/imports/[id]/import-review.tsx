@@ -57,6 +57,9 @@ type LineRow = {
   proposedCategoryId: string | null;
   status: 'pending' | 'accepted' | 'rejected' | 'edited';
   transactionId: string | null;
+  /** Ya existe una transacción equivalente en la cuenta, venida de OTRO import.
+   *  Lo calcula el server con `findAlreadyImported`. */
+  alreadyImported?: boolean;
 };
 
 type ImportSummary = {
@@ -136,7 +139,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
   // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
   const [textFilter, setTextFilter] = useState('');
-  const [catFilter, setCatFilter] = useState<'all' | 'uncat' | 'categorized' | 'transfer'>('all');
+  const [catFilter, setCatFilter] = useState<'all' | 'uncat' | 'categorized' | 'transfer' | 'dup'>('all');
   const [kindFilter, setKindFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   // Rango de fechas: los resúmenes arrastran movimientos del ejercicio anterior
@@ -226,11 +229,19 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
       if (catFilter === 'uncat' && (l.proposedCategoryId !== null || p.isTransfer)) return false;
       if (catFilter === 'categorized' && l.proposedCategoryId === null) return false;
       if (catFilter === 'transfer' && !p.isTransfer) return false;
+      if (catFilter === 'dup' && !l.alreadyImported) return false;
       return true;
     };
   }, [textFilter, kindFilter, statusFilter, catFilter, dateFrom, dateTo]);
 
   const filteredLines = useMemo(() => lines.filter(matchesFilter), [lines, matchesFilter]);
+
+  // Líneas que ya existen como transacción por otro import. Sólo cuentan las que
+  // todavía se pueden descartar: una ya confirmada o rechazada no es accionable.
+  const dupCount = useMemo(
+    () => lines.filter((l) => l.alreadyImported && l.transactionId === null && l.status !== 'rejected').length,
+    [lines],
+  );
 
   const catNameById = useMemo(() => new Map(tree.map((c) => [c.id, c.name])), [tree]);
   const sortedFiltered = useMemo(
@@ -527,6 +538,32 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
    * con eso no había forma de descartar un subconjunto (ej. el arrastre de 2025
    * de un extracto mixto) sin ir de a una.
    */
+  /**
+   * Descarta de una todas las líneas que ya existen como transacción por otro
+   * import. Es el atajo del caso real: un extracto que vuelve a listar meses ya
+   * cargados traía 327 de 411 repetidas.
+   */
+  function doRejectAlreadyImported() {
+    const ids = lines
+      .filter((l) => l.alreadyImported && l.transactionId === null && l.status !== 'rejected')
+      .map((l) => l.id);
+    if (ids.length === 0) {
+      toast.info('No hay líneas repetidas');
+      return;
+    }
+    pinList();
+    startTransition(async () => {
+      const res = await setLineStatus({ importId, lineIds: ids, status: 'rejected' });
+      if (res.ok) {
+        toast.success(`Rechazadas · ${res.updated} ya existentes`);
+        setSelectedIds(new Set());
+        router.refresh();
+      } else {
+        toast.error(`Error: ${res.error}`);
+      }
+    });
+  }
+
   function doBulkSelectedStatus(status: 'accepted' | 'rejected') {
     if (selectedIds.size === 0) {
       toast.info('No hay líneas seleccionadas');
@@ -744,6 +781,11 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             <FilterChip active={catFilter === 'uncat'} onClick={() => applyCatFilter('uncat')}>Sin categorizar</FilterChip>
             <FilterChip active={catFilter === 'categorized'} onClick={() => applyCatFilter('categorized')}>Categorizadas</FilterChip>
             <FilterChip active={catFilter === 'transfer'} onClick={() => applyCatFilter('transfer')}>Transfers</FilterChip>
+            {dupCount > 0 && (
+              <FilterChip active={catFilter === 'dup'} onClick={() => applyCatFilter('dup')}>
+                Ya existen ({dupCount})
+              </FilterChip>
+            )}
           </FilterGroup>
           <FilterGroup label="Tipo">
             <FilterChip active={kindFilter === 'all'} onClick={() => applyKindFilter('all')}>Todos</FilterChip>
@@ -786,6 +828,41 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             )}
           </FilterGroup>
         </div>
+        {!readOnly && dupCount > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <div className="flex-1">
+              <p className="font-medium">
+                {dupCount} línea{dupCount === 1 ? '' : 's'} ya existe
+                {dupCount === 1 ? '' : 'n'} en esta cuenta
+              </p>
+              <p className="text-xs">
+                Coinciden en fecha (±1 día) y monto con movimientos cargados por otro
+                import. Confirmarlas duplicaría la cuenta. Revisalas antes de descartar:
+                un mismo importe puede repetirse el mismo día de forma legítima.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="bg-background"
+              onClick={() => applyCatFilter('dup')}
+              disabled={isPending}
+            >
+              Ver cuáles
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="bg-background"
+              onClick={doRejectAlreadyImported}
+              disabled={isPending}
+            >
+              Rechazar las {dupCount}
+            </Button>
+          </div>
+        )}
         {!readOnly && selectableFilteredIds.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t pt-2">
             <Button type="button" size="sm" variant="outline" onClick={toggleAllFiltered}>
@@ -1645,6 +1722,14 @@ function LineRowEditor({
         <span className={line.parsedData.kind === 'income' ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]'}>
           {line.parsedData.amountOriginal}
         </span>
+        {line.alreadyImported && line.transactionId === null && line.status !== 'rejected' && (
+          <span
+            className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-900"
+            title="Ya hay un movimiento con esta fecha (±1 día) y monto en la cuenta, cargado por otro import. Confirmarla lo duplicaría."
+          >
+            ya existe
+          </span>
+        )}
       </td>
       <td className="px-2 py-1.5">{line.parsedData.currencyOriginal}</td>
       <td className="px-2 py-1.5">
