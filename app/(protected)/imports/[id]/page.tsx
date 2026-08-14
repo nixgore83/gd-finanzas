@@ -292,8 +292,14 @@ export default async function ImportDetailPage({
           <p>{row.errorMessage}</p>
           {row.status === 'reviewing' && (
             <p className="mt-1 text-xs">
-              Las líneas sin transacción quedaron editables. Reintentá &ldquo;Confirmar
-              import&rdquo; tras corregir (o backfill de FX si fue ese el problema).
+              Las líneas sin transacción quedaron editables. Corregí lo que indica el
+              detalle de arriba y reintentá &ldquo;Confirmar import&rdquo;.
+              {/* La pista del FX sólo si el FX fue realmente el problema: sugerirla
+                  siempre mandaba a revisar cotizaciones en imports que fallaban por
+                  otra causa (caso real 2026-08-14). */}
+              {row.errorMessage.toLowerCase().includes('fx') && (
+                <> Si faltan cotizaciones, corré el backfill de FX antes de reintentar.</>
+              )}
             </p>
           )}
         </div>

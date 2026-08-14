@@ -19,6 +19,7 @@ import {
 import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
 import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
 import { counterpartyBankRefs } from '@/lib/imports/counterparty-identity';
+import { buildConfirmErrorMessage } from '@/lib/imports/confirm-error-summary';
 
 /** Suma `days` (puede ser negativo) a una fecha ISO 'YYYY-MM-DD'. */
 function shiftIsoDate(iso: string, days: number): string {
@@ -644,7 +645,7 @@ export async function confirmImport(input: {
           .set({
             status: 'reviewing',
             transactionCount: linkedCount,
-            errorMessage: `${linkedCount} confirmadas, ${remaining.length} pendientes con error`,
+            errorMessage: buildConfirmErrorMessage(linkedCount, lineErrors),
             ...(input.accountId ? { accountId: input.accountId } : {}),
           })
           .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
@@ -655,7 +656,7 @@ export async function confirmImport(input: {
           .update(imports)
           .set({
             status: 'reviewing',
-            errorMessage: `${remaining.length} líneas con error`,
+            errorMessage: buildConfirmErrorMessage(0, lineErrors),
             ...(input.accountId ? { accountId: input.accountId } : {}),
           })
           .where(and(eq(imports.id, input.importId), eq(imports.householdId, session.householdId)));
