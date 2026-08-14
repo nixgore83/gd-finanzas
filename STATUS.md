@@ -3,12 +3,88 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-07-22 por Claude
+**Última actualización:** 2026-08-14 por Claude
 
 ---
 
 ## Hito en curso
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-08-13/14 — Carga masiva desde Drive + alta de Banco Industrial (PRs #84, #85)
+
+Pedido de Nico: "se me está haciendo MUY cuesta arriba la carga de data, ¿puedo darte una carpeta
+y la importás?". Cargar los resúmenes de a uno por la UI era el cuello de botella del proyecto.
+
+**Auditoría previa (142 archivos en Drive vs 92 imports en prod):**
+- 69 hashes ya cargados, 50 no. **31 de los 50 eran de Pau: no había NADA de ella.**
+  Pasó desapercibido porque su Visa Galicia tenía `expects_monthly_import = false`, así que el
+  detector de gaps nunca la marcó como faltante. Corregido en prod.
+- **Los archivos `<CUIL>_*` no son de Galicia sino de Banco Industrial (BIND)** — verificado
+  leyendo los PDFs (`www.bind.com.ar`, `pagoslink.com.ar`, header "EMPLEADOS BI"). **Pau tiene dos
+  Visas de dos bancos distintos**, con cierres en fechas parecidas. Su resumen de cuentas BIND trae
+  8 líneas `Pago Haberes`: **el sueldo de Pau, que no estaba en la app.**
+- **El dedup por `file_hash` no alcanzaba.** Los 21 archivos de "Visa Pau" eran 7 resúmenes × ~3
+  copias re-descargadas con bytes distintos. Subir la carpeta cruda reintroducía los duplicados
+  que se limpiaron a mano en jun/jul.
+
+**Entregado:**
+- [x] `lib/imports/bulk-routing.ts` (puro, 32 tests): tabla de ruteo + **dedup por (cuenta, fecha
+  de cierre)**, la capa que faltaba. `accountNumberMatchesHint` resuelve dos convenciones distintas
+  (el hint `5727` del nombre de archivo vs el `0905/02100757/27` guardado; el sufijo `/3` de
+  sub-cuenta necesita match exacto — comparar dígitos matchearía la sub-cuenta equivocada).
+- [x] **Banco Industrial**: institución + 3 cuentas de Pau creadas en prod (Visa, caja ARS
+  `743449/3`, caja USD `743449/2`) + parsers `bind-tc` y `bind-banco`. **Sin migración**: la
+  sub-cuenta EUR está "SIN MOVIMIENTOS", así que no se tocó `currencyEnum`.
+- [x] **Bloque `CUENTA DESTINO`** en `parse-internal` (aditivo): un extracto consolidado no se puede
+  acotar a su cuenta sin decirle al parser cuál es. Verificado: el mismo PDF de BIND subido dos
+  veces dio 32 líneas para la sub-cuenta ARS y 3 para la USD, sin mezclarlas.
+- [x] `scripts/bulk-import.ts` (sube y parsea, **nunca confirma**) y `scripts/organize-statements.ts`
+  (deja la carpeta reflejando la realidad; no borra nada, exige `--apply`).
+- [x] **Carpeta de Drive reorganizada**: 58 archivos movidos, 142 intactos, 0 borrados, idempotente.
+  Nuevas carpetas `TC/Visa BIND Pau`, `TC/Visa Galicia Pau`, `Cuentas/Galicia Nico`,
+  `Cuentas/Galicia Pau`, `Cuentas/BIND Pau`. Las copias sobrantes viven en `_duplicados/`.
+- **Resultado: 41 imports / 1.696 líneas cargados, 0 en error, 0 con fechas colapsadas.**
+  Todo en `parsed`, esperando revisión humana. Suite 597 → 644.
+
+**4 bugs que sólo aparecieron corriéndolo de verdad, no en los tests:**
+1. **El ruteo no sobrevivía a la reorganización** — las reglas matcheaban sólo la carpeta original,
+   así que al mover los archivos quedaban 23 sin ruteo. La reorganización rompía lo que venía a
+   ordenar. Cubierto con test de regresión + test de idempotencia.
+2. **La moneda de los consolidados de Galicia no está en el nombre** — el mismo patrón se usa para
+   la caja en pesos y la de dólares (`02-01` es USD, `02-07` es ARS). Ahora se lee del encabezado
+   del PDF y, si no se puede leer, **no se adivina**: va a CONFLICTO. *Corolario: la sospecha de
+   mis-routing en datos ya cargados era INFUNDADA — los imports atados a la Galicia USD estaban
+   bien; lo que estaba mal era la regla nueva.*
+3. **`pdf-parse` dejaba los bytes detached** — pdf.js toma posesión del ArrayBuffer, así que tras
+   verificar el ruteo los mismos bytes ya no servían para subir.
+4. **`revalidatePath` volteaba un parseo ya persistido** fuera de una request de Next.
+
+**Y 2 bugs de fondo en el pipeline (PR #85), los dos disfrazados de otra cosa:**
+- **Truncamiento silencioso a 16k tokens.** `runParser` usaba `messages.create` con
+  `max_tokens: 16000`; cuatro extractos largos (395, 276, 247 y 181 líneas) partían el JSON a la
+  mitad y morían con `invalid_json` — un límite de tokens que se presentaba como error de parseo.
+  Fix: **streaming** (`messages.stream` + `finalMessage`) + `PARSE_MAX_OUTPUT_TOKENS = 64k`. El
+  orden importa: sin streaming el SDK aborta por timeout HTTP arriba de ~16k, así que el techo
+  viejo era el máximo seguro por ese camino. `stop_reason: 'max_tokens'` ahora **tira** con código
+  `truncated`. No encarece los parseos normales (se paga por token generado, no por el límite).
+- **PDFs rechazados por un byte.** Los extractos de la caja HSBC US traen un `0x0A` suelto en el
+  byte 0, así que `%PDF` arranca en el offset 1. mupdf y pdf-parse los abren igual, pero la API de
+  Anthropic exige el header en el byte 0 y responde "The PDF specified was not valid" sin mencionar
+  el offset. Nuevo `stripPdfPreamble()` (margen de 1024 bytes; si no encuentra el header, devuelve
+  los bytes intactos en vez de adivinar).
+
+**Pendientes de esta sesión:**
+- [ ] **Revisar y confirmar los 41 imports en `/imports`.** Nada se confirmó automáticamente.
+- [ ] Empezar por la Visa Galicia de Pau (verificada: 7 imports, uno por cierre, 0 duplicados).
+- [ ] **2 resúmenes de la Visa BIND** quedaron con todas sus líneas en una sola fecha (4 el 14/05,
+  2 el 31/05). Con <5 líneas el detector de colapso no se dispara; vale un vistazo.
+- [ ] **1 `POSIBLE_DUP` no subido**: `CAJA DE AHORRO 02-03-2026` choca con un import existente de
+  esa cuenta (`period_end 2026-03-06`). Decidir si es el mismo extracto.
+- [ ] **Master Galicia de Pau**: sigue sin esperar import mensual, porque no hay ni un resumen suyo
+  en la carpeta. Decidir si se usa o se archiva.
+- [ ] **No están en esta carpeta** (siguen desactualizados): extractos de brokers (Balanz ×2, Cocos,
+  ICBC broker — última data marzo/abril) y nada de agosto.
+- [ ] **Sync PRD Notion pendiente**: institución BIND + cuentas de Pau + regla de dedup por período.
 
 ### Sesión 2026-08-12 — El gate de transferencias: buscar match siempre, inventar contraparte casi nunca
 
