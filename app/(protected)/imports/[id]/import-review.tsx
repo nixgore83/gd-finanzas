@@ -1741,7 +1741,8 @@ function LineRowEditor({
           ) : (
             // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
             // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
-            <span className="text-muted-foreground">Contracuenta sin asignar</span>
+            // Ya no bloquea el confirm: la línea entra como pata sola sin parear.
+            <span className="text-muted-foreground">Sin contracuenta · queda sin parear</span>
           )
         ) : readOnly || line.transactionId || editing ? (
           categoryName ?? <span className="text-muted-foreground">—</span>
@@ -1989,6 +1990,16 @@ function LineRowEditor({
                 </Field>
               )}
             </div>
+            {/* Se puede dejar vacía: hay extractos que no dicen de qué cuenta propia
+                salió la plata (el ordenante es el propio titular). La línea se
+                confirma igual como pata sola. */}
+            {draft.isTransfer && !draft.transferAccountId && !transferMatch && (
+              <p className="max-w-xl text-xs text-muted-foreground">
+                Si no sabés de qué cuenta vino, dejala vacía: se crea solo la pata de
+                esta cuenta y queda <span className="font-medium">pendiente de parear</span>{' '}
+                (aparece en Pendientes). Cuando importes el otro extracto se parean solas.
+              </p>
+            )}
             {!draft.isTransfer && (
               <label className="flex max-w-xl items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
                 <input

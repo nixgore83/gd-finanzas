@@ -6,9 +6,68 @@ import {
   resignAmount,
   extractOperationRef,
   selectOperationRefTransferMatch,
+  planTransferConfirm,
   selectSameCurrencyTransferMatch,
   shouldSynthesizeCounterpartyLeg,
 } from './_build-transfer';
+
+describe('planTransferConfirm', () => {
+  const ARS = 'ARS' as const;
+  const CP = 'cuenta-contraparte';
+
+  it('parea cuando hay candidato, haya o no contracuenta asignada', () => {
+    expect(
+      planTransferConfirm({
+        counterpartyAccountId: CP,
+        matchedCandidateId: 'tx-1',
+        counterpartyCurrencyDefault: ARS,
+        lineCurrency: ARS,
+      }),
+    ).toEqual({ action: 'pair', matchedCandidateId: 'tx-1' });
+
+    expect(
+      planTransferConfirm({
+        counterpartyAccountId: null,
+        matchedCandidateId: 'tx-1',
+        counterpartyCurrencyDefault: null,
+        lineCurrency: ARS,
+      }),
+    ).toEqual({ action: 'pair', matchedCandidateId: 'tx-1' });
+  });
+
+  it('sin match y contraparte en la misma moneda → inventa la otra pata', () => {
+    expect(
+      planTransferConfirm({
+        counterpartyAccountId: CP,
+        matchedCandidateId: null,
+        counterpartyCurrencyDefault: ARS,
+        lineCurrency: ARS,
+      }),
+    ).toEqual({ action: 'synthesize', counterpartyAccountId: CP });
+  });
+
+  it('sin match y contraparte en otra moneda → solo la pata propia', () => {
+    expect(
+      planTransferConfirm({
+        counterpartyAccountId: CP,
+        matchedCandidateId: null,
+        counterpartyCurrencyDefault: 'USD',
+        lineCurrency: ARS,
+      }),
+    ).toEqual({ action: 'own_leg_only' });
+  });
+
+  it('sin contracuenta y sin match → pata propia sin parear, nunca sintética', () => {
+    expect(
+      planTransferConfirm({
+        counterpartyAccountId: null,
+        matchedCandidateId: null,
+        counterpartyCurrencyDefault: null,
+        lineCurrency: ARS,
+      }),
+    ).toEqual({ action: 'own_leg_only' });
+  });
+});
 
 describe('shouldSynthesizeCounterpartyLeg', () => {
   it('inventa la contraparte cuando opera en la moneda de la línea', () => {
