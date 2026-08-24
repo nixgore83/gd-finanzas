@@ -12,9 +12,9 @@ import {
   buildTransferFields,
   buildSingleTransferLeg,
   extractOperationRef,
+  planTransferConfirm,
   selectOperationRefTransferMatch,
   selectSameCurrencyTransferMatch,
-  shouldSynthesizeCounterpartyLeg,
 } from '@/app/actions/transactions/_build-transfer';
 import { MATCH_DATE_WINDOW_DAYS } from '@/lib/forecasts/candidates';
 import { getAutoMatchEnabled, tryAutoMatch } from '@/lib/forecasts/auto-match';
@@ -230,12 +230,12 @@ export async function confirmImport(input: {
         //  - sin candidato y la contraparte opera en otra → crear SOLO la pata
         //    propia sin parear: o llega el otro extracto y se parea sola, o se
         //    linkea a mano (compra de dólares: los montos difieren y no se matchea).
+        //  - SIN contracuenta asignada → la línea ya no se rechaza: se busca match
+        //    en todas las cuentas y, si no hay, queda la pata propia sin parear.
+        //    Es el caso del "CREDITO TRANSFERENCIA" cuyo ordenante es el propio
+        //    titular: el extracto no dice de qué cuenta salió.
         if (parsed.data.isTransfer) {
-          const transferAccountId = parsed.data.transferAccountId;
-          if (!transferAccountId) {
-            lineErrors.push({ lineId: line.id, reason: 'transfer sin cuenta contraparte' });
-            continue;
-          }
+          const transferAccountId = parsed.data.transferAccountId ?? null;
 
           const isOutgoing = parsed.data.kind === 'expense';
           const ownDirection: 'out' | 'in' = isOutgoing ? 'out' : 'in';
@@ -293,35 +293,38 @@ export async function confirmImport(input: {
           };
 
           // Moneda de la cuenta contraparte (same-ccy vs cross-ccy) + sus refs.
-          const [cpAcc] = await tx
-            .select({ currency: accounts.currencyDefault, transferRefs: accounts.transferRefs })
-            .from(accounts)
-            .where(
-              and(eq(accounts.householdId, session.householdId), eq(accounts.id, transferAccountId)),
-            )
-            .limit(1);
-          if (!cpAcc) {
-            lineErrors.push({ lineId: line.id, reason: 'cuenta contraparte inválida' });
-            continue;
-          }
-          // Solo decide si INVENTAMOS la pata de la contraparte cuando no hay
-          // candidato. Buscar candidato se intenta siempre (ver abajo).
-          const synthesizeCounterpartyLeg = shouldSynthesizeCounterpartyLeg(
-            cpAcc.currency,
-            parsed.data.currencyOriginal,
-          );
+          // Sin contracuenta no hay nada que mirar ni nada que aprender: la
+          // identidad de contraparte no apunta a ninguna cuenta elegida.
+          let counterpartyCurrency: 'ARS' | 'USD' | null = null;
+          if (transferAccountId) {
+            const [cpAcc] = await tx
+              .select({ currency: accounts.currencyDefault, transferRefs: accounts.transferRefs })
+              .from(accounts)
+              .where(
+                and(
+                  eq(accounts.householdId, session.householdId),
+                  eq(accounts.id, transferAccountId),
+                ),
+              )
+              .limit(1);
+            if (!cpAcc) {
+              lineErrors.push({ lineId: line.id, reason: 'cuenta contraparte inválida' });
+              continue;
+            }
+            counterpartyCurrency = cpAcc.currency;
 
-          // APRENDER: la contraparte (CBU/CUIT/alias) de esta línea refiere a la
-          // cuenta destino elegida → guardar sus refs para auto-resolver la cuenta
-          // en futuros imports (item 8 del backlog).
-          const newRefs = counterpartyBankRefs(parsed.data.counterparty);
-          if (newRefs.length > 0) {
-            const merged = [...new Set([...(cpAcc.transferRefs ?? []), ...newRefs])];
-            if (merged.length !== (cpAcc.transferRefs ?? []).length) {
-              await tx
-                .update(accounts)
-                .set({ transferRefs: merged })
-                .where(eq(accounts.id, transferAccountId));
+            // APRENDER: la contraparte (CBU/CUIT/alias) de esta línea refiere a la
+            // cuenta destino elegida → guardar sus refs para auto-resolver la cuenta
+            // en futuros imports (item 8 del backlog).
+            const newRefs = counterpartyBankRefs(parsed.data.counterparty);
+            if (newRefs.length > 0) {
+              const merged = [...new Set([...(cpAcc.transferRefs ?? []), ...newRefs])];
+              if (merged.length !== (cpAcc.transferRefs ?? []).length) {
+                await tx
+                  .update(accounts)
+                  .set({ transferRefs: merged })
+                  .where(eq(accounts.id, transferAccountId));
+              }
             }
           }
 
@@ -334,13 +337,20 @@ export async function confirmImport(input: {
           // La query trae patas-transfer sin parear de la contraparte en la ventana
           // de fechas; el filtro de dirección/monto y la decisión (1 solo match) es
           // lógica pura testeable (`selectSameCurrencyTransferMatch`).
+          // Sin contracuenta el alcance se abre a TODAS las cuentas del household
+          // salvo la del extracto (misma regla que usa la review para precargarla).
+          // Lo que evita un pareo equivocado no es la cuenta sino el resto del
+          // filtro: misma moneda, dirección opuesta, monto ±10%, fecha ±5 días y
+          // EXACTAMENTE un candidato.
           const candidates = await tx
             .select({ id: transactions.id, amountOriginal: transactions.amountOriginal })
             .from(transactions)
             .where(
               and(
                 eq(transactions.householdId, session.householdId),
-                eq(transactions.accountId, transferAccountId),
+                transferAccountId
+                  ? eq(transactions.accountId, transferAccountId)
+                  : ne(transactions.accountId, input.accountId),
                 eq(transactions.kind, 'transfer'),
                 isNull(transactions.transferPairId),
                 // Una misma cuenta puede tener patas en ambas monedas (TC
@@ -391,7 +401,14 @@ export async function confirmImport(input: {
             }
           }
 
-          if (matchedCandidateId) {
+          const plan = planTransferConfirm({
+            counterpartyAccountId: transferAccountId,
+            matchedCandidateId,
+            counterpartyCurrencyDefault: counterpartyCurrency,
+            lineCurrency: parsed.data.currencyOriginal,
+          });
+
+          if (plan.action === 'pair') {
             // PAREAR: solo pata propia + setear el pair id compartido en el candidato.
             const pairId = randomUUID();
             const ownId = await insertOwnLeg(pairId);
@@ -401,7 +418,7 @@ export async function confirmImport(input: {
               .set({ transferPairId: pairId })
               .where(
                 and(
-                  eq(transactions.id, matchedCandidateId),
+                  eq(transactions.id, plan.matchedCandidateId),
                   eq(transactions.householdId, session.householdId),
                 ),
               );
@@ -409,10 +426,10 @@ export async function confirmImport(input: {
             continue;
           }
 
-          if (synthesizeCounterpartyLeg) {
+          if (plan.action === 'synthesize') {
             // Sin match y misma moneda → crear ambas patas (el otro lado no se importa).
-            const accountFromId = isOutgoing ? input.accountId : transferAccountId;
-            const accountToId = isOutgoing ? transferAccountId : input.accountId;
+            const accountFromId = isOutgoing ? input.accountId : plan.counterpartyAccountId;
+            const accountToId = isOutgoing ? plan.counterpartyAccountId : input.accountId;
             const transferResult = await buildTransferFields(
               {
                 date: parsed.data.date,
@@ -478,9 +495,10 @@ export async function confirmImport(input: {
             continue;
           }
 
-          // La contraparte opera en otra moneda y no hubo match → solo pata propia,
-          // sin parear. Se parea cuando se importe el otro extracto (pago de TC en
-          // USD) o a mano si nunca llega (compra de dólares).
+          // Sin match y sin poder sintetizar (la contraparte opera en otra moneda,
+          // o directamente no hay contracuenta asignada) → solo pata propia, sin
+          // parear. Se parea cuando se importe el otro extracto (pago de TC en USD,
+          // transferencia de la que solo tenemos un lado) o a mano si nunca llega.
           const ownId = await insertOwnLeg(null);
           if (!ownId) continue;
           createdCount += 1;

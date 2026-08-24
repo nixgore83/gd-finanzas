@@ -73,6 +73,26 @@ export function counterpartyBankRefs(cp: Counterparty | null | undefined): strin
 }
 
 /**
+ * ¿La contraparte de la línea refiere a la CUENTA DEL PROPIO EXTRACTO?
+ *
+ * Pasa cuando el ordenante/beneficiario del movimiento es el titular mismo: el
+ * banco imprime su CUIL/CBU y nada del otro banco, así que un "CREDITO
+ * TRANSFERENCIA" no dice de qué cuenta propia salió la plata. La sugerencia de
+ * contracuenta descarta ese match — correctamente, una cuenta no es contraparte
+ * de sí misma — pero sin decirlo, y el campo queda mudo. Esto permite que la
+ * review lo explique en vez de parecer un dato faltante.
+ */
+export function counterpartyIsStatementAccount(
+  cp: Counterparty | null | undefined,
+  statementAccount: { transferRefs: string[] | null } | null | undefined,
+): boolean {
+  if (!statementAccount) return false;
+  const cpRefs = new Set(counterpartyBankRefs(cp));
+  if (cpRefs.size === 0) return false;
+  return (statementAccount.transferRefs ?? []).some((r) => cpRefs.has(normalizeBankRef(r)));
+}
+
+/**
  * Resuelve a qué cuenta PROPIA refiere una contraparte, comparando sus refs
  * (CBU/CUIT/alias/nro) contra `accounts.transfer_refs` aprendidas. Devuelve el
  * id solo si matchea EXACTAMENTE una cuenta (ambigüedad ⇒ null, queda manual).

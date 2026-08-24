@@ -125,6 +125,49 @@ export function shouldSynthesizeCounterpartyLeg(
   return counterpartyCurrencyDefault === lineCurrency;
 }
 
+/** Qué hace el confirm con una línea marcada como transferencia. */
+export type TransferConfirmPlan =
+  /** Hay una pata libre que matchea: se crea solo la propia y se parean. */
+  | { action: 'pair'; matchedCandidateId: string }
+  /** Sin match y la contraparte opera en la moneda: se crean las dos patas. */
+  | { action: 'synthesize'; counterpartyAccountId: string }
+  /** Solo la pata propia, `transfer_pair_id = null`, pendiente de parear. */
+  | { action: 'own_leg_only' };
+
+/**
+ * Tabla de decisión del branch transfer del confirm, en un solo lugar testeable.
+ *
+ * El caso nuevo es `counterpartyAccountId === null`: una línea que SÍ es
+ * transferencia entre cuentas propias pero cuyo extracto no dice de dónde vino
+ * (un "CREDITO TRANSFERENCIA" cuyo ordenante es el propio titular). Antes eso
+ * era un error y la línea no se podía confirmar. Ahora se resuelve como
+ * cualquier otra: si hay una pata libre que matchea se parea, y si no, queda la
+ * pata propia sin parear — un estado que el modelo ya soporta y que aparece en
+ * Pendientes hasta que llegue el otro extracto o se linkee a mano.
+ *
+ * Sin contracuenta NUNCA se sintetiza la otra pata: no hay a qué cuenta
+ * imputarla, e inventar una sería peor que dejarla pendiente.
+ */
+export function planTransferConfirm(input: {
+  counterpartyAccountId: string | null;
+  matchedCandidateId: string | null;
+  /** `currency_default` de la contraparte; null si no hay contracuenta. */
+  counterpartyCurrencyDefault: 'ARS' | 'USD' | null;
+  lineCurrency: 'ARS' | 'USD';
+}): TransferConfirmPlan {
+  if (input.matchedCandidateId) {
+    return { action: 'pair', matchedCandidateId: input.matchedCandidateId };
+  }
+  if (
+    input.counterpartyAccountId &&
+    input.counterpartyCurrencyDefault &&
+    shouldSynthesizeCounterpartyLeg(input.counterpartyCurrencyDefault, input.lineCurrency)
+  ) {
+    return { action: 'synthesize', counterpartyAccountId: input.counterpartyAccountId };
+  }
+  return { action: 'own_leg_only' };
+}
+
 /**
  * Nro de operación bancaria embebido en el concepto, si lo hay. ICBC imprime la
  * MISMA referencia en las dos patas de un traspaso entre cuentas propias
