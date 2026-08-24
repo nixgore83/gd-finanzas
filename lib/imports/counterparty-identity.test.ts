@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   counterpartyBankRefs,
   counterpartyHasIdentity,
+  counterpartyIsStatementAccount,
   matchAccountByRefs,
   normalizeBankRef,
   normalizeCounterpartyName,
@@ -112,5 +113,34 @@ describe('counterpartyBankRefs / matchAccountByRefs', () => {
 
   it('sin match → null', () => {
     expect(matchAccountByRefs({ cuil: '27-99999999-9' }, accounts)).toBeNull();
+  });
+});
+
+describe('counterpartyIsStatementAccount', () => {
+  // Caso real: "CREDITO TRANSFERENCIA" en el extracto de la caja de ahorro, con
+  // el CUIL del propio titular como ordenante. No hay contracuenta que asignar.
+  const statement = { transferRefs: ['20305551067', '0070999030004012345678'] };
+
+  it('reconoce que el ordenante es la cuenta del propio extracto', () => {
+    expect(
+      counterpartyIsStatementAccount({ name: 'GORE NICOLAS MARIO', cuil: '20305551067' }, statement),
+    ).toBe(true);
+  });
+
+  it('normaliza igual que el resto: el CUIT con guiones también matchea', () => {
+    expect(counterpartyIsStatementAccount({ cuil: '20-30555106-7' }, statement)).toBe(true);
+  });
+
+  it('una contraparte de verdad no matchea', () => {
+    expect(counterpartyIsStatementAccount({ cuil: '27-99999999-9' }, statement)).toBe(false);
+  });
+
+  it('sin refs usables (solo nombre) o sin cuenta → false', () => {
+    expect(counterpartyIsStatementAccount({ name: 'GORE NICOLAS MARIO' }, statement)).toBe(false);
+    expect(counterpartyIsStatementAccount({ cuil: '20305551067' }, null)).toBe(false);
+    expect(counterpartyIsStatementAccount({ cuil: '20305551067' }, { transferRefs: null })).toBe(
+      false,
+    );
+    expect(counterpartyIsStatementAccount(null, statement)).toBe(false);
   });
 });

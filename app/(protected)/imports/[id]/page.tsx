@@ -173,6 +173,9 @@ export default async function ImportDetailPage({
       institutionName: institutions.name,
       ownerTag: accounts.ownerTag,
       accountNumber: accounts.accountNumber,
+      // Refs aprendidas (CBU/CUIL/alias). La review las usa para reconocer las
+      // líneas cuya contraparte es la cuenta del propio extracto.
+      transferRefs: accounts.transferRefs,
     })
     .from(accounts)
     .leftJoin(institutions, eq(accounts.institutionId, institutions.id))

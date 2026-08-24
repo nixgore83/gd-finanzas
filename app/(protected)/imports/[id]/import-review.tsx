@@ -24,7 +24,10 @@ import { DATE_COLLAPSE_LINE_MARKER } from '@/lib/imports/date-collapse';
 import type { CategoryNode } from '@/lib/categories/tree';
 import type { ParsedTxLine } from '@/lib/imports/parsers/types';
 import { CounterpartyTag } from '@/components/transactions/counterparty-tag';
-import { sameCounterpartyIdentity } from '@/lib/imports/counterparty-identity';
+import {
+  counterpartyIsStatementAccount,
+  sameCounterpartyIdentity,
+} from '@/lib/imports/counterparty-identity';
 import { mergeCounterpartyLabels } from '@/lib/imports/counterparty-labels';
 import {
   bulkTransferAccountSelection,
@@ -78,7 +81,7 @@ type Props = {
   tags: TagOption[];
   /** Etiquetas de contraparte ya usadas en transacciones del household. */
   knownCounterpartyLabels: string[];
-  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null }>;
+  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null; transferRefs: string[] | null }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
   /** Nº de cuenta propia del extracto extraído por el parser (encabezado). */
@@ -1477,7 +1480,7 @@ function LineRowEditor({
   importId: string;
   tree: CategoryNode[];
   tags: TagOption[];
-  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string }>;
+  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; transferRefs: string[] | null }>;
   currentAccountId: string;
   readOnly: boolean;
   isPending: boolean;
@@ -1626,6 +1629,13 @@ function LineRowEditor({
 
   const colCount = readOnly ? 7 : 9;
   const counterpart = accounts.find((a) => a.id === line.parsedData.transferAccountId);
+  // La identidad de contraparte apunta a la cuenta del propio extracto: el
+  // ordenante es el titular y el banco no dice de qué cuenta salió la plata.
+  // No es un dato faltante — no hay contracuenta que asignar.
+  const counterpartyIsSelf = counterpartyIsStatementAccount(
+    line.parsedData.counterparty,
+    accounts.find((a) => a.id === currentAccountId),
+  );
 
   return (
     <>
@@ -1742,7 +1752,15 @@ function LineRowEditor({
             // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
             // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
             // Ya no bloquea el confirm: la línea entra como pata sola sin parear.
-            <span className="text-muted-foreground">Sin contracuenta · queda sin parear</span>
+            <span className="text-muted-foreground">
+              {counterpartyIsSelf ? (
+                <span title="El ordenante del movimiento sos vos mismo: el extracto no dice de qué cuenta propia salió. No hay contracuenta que asignar.">
+                  Ordenante = vos mismo · sin dato de origen
+                </span>
+              ) : (
+                'Sin contracuenta · queda sin parear'
+              )}
+            </span>
           )
         ) : readOnly || line.transactionId || editing ? (
           categoryName ?? <span className="text-muted-foreground">—</span>
@@ -1995,9 +2013,18 @@ function LineRowEditor({
                 confirma igual como pata sola. */}
             {draft.isTransfer && !draft.transferAccountId && !transferMatch && (
               <p className="max-w-xl text-xs text-muted-foreground">
-                Si no sabés de qué cuenta vino, dejala vacía: se crea solo la pata de
-                esta cuenta y queda <span className="font-medium">pendiente de parear</span>{' '}
-                (aparece en Pendientes). Cuando importes el otro extracto se parean solas.
+                {counterpartyIsSelf ? (
+                  <>
+                    El <span className="font-medium">ordenante sos vos mismo</span> — el
+                    extracto solo trae tu CUIL/CBU y no dice de qué cuenta propia salió.
+                    Dejala vacía:{' '}
+                  </>
+                ) : (
+                  <>Si no sabés de qué cuenta vino, dejala vacía: </>
+                )}
+                se crea solo la pata de esta cuenta y queda{' '}
+                <span className="font-medium">pendiente de parear</span> (aparece en
+                Pendientes). Cuando importes el otro extracto se parean solas.
               </p>
             )}
             {!draft.isTransfer && (
