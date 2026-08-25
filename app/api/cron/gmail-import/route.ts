@@ -12,7 +12,12 @@ import {
 } from '@/lib/gmail/client';
 import { createImportInternal } from '@/lib/imports/create-internal';
 import { parseImportInternal } from '@/lib/imports/parse-internal';
-import { routeAttachment, type RoutableAccount } from '@/lib/gmail/attachment-router';
+import {
+  routeAttachment,
+  accountNumberSuffix,
+  filenameSuffix,
+  type RoutableAccount,
+} from '@/lib/gmail/attachment-router';
 import { decryptPdfPassword } from '@/lib/crypto/pdf-password';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +38,7 @@ type WatchedAccount = {
   currencyDefault: string;
   institutionId: string | null;
   gmailLabelId: string | null;
+  accountNumber: string | null;
   pdfPassword: string | null;
 };
 
@@ -87,6 +93,7 @@ export async function GET(request: Request) {
       currencyDefault: accounts.currencyDefault,
       institutionId: accounts.institutionId,
       gmailLabelId: accounts.gmailLabelId,
+      accountNumber: accounts.accountNumber,
       pdfPassword: accounts.pdfPassword,
     })
     .from(accounts)
@@ -96,15 +103,23 @@ export async function GET(request: Request) {
         eq(accounts.archived, false),
         isNotNull(accounts.gmailLabelId),
       ),
-    );
+    )
+    // Orden determinístico: sin esto "la primera cuenta del grupo" (el fallback
+    // de los adjuntos que no rutean) queda a criterio de Postgres.
+    .orderBy(accounts.id);
 
   if (watchedAccounts.length === 0) {
     return NextResponse.json({ ok: true, skipped: 'no_gmail_accounts', accounts: 0 });
   }
 
   let processedLabelId: string;
+  let unroutedLabelId: string;
   try {
     processedLabelId = await findOrCreateLabel('gd-procesados');
+    // Los adjuntos que no se pudieron rutear NO van a gd-procesados: van acá,
+    // donde quedan visibles. Antes se archivaban como si se hubieran importado
+    // y el faltante era invisible.
+    unroutedLabelId = await findOrCreateLabel('gd-sin-rutear');
   } catch (err) {
     if (err instanceof GmailConfigError) {
       return NextResponse.json({ ok: true, skipped: 'gmail_not_configured' });
@@ -113,7 +128,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: 'label_setup_failed' }, { status: 502 });
   }
 
-  const stats = { processed: 0, skipped: 0, errors: 0, accounts: watchedAccounts.length };
+  const stats = {
+    processed: 0,
+    skipped: 0,
+    unrouted: 0,
+    errors: 0,
+    accounts: watchedAccounts.length,
+  };
   const byLabel = groupByLabel(watchedAccounts);
 
   for (const [labelId, accountGroup] of byLabel) {
@@ -130,18 +151,18 @@ export async function GET(request: Request) {
             continue;
           }
 
-          let anyCreated = false;
+          let anyHandled = false;
 
           if (accountGroup.length === 1) {
             // ── Single-account label: existing behavior ──
             const acc = accountGroup[0]!;
-            if (!acc.institutionId) continue;
-
-            for (const att of attachments) {
-              const result = await createAndParse(
-                att.filename, att.data, acc, householdId, userId, stats,
-              );
-              if (result) anyCreated = true;
+            if (acc.institutionId) {
+              for (const att of attachments) {
+                const result = await createAndParse(
+                  att.filename, att.data, acc, householdId, userId, stats,
+                );
+                if (result) anyHandled = true;
+              }
             }
           } else {
             // ── Multi-account label: route each attachment by content ──
@@ -166,6 +187,7 @@ export async function GET(request: Request) {
                   cardBrand: a.cardBrand,
                   currencyDefault: a.currencyDefault as RoutableAccount['currencyDefault'],
                   institutionId: a.institutionId,
+                  accountNumber: a.accountNumber,
                   pdfPassword,
                 };
               });
@@ -182,23 +204,37 @@ export async function GET(request: Request) {
 
                 const acc = accountGroup.find((a) => a.id === routeResult.account.id)!;
                 const result = await createAndParse(
-                  att.filename, routeResult.decryptedBytes, acc, householdId, userId, stats,
+                  att.filename, routeResult.bytes, acc, householdId, userId, stats,
                 );
-                if (result) anyCreated = true;
+                if (result) anyHandled = true;
               } else {
-                // CSV: fall back to first account in group
-                const acc = accountGroup[0]!;
-                if (!acc.institutionId) continue;
+                // CSV: se rutea por el sufijo del filename igual que los PDF. Sin
+                // sufijo no adivinamos: mandar el CSV a "la primera cuenta del
+                // grupo" metía movimientos en la cuenta equivocada.
+                const suffix = filenameSuffix(att.filename);
+                const acc = suffix
+                  ? accountGroup.find((a) => accountNumberSuffix(a.accountNumber) === suffix)
+                  : undefined;
+                if (!acc?.institutionId) {
+                  stats.skipped++;
+                  continue;
+                }
                 const result = await createAndParse(
                   att.filename, att.data, acc, householdId, userId, stats,
                 );
-                if (result) anyCreated = true;
+                if (result) anyHandled = true;
               }
             }
           }
 
-          if (anyCreated || attachments.length > 0) {
+          // Solo se archiva como procesado lo que EFECTIVAMENTE generó un import.
+          // Lo demás va a gd-sin-rutear: sale del label de entrada (no se
+          // reintenta en loop) pero queda visible en vez de desaparecer.
+          if (anyHandled) {
             await moveToProcessed(msgId, labelId, processedLabelId);
+          } else {
+            await moveToProcessed(msgId, labelId, unroutedLabelId);
+            stats.unrouted++;
           }
         } catch {
           console.error('[cron/gmail-import] message processing failed', {
@@ -218,7 +254,12 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, ...stats });
 }
 
-/** Create import + auto-parse. Returns true if an import was created. */
+/**
+ * Create import + auto-parse. Devuelve `true` si el adjunto quedó **atendido**:
+ * se creó el import, o ya existía (duplicado). `false` solo si no se pudo crear.
+ * Un duplicado cuenta como atendido a propósito: el mail ya dio su fruto y tiene
+ * que archivarse en gd-procesados, no quedar marcado como sin rutear.
+ */
 async function createAndParse(
   filename: string,
   bytes: Uint8Array,
@@ -245,6 +286,7 @@ async function createAndParse(
   if (!createResult.ok) {
     if (createResult.error === 'duplicate') {
       stats.skipped++;
+      return true;
     } else {
       console.error('[cron/gmail-import] create failed', {
         account: acc.name,
