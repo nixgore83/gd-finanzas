@@ -45,10 +45,10 @@ ESTRUCTURA DEL PDF DE MERCADO PAGO:
 1. **Encabezado**: "Este es tu resumen de [mes]", "Total a pagar", "Fecha de cierre [D de mes]", "Fecha de vencimiento".
 2. **Consolidado**: tabla resumen con "Saldo del periodo anterior", "Consumos", "Impuestos e intereses", "Pagos anticipados", "Ajustes y reembolsos", "Total a pagar".
 3. **DETALLE DE MOVIMIENTOS**, con estas secciones:
-   - "Composición del saldo del periodo anterior": trae "Total a pagar del periodo anterior" y "Débito automático de tarjeta" → IGNORAR LA SECCIÓN ENTERA. No son consumos de este resumen; incluirlos duplica el mes anterior y mete el pago de la tarjeta como gasto.
+   - Saldo del mes anterior — MP le cambió el título con el tiempo: "Composición del saldo del periodo anterior" en los resúmenes nuevos, "Resumen de [mes anterior]" en los viejos. Trae filas como "Total a pagar del periodo anterior" o "Resumen de febrero" → IGNORAR LA SECCIÓN ENTERA. No son consumos de este resumen; incluirlos duplica el mes anterior.
+   - Pagos a la tarjeta — también cambió de título: "Pagos anticipados" o "Pagos realizados". Filas como "Débito automático de tarjeta" o "Pago de tarjeta", siempre en negativo → IGNORAR LA SECCIÓN ENTERA. Es el pago de la tarjeta, no un consumo.
    - "Consumos" (subsecciones tipo "Con tarjeta virtual"): columnas Fecha | Descripción | Cuota | Operación | Pesos | Dólares. ESTAS SON LAS TRANSACCIONES PRINCIPALES.
-   - "Impuestos e intereses" (ej. "Impuesto al sello Buenos Aires") → INCLUIR como expense.
-   - "Pagos anticipados" → IGNORAR (son pagos a la tarjeta, no consumos).
+   - "Impuestos e intereses" (ej. "Impuesto al sello", "Intereses de financiación", "Intereses punitorios") → INCLUIR como expense, cada uno con SU fecha impresa (pueden caer un día después del cierre).
    - "Ajustes y reembolsos" (ej. "Reembolso de COMERCIO") → INCLUIR como income.
 
 CUOTAS — CÓMO VIENEN EN ESTE RESUMEN:
@@ -68,7 +68,7 @@ REGLAS ESTRICTAS:
 - Devolvé ÚNICAMENTE el objeto JSON. Sin markdown fences, sin comentarios, sin texto fuera del JSON.
 - NUNCA incluyas números completos de tarjeta (PAN), CBU, alias, claves, ni datos personales sensibles.
 - Cada línea representa UNA transacción individual.
-- IGNORÁ: la sección "Composición del saldo del periodo anterior", los "Pagos anticipados", subtotales, totales de cierre y mínimos a pagar.
+- IGNORÁ: la sección del saldo anterior ("Composición del saldo del periodo anterior" / "Resumen de [mes]"), la de pagos a la tarjeta ("Pagos anticipados" / "Pagos realizados"), subtotales, totales de cierre y mínimos a pagar.
 - SÍ INCLUÍ: cada consumo individual, cada impuesto/interés individual, cada ajuste/reembolso individual.
 - Cuotas: registrá UNA línea con el monto de la cuota que aparece en ESTE resumen (no el total de la compra).
 - Montos negativos o créditos → kind: "income", monto positivo.

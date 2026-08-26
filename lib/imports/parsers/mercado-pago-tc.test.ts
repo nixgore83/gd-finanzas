@@ -37,8 +37,15 @@ describe('prompt de mercado-pago-tc', () => {
     expect(p).toContain('C.05/06');
   });
 
-  it('ignora la composición del saldo anterior (mes anterior + pago de la tarjeta)', () => {
+  it('ignora el saldo anterior y el pago de la tarjeta, con los DOS títulos que usa MP', () => {
+    // MP renombró las secciones con el tiempo: los resúmenes de ene–mar 2026 dicen
+    // "Resumen de [mes]" / "Pagos realizados"; los de abr–jul, "Composición del
+    // saldo del periodo anterior" / "Pagos anticipados". Nombrar sólo un juego deja
+    // al modelo sin ancla en la mitad de los archivos.
     expect(p).toContain('Composición del saldo del periodo anterior');
+    expect(p).toContain('Resumen de [mes anterior]');
+    expect(p).toContain('Pagos anticipados');
+    expect(p).toContain('Pagos realizados');
     expect(p).toContain('IGNORAR LA SECCIÓN ENTERA');
   });
 
