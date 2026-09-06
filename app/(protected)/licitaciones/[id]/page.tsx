@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db/client';
 import { licitacionesJobs } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { isLicitacionStale } from '@/lib/licitaciones/stale';
+import { esResultadoParcial } from '@/lib/schemas/licitaciones';
 import { JobStatus } from './job-status';
 
 export const metadata = { title: 'Licitación · gd-finanzas' };
@@ -41,6 +42,8 @@ export default async function LicitacionDetailPage({
       id: licitacionesJobs.id,
       status: licitacionesJobs.status,
       pdfCount: licitacionesJobs.pdfCount,
+      pdfsOk: licitacionesJobs.pdfsOk,
+      pdfErrors: licitacionesJobs.pdfErrors,
       modelo: licitacionesJobs.modelo,
       lunesOverride: licitacionesJobs.lunesOverride,
       errorMessage: licitacionesJobs.errorMessage,
@@ -55,6 +58,7 @@ export default async function LicitacionDetailPage({
   if (!job) notFound();
 
   const stale = isLicitacionStale(job.processingStartedAt, new Date());
+  const parcial = esResultadoParcial(job.pdfCount, job.pdfsOk);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -72,7 +76,9 @@ export default async function LicitacionDetailPage({
         </div>
         <div>
           <dt className="text-muted-foreground">PDFs</dt>
-          <dd className="font-medium">{job.pdfCount}</dd>
+          <dd className={`font-medium ${parcial ? 'text-amber-700' : ''}`}>
+            {parcial ? `${job.pdfsOk} de ${job.pdfCount} procesados` : job.pdfCount}
+          </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Lunes objetivo</dt>
@@ -99,7 +105,14 @@ export default async function LicitacionDetailPage({
         </div>
       )}
 
-      <JobStatus jobId={job.id} status={job.status} stale={stale} />
+      <JobStatus
+        jobId={job.id}
+        status={job.status}
+        stale={stale}
+        pdfCount={job.pdfCount}
+        pdfsOk={job.pdfsOk}
+        pdfErrors={job.pdfErrors}
+      />
     </div>
   );
 }

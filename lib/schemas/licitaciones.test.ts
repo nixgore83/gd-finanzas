@@ -1,5 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { parseLunesOverride, isPdfFilename, lunesOverrideSchema } from './licitaciones';
+import {
+  parseLunesOverride,
+  isPdfFilename,
+  lunesOverrideSchema,
+  esResultadoParcial,
+} from './licitaciones';
+
+describe('esResultadoParcial', () => {
+  it('true cuando se procesaron menos de los que se subieron', () => {
+    expect(esResultadoParcial(5, 3)).toBe(true);
+  });
+
+  it('false cuando salieron todos', () => {
+    expect(esResultadoParcial(5, 5)).toBe(false);
+  });
+
+  it('true incluso si no salió ninguno (caso borde, el job igual sería error)', () => {
+    expect(esResultadoParcial(5, 0)).toBe(true);
+  });
+
+  it('null/undefined = no informado (job viejo): no avisa nada', () => {
+    expect(esResultadoParcial(5, null)).toBe(false);
+    expect(esResultadoParcial(5, undefined)).toBe(false);
+  });
+});
 
 describe('parseLunesOverride', () => {
   it('acepta una fecha válida YYYY-MM-DD', () => {

@@ -9,6 +9,18 @@ export const DEFAULT_LICITACIONES_MODEL = 'claude-sonnet-4-5';
  *  subida directa con signed URLs). */
 export const LICITACIONES_BUCKET_NAME = 'licitaciones';
 
+/**
+ * `true` si la tanda se cerró con menos PDFs procesados de los que se subieron.
+ * El micro no aborta cuando un PDF rompe: devuelve el Excel con el resto. Un job
+ * así NO es un éxito limpio y la UI tiene que decirlo.
+ *
+ * `pdfsOk` null = job anterior a que persistiéramos el detalle: "no informado"
+ * (≠ 0), así que no inventamos un aviso.
+ */
+export function esResultadoParcial(pdfCount: number, pdfsOk: number | null | undefined): boolean {
+  return typeof pdfsOk === 'number' && pdfsOk < pdfCount;
+}
+
 /** Máximo de PDFs por job (un set semanal típico es < 20). */
 export const MAX_LICITACIONES_PDF_COUNT = 20;
 

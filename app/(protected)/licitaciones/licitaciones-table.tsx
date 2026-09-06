@@ -1,10 +1,13 @@
 import Link from 'next/link';
+import { esResultadoParcial } from '@/lib/schemas/licitaciones';
 import { DownloadButton } from './[id]/download-button';
 
 export type LicitacionRow = {
   id: string;
   status: 'uploaded' | 'processing' | 'done' | 'error';
   pdfCount: number;
+  /** Cuántos PDFs pudo procesar el micro. Null = job viejo, sin el dato. */
+  pdfsOk: number | null;
   lunesOverride: string | null;
   createdAt: string; // ISO
   hasOutput: boolean;
@@ -44,26 +47,35 @@ export function LicitacionesTable({ rows }: { rows: LicitacionRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-b last:border-0 hover:bg-accent/30">
-              <td className="px-3 py-2 whitespace-nowrap">{formatDate(r.createdAt)}</td>
-              <td className="px-3 py-2">{r.pdfCount}</td>
-              <td className="px-3 py-2 whitespace-nowrap">{r.lunesOverride ?? '—'}</td>
-              <td className={`px-3 py-2 font-medium ${STATUS_CLASSES[r.status]}`}>
-                {STATUS_LABELS[r.status]}
-              </td>
-              <td className="px-3 py-2">
-                <div className="flex items-center justify-end gap-3">
-                  {r.status === 'done' && r.hasOutput && (
-                    <DownloadButton jobId={r.id} size="sm" />
-                  )}
-                  <Link href={`/licitaciones/${r.id}`} className="text-primary hover:underline">
-                    Ver
-                  </Link>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            // Una tanda parcial no se muestra como "Listo" en verde: el Excel
+            // existe, pero le faltan instrumentos.
+            const parcial = esResultadoParcial(r.pdfCount, r.pdfsOk);
+            return (
+              <tr key={r.id} className="border-b last:border-0 hover:bg-accent/30">
+                <td className="px-3 py-2 whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                <td className="px-3 py-2">
+                  {parcial ? `${r.pdfsOk} / ${r.pdfCount}` : r.pdfCount}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">{r.lunesOverride ?? '—'}</td>
+                <td
+                  className={`px-3 py-2 font-medium ${parcial ? 'text-amber-700' : STATUS_CLASSES[r.status]}`}
+                >
+                  {parcial ? 'Listo (parcial)' : STATUS_LABELS[r.status]}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-3">
+                    {r.status === 'done' && r.hasOutput && (
+                      <DownloadButton jobId={r.id} size="sm" />
+                    )}
+                    <Link href={`/licitaciones/${r.id}`} className="text-primary hover:underline">
+                      Ver
+                    </Link>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
