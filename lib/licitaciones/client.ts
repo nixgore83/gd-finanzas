@@ -1,5 +1,6 @@
 import { getLicitacionesServiceEnv } from '@/lib/env';
 import { DEFAULT_LICITACIONES_MODEL } from '@/lib/schemas/licitaciones';
+import type { LicitacionPdfError } from '@/db/schema/licitaciones';
 
 /**
  * Timeout de la llamada al microservicio, por debajo de la maxDuration de la ruta
@@ -22,8 +23,46 @@ export type ProcesarInput = {
 };
 
 export type ProcesarResult =
-  | { ok: true; xlsx: Uint8Array; model: string }
+  | {
+      ok: true;
+      xlsx: Uint8Array;
+      model: string;
+      /** PDFs que le mandamos al micro (lo confirma él en `X-Pdfs-Recibidos`). */
+      recibidos: number;
+      /** Cuántos pudo procesar. Puede ser < `recibidos`: el Excel sale parcial. */
+      pdfsOk: number;
+      /** Detalle de los que no pudo, con el motivo (viene de `X-Warnings`). */
+      fallidos: LicitacionPdfError[];
+    }
   | { ok: false; error: string; code: 'not_configured' | 'http_error' | 'timeout' | 'network' };
+
+/**
+ * Parsea el header `X-Warnings` del micro: `input_0.pdf: motivo; input_1.pdf: motivo`.
+ *
+ * El separador `"; "` también puede aparecer dentro de un motivo (los mensajes
+ * de la API de Anthropic lo usan), así que cortamos sólo donde arranca el nombre
+ * del PDF siguiente. Si el formato no matchea, devolvemos el texto entero como
+ * un warning suelto en vez de tirarlo: perder el detalle es justo el bug que
+ * estamos arreglando.
+ */
+export function parseWarningsHeader(raw: string | null | undefined): LicitacionPdfError[] {
+  const texto = raw?.trim();
+  if (!texto) return [];
+  return texto.split(/;\s+(?=input_\d+\.pdf:)/).flatMap((parte) => {
+    const limpio = parte.trim();
+    if (!limpio) return [];
+    const m = /^(input_\d+\.pdf):\s*(.*)$/.exec(limpio);
+    if (!m) return [{ pdf: 'desconocido', error: limpio }];
+    return [{ pdf: m[1]!, error: m[2]!.trim() || 'sin detalle' }];
+  });
+}
+
+/** Lee un header numérico del micro. `null` si falta o no es un entero >= 0. */
+function parseCountHeader(raw: string | null): number | null {
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
 
 /**
  * Traduce un status HTTP de error a un mensaje entendible para Pau, cuando la
@@ -107,6 +146,18 @@ export async function procesarLicitaciones(input: ProcesarInput): Promise<Proces
   }
 
   const model = res.headers.get('x-model-used') || DEFAULT_LICITACIONES_MODEL;
+
+  // Un 200 puede ser PARCIAL: si un PDF rompe, el micro procesa el resto y lo
+  // informa en los headers. Fallback a "todos OK" si no vienen (micro viejo),
+  // que es el comportamiento que asumíamos antes de que existieran.
+  const recibidos = parseCountHeader(res.headers.get('x-pdfs-recibidos')) ?? input.pdfUrls.length;
+  const pdfsOk = parseCountHeader(res.headers.get('x-pdfs-ok')) ?? recibidos;
+  const fallidos = parseWarningsHeader(res.headers.get('x-warnings'));
+  if (pdfsOk < recibidos) {
+    // Sin URLs ni nombres de archivo del usuario: sólo el conteo.
+    console.warn('[licitaciones] tanda parcial', { recibidos, pdfsOk });
+  }
+
   const buf = await res.arrayBuffer();
-  return { ok: true, xlsx: new Uint8Array(buf), model };
+  return { ok: true, xlsx: new Uint8Array(buf), model, recibidos, pdfsOk, fallidos };
 }

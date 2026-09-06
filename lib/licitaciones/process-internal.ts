@@ -88,12 +88,26 @@ export async function processLicitacionesJobInternal(
   }
 
   // 4. Cerrar el job como completado.
+  //    Ojo: "completado" puede ser PARCIAL. Un PDF que rompe no aborta la tanda
+  //    (el Excel con el resto le sirve igual a Pau), pero persistimos cuántos
+  //    entraron, cuántos salieron y por qué falló cada uno, para que la UI no lo
+  //    presente como un éxito limpio. Antes esos PDFs se perdían en silencio.
+  if (result.pdfsOk < result.recibidos) {
+    console.warn('[licitaciones] job cerrado con resultado parcial', {
+      jobId,
+      recibidos: result.recibidos,
+      pdfsOk: result.pdfsOk,
+    });
+  }
+
   await db
     .update(licitacionesJobs)
     .set({
       status: 'done',
       outputFilePath: outputPath,
       modelo: result.model,
+      pdfsOk: result.pdfsOk,
+      pdfErrors: result.fallidos.length > 0 ? result.fallidos : null,
       completedAt: sql`now()`,
       processingStartedAt: null,
       errorMessage: null,

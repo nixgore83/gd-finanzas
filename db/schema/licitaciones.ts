@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, date, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, date, timestamp, index, jsonb } from 'drizzle-orm/pg-core';
 import { households } from './households';
 import { authUsers } from './auth';
 import { licitacionesJobStatusEnum } from './enums';
@@ -13,6 +13,13 @@ import { licitacionesJobStatusEnum } from './enums';
  * el reaper detecte jobs cortados (el trabajo corre async con `after()`, no es
  * durable). Dominio ajeno a finanzas — autocontenido y extraíble a futuro.
  */
+/**
+ * Un PDF de la tanda que el microservicio no pudo procesar, con el motivo. El
+ * nombre es el sintético con el que viaja al micro (`input_N.pdf`, mismo índice
+ * que `input_file_paths`): no guardamos el nombre original del archivo.
+ */
+export type LicitacionPdfError = { pdf: string; error: string };
+
 export const licitacionesJobs = pgTable(
   'licitaciones_jobs',
   {
@@ -26,6 +33,13 @@ export const licitacionesJobs = pgTable(
     // Path del Excel resultante en Storage. Null hasta completar.
     outputFilePath: text('output_file_path'),
     pdfCount: integer('pdf_count').notNull(),
+    // Cuántos de esos PDFs pudo procesar el micro. Puede ser < pdfCount: un PDF
+    // que rompe no aborta la tanda, el Excel sale con el resto. Null en jobs
+    // viejos (o si el micro desplegado todavía no reporta el detalle).
+    pdfsOk: integer('pdfs_ok'),
+    // Los que fallaron y por qué. Null/[] = ninguno. Los motivos vienen del
+    // header X-Warnings del micro (ASCII, truncados); nunca traen signed URLs.
+    pdfErrors: jsonb('pdf_errors').$type<LicitacionPdfError[]>(),
     // Modelo usado por el microservicio (lo reporta en la respuesta). Default de
     // negocio: claude-sonnet-4-5 (ver lib/schemas/licitaciones).
     modelo: text('modelo').notNull(),
