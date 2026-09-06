@@ -8,20 +8,31 @@ import {
 
 describe('esResultadoParcial', () => {
   it('true cuando se procesaron menos de los que se subieron', () => {
-    expect(esResultadoParcial(5, 3)).toBe(true);
+    expect(esResultadoParcial('done', 5, 3)).toBe(true);
   });
 
   it('false cuando salieron todos', () => {
-    expect(esResultadoParcial(5, 5)).toBe(false);
+    expect(esResultadoParcial('done', 5, 5)).toBe(false);
   });
 
   it('true incluso si no salió ninguno (caso borde, el job igual sería error)', () => {
-    expect(esResultadoParcial(5, 0)).toBe(true);
+    expect(esResultadoParcial('done', 5, 0)).toBe(true);
   });
 
   it('null/undefined = no informado (job viejo): no avisa nada', () => {
-    expect(esResultadoParcial(5, null)).toBe(false);
-    expect(esResultadoParcial(5, undefined)).toBe(false);
+    expect(esResultadoParcial('done', 5, null)).toBe(false);
+    expect(esResultadoParcial('done', 5, undefined)).toBe(false);
+  });
+
+  // Regresión: `pdfsOk` sobrevive hasta que el job se re-encola, así que un
+  // reintento en curso o fallido no puede seguir mostrándose como "parcial".
+  it('false mientras el job no terminó, aunque arrastre el pdfsOk viejo', () => {
+    expect(esResultadoParcial('processing', 5, 3)).toBe(false);
+    expect(esResultadoParcial('uploaded', 5, 3)).toBe(false);
+  });
+
+  it('false si el job terminó en error: se muestra Error, no Listo (parcial)', () => {
+    expect(esResultadoParcial('error', 5, 3)).toBe(false);
   });
 });
 

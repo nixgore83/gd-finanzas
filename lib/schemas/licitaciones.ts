@@ -9,6 +9,9 @@ export const DEFAULT_LICITACIONES_MODEL = 'claude-sonnet-4-5';
  *  subida directa con signed URLs). */
 export const LICITACIONES_BUCKET_NAME = 'licitaciones';
 
+/** Estados de un job de licitaciones (espejo de `licitacionesJobStatusEnum`). */
+export type LicitacionJobStatus = 'uploaded' | 'processing' | 'done' | 'error';
+
 /**
  * `true` si la tanda se cerró con menos PDFs procesados de los que se subieron.
  * El micro no aborta cuando un PDF rompe: devuelve el Excel con el resto. Un job
@@ -16,9 +19,19 @@ export const LICITACIONES_BUCKET_NAME = 'licitaciones';
  *
  * `pdfsOk` null = job anterior a que persistiéramos el detalle: "no informado"
  * (≠ 0), así que no inventamos un aviso.
+ *
+ * El `status` es obligatorio a propósito: "parcial" describe un job TERMINADO.
+ * `pdfsOk` sobrevive a un reintento (se limpia recién al re-encolar), así que sin
+ * este chequeo un job reintentado que vuelve a fallar se mostraría como
+ * "Listo (parcial)" en vez de "Error" — un fallo disfrazado de éxito, justo el
+ * bug que este módulo existe para evitar.
  */
-export function esResultadoParcial(pdfCount: number, pdfsOk: number | null | undefined): boolean {
-  return typeof pdfsOk === 'number' && pdfsOk < pdfCount;
+export function esResultadoParcial(
+  status: LicitacionJobStatus,
+  pdfCount: number,
+  pdfsOk: number | null | undefined,
+): boolean {
+  return status === 'done' && typeof pdfsOk === 'number' && pdfsOk < pdfCount;
 }
 
 /** Máximo de PDFs por job (un set semanal típico es < 20). */

@@ -50,7 +50,7 @@ export function LicitacionesTable({ rows }: { rows: LicitacionRow[] }) {
           {rows.map((r) => {
             // Una tanda parcial no se muestra como "Listo" en verde: el Excel
             // existe, pero le faltan instrumentos.
-            const parcial = esResultadoParcial(r.pdfCount, r.pdfsOk);
+            const parcial = esResultadoParcial(r.status, r.pdfCount, r.pdfsOk);
             return (
               <tr key={r.id} className="border-b last:border-0 hover:bg-accent/30">
                 <td className="px-3 py-2 whitespace-nowrap">{formatDate(r.createdAt)}</td>

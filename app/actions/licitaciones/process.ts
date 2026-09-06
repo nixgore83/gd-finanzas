@@ -50,6 +50,11 @@ export async function processLicitacionesJob(
       status: 'processing',
       processingStartedAt: sql`now()`,
       errorMessage: null,
+      // El resultado de la corrida anterior no vale para esta: si no lo
+      // limpiamos, un reintento arrastra el "3 de 5" viejo mientras procesa y,
+      // si vuelve a fallar, la UI lo sigue mostrando como parcial.
+      pdfsOk: null,
+      pdfErrors: null,
     })
     .where(
       and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)),

@@ -58,7 +58,7 @@ export default async function LicitacionDetailPage({
   if (!job) notFound();
 
   const stale = isLicitacionStale(job.processingStartedAt, new Date());
-  const parcial = esResultadoParcial(job.pdfCount, job.pdfsOk);
+  const parcial = esResultadoParcial(job.status, job.pdfCount, job.pdfsOk);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">

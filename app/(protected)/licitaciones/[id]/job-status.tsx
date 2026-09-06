@@ -64,7 +64,7 @@ export function JobStatus({
     // Tanda parcial: el Excel existe y sirve, pero le faltan instrumentos. No se
     // puede presentar como un éxito limpio — es exactamente lo que pasó
     // desapercibido cuando 2 de 5 PDFs se descartaron en silencio.
-    if (esResultadoParcial(pdfCount, pdfsOk)) {
+    if (esResultadoParcial(status, pdfCount, pdfsOk)) {
       return (
         <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-medium">
