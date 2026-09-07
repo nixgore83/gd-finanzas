@@ -1,0 +1,15 @@
+# Normaliza los finales de linea: LF en el repo Y en el working tree.
+# Sin esto, en Windows (core.autocrlf=true) los archivos quedan con CRLF en disco
+# y prettier --check falla en ~200 archivos que nadie tocó.
+* text=auto eol=lf
+
+# Binarios: que git no toque nada.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.xlsx binary
+*.woff binary
+*.woff2 binary
