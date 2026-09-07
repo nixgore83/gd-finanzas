@@ -4,13 +4,62 @@ import type { CategoryNode } from '@/lib/categories/tree';
 
 const tree: CategoryNode[] = [
   { id: 'sueldo', name: 'Sueldo', kind: 'income', depth: 0, parentId: null, isInvestment: false },
-  { id: 'sueldo-nico', name: 'Sueldo Nico', kind: 'income', depth: 1, parentId: 'sueldo', isInvestment: false },
-  { id: 'sueldo-pau', name: 'Sueldo Pau', kind: 'income', depth: 1, parentId: 'sueldo', isInvestment: false },
-  { id: 'otros-ing', name: 'Otros ingresos', kind: 'income', depth: 0, parentId: null, isInvestment: false },
-  { id: 'vivienda', name: 'Vivienda', kind: 'expense', depth: 0, parentId: null, isInvestment: false },
-  { id: 'alquiler', name: 'Alquiler', kind: 'expense', depth: 1, parentId: 'vivienda', isInvestment: false },
-  { id: 'expensas', name: 'Expensas', kind: 'expense', depth: 1, parentId: 'vivienda', isInvestment: false },
-  { id: 'vacaciones', name: 'Vacaciones', kind: 'expense', depth: 0, parentId: null, isInvestment: false },
+  {
+    id: 'sueldo-nico',
+    name: 'Sueldo Nico',
+    kind: 'income',
+    depth: 1,
+    parentId: 'sueldo',
+    isInvestment: false,
+  },
+  {
+    id: 'sueldo-pau',
+    name: 'Sueldo Pau',
+    kind: 'income',
+    depth: 1,
+    parentId: 'sueldo',
+    isInvestment: false,
+  },
+  {
+    id: 'otros-ing',
+    name: 'Otros ingresos',
+    kind: 'income',
+    depth: 0,
+    parentId: null,
+    isInvestment: false,
+  },
+  {
+    id: 'vivienda',
+    name: 'Vivienda',
+    kind: 'expense',
+    depth: 0,
+    parentId: null,
+    isInvestment: false,
+  },
+  {
+    id: 'alquiler',
+    name: 'Alquiler',
+    kind: 'expense',
+    depth: 1,
+    parentId: 'vivienda',
+    isInvestment: false,
+  },
+  {
+    id: 'expensas',
+    name: 'Expensas',
+    kind: 'expense',
+    depth: 1,
+    parentId: 'vivienda',
+    isInvestment: false,
+  },
+  {
+    id: 'vacaciones',
+    name: 'Vacaciones',
+    kind: 'expense',
+    depth: 0,
+    parentId: null,
+    isInvestment: false,
+  },
 ];
 
 describe('buildCashflowReport', () => {
@@ -40,11 +89,7 @@ describe('buildCashflowReport', () => {
   });
 
   it('budget = 0 → deltaPct null', () => {
-    const out = buildCashflowReport(
-      tree,
-      [],
-      [{ categoryId: 'vacaciones', realUsd: '300' }],
-    );
+    const out = buildCashflowReport(tree, [], [{ categoryId: 'vacaciones', realUsd: '300' }]);
     const v = out.rows.find((r) => r.category.id === 'vacaciones')!;
     expect(v.budget).toBe('0.00');
     expect(v.real).toBe('300.00');

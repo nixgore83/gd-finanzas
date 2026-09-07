@@ -47,9 +47,7 @@ export const recurrenceInputSchema = z
       .int({ message: 'Día inválido' })
       .min(1, { message: 'Día entre 1 y 31' })
       .max(31, { message: 'Día entre 1 y 31' }),
-    startDate: z
-      .string()
-      .regex(ISO_DATE_RE, { message: 'Fecha inválida (YYYY-MM-DD)' }),
+    startDate: z.string().regex(ISO_DATE_RE, { message: 'Fecha inválida (YYYY-MM-DD)' }),
     endDate: z
       .union([z.string(), z.null(), z.undefined()])
       .transform((v) => (typeof v === 'string' && ISO_DATE_RE.test(v) ? v : null)),

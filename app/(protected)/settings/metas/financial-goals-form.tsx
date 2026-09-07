@@ -11,9 +11,7 @@ import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { upsertFinancialGoals } from '@/app/actions/financial-goals/upsert';
 import { cn } from '@/lib/utils';
 
-type ActionResult =
-  | { ok: true }
-  | { ok: false; error: string; fields?: Record<string, string> };
+type ActionResult = { ok: true } | { ok: false; error: string; fields?: Record<string, string> };
 
 type Initial = {
   targetAhorroMensualUsd: string;
@@ -63,7 +61,10 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
 
   const totalTarget = useMemo(() => {
     try {
-      return new Decimal(retiro || 0).plus(educacion || 0).plus(buffer || 0).toFixed(0);
+      return new Decimal(retiro || 0)
+        .plus(educacion || 0)
+        .plus(buffer || 0)
+        .toFixed(0);
     } catch {
       return '0';
     }
@@ -92,17 +93,10 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
       {/* ============ TARGET SUMMARY STRIP ============ */}
       <section>
         <Label>Resumen del plan</Label>
-        <div className="mt-3 grid grid-cols-2 gap-px bg-border md:grid-cols-4">
+        <div className="bg-border mt-3 grid grid-cols-2 gap-px md:grid-cols-4">
           <SummaryCard label="Target total" value={formatUsd(totalTarget)} variant="attn" />
-          <SummaryCard
-            label="Ahorro mensual"
-            value={formatUsd(target || 0)}
-            variant="primary"
-          />
-          <SummaryCard
-            label="Edad IF"
-            value={`${edadNico || '—'} / ${edadPau || '—'}`}
-          />
+          <SummaryCard label="Ahorro mensual" value={formatUsd(target || 0)} variant="primary" />
+          <SummaryCard label="Edad IF" value={`${edadNico || '—'} / ${edadPau || '—'}`} />
           <SummaryCard
             label="Años a la IF"
             value={(() => {
@@ -151,8 +145,8 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
             required
           />
           {/* Sum row */}
-          <div className="grid grid-cols-[1fr_220px] items-baseline gap-4 border-t-2 border-border py-3.5">
-            <span className="font-display text-lg italic text-[color:var(--attn)]">Suma</span>
+          <div className="border-border grid grid-cols-[1fr_220px] items-baseline gap-4 border-t-2 py-3.5">
+            <span className="font-display text-lg text-[color:var(--attn)] italic">Suma</span>
             <div className="flex items-baseline justify-end gap-3">
               <Num className="text-2xl font-semibold text-[color:var(--attn)]">
                 {formatUsd(totalTarget)}
@@ -216,9 +210,9 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
               disabled={isPending}
               placeholder="Supuestos del plan, próxima review, recordatorios…"
               className={cn(
-                'mt-2 flex w-full border border-input bg-background px-3 py-2.5 font-display text-base italic leading-relaxed text-foreground',
-                'placeholder:not-italic placeholder:font-sans placeholder:text-sm placeholder:text-muted-foreground',
-                'focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/40',
+                'border-input bg-background font-display text-foreground mt-2 flex w-full border px-3 py-2.5 text-base leading-relaxed italic',
+                'placeholder:text-muted-foreground placeholder:font-sans placeholder:text-sm placeholder:not-italic',
+                'focus:border-primary/60 focus:ring-primary/40 focus:ring-1 focus:outline-none',
                 'disabled:cursor-not-allowed disabled:opacity-50',
               )}
               aria-invalid={errors.notas ? true : undefined}
@@ -239,9 +233,9 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
             <>
               Última edición:{' '}
               {initial.updatedByEmail && (
-                <span className="not-italic text-foreground">{initial.updatedByEmail}</span>
+                <span className="text-foreground not-italic">{initial.updatedByEmail}</span>
               )}{' '}
-              <span className="font-mono not-italic text-muted-foreground">
+              <span className="text-muted-foreground font-mono not-italic">
                 · {formatTimestamp(initial.updatedAt)}
               </span>
             </>
@@ -285,8 +279,8 @@ function FieldRow({
   step?: number;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_220px] items-baseline gap-4 border-t border-border/40 py-3.5">
-      <FormLabel htmlFor={id} className="font-display text-base font-normal text-foreground">
+    <div className="border-border/40 grid grid-cols-[1fr_220px] items-baseline gap-4 border-t py-3.5">
+      <FormLabel htmlFor={id} className="font-display text-foreground text-base font-normal">
         {label}
       </FormLabel>
       <div>
@@ -306,7 +300,7 @@ function FieldRow({
             aria-invalid={error ? true : undefined}
             className="text-right font-mono tabular-nums"
           />
-          <Label className="min-w-[42px] text-right normal-case tracking-[0.18em]">{unit}</Label>
+          <Label className="min-w-[42px] text-right tracking-[0.18em] normal-case">{unit}</Label>
         </div>
         {error && (
           <p className="mt-1 text-right font-sans text-xs text-[color:var(--bad)]">{error}</p>

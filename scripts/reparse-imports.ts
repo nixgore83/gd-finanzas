@@ -37,7 +37,9 @@ async function main() {
   const modelId = modelOverride ?? process.env.IMPORT_PARSER_MODEL_DEFAULT ?? 'claude-sonnet-4-6';
 
   if (!directUrl || !supabaseUrl || !supabaseSecret || !anthropicKey) {
-    throw new Error('DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, ANTHROPIC_API_KEY must be set');
+    throw new Error(
+      'DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, ANTHROPIC_API_KEY must be set',
+    );
   }
 
   const sql = postgres(directUrl, { max: 1 });
@@ -47,11 +49,16 @@ async function main() {
   try {
     // Get household
     const [household] = await sql<{ id: string }[]>`select id from public.households limit 1`;
-    if (!household) { console.warn('No household'); return; }
+    if (!household) {
+      console.warn('No household');
+      return;
+    }
     const hhId = household.id;
 
     // Load categories for prompt enrichment + suggestion
-    const cats = await sql<{ id: string; name: string; kind: string; depth: number; parentId: string | null }[]>`
+    const cats = await sql<
+      { id: string; name: string; kind: string; depth: number; parentId: string | null }[]
+    >`
       select c.id, c.name, c.kind::text,
              case when c.parent_id is null then 0 else 1 end as depth,
              c.parent_id as "parentId"
@@ -59,10 +66,10 @@ async function main() {
       where c.household_id = ${hhId} and c.archived = false
       order by c.kind, c.name
     `;
-    const catByName = new Map(cats.map(c => [c.name.toLowerCase(), c.id]));
+    const catByName = new Map(cats.map((c) => [c.name.toLowerCase(), c.id]));
 
     // Build category prompt block
-    const catLines = cats.map(c => {
+    const catLines = cats.map((c) => {
       const prefix = c.depth === 1 ? '  - ' : '- ';
       return `${prefix}${c.name} (${c.kind})`;
     });
@@ -98,25 +105,43 @@ Reglas:
       // exact
       const exactMap = descCatCount.get(desc.trim().toLowerCase());
       if (exactMap) {
-        let best = ''; let bestN = 0;
-        for (const [catId, n] of exactMap) { if (n > bestN) { best = catId; bestN = n; } }
+        let best = '';
+        let bestN = 0;
+        for (const [catId, n] of exactMap) {
+          if (n > bestN) {
+            best = catId;
+            bestN = n;
+          }
+        }
         if (best) return best;
       }
       // normalized
       const normMap = descCatCount.get(norm);
       if (normMap) {
-        let best = ''; let bestN = 0;
-        for (const [catId, n] of normMap) { if (n > bestN) { best = catId; bestN = n; } }
+        let best = '';
+        let bestN = 0;
+        for (const [catId, n] of normMap) {
+          if (n > bestN) {
+            best = catId;
+            bestN = n;
+          }
+        }
         if (best) return best;
       }
       return null;
     }
 
     // Get imports to re-parse
-    const importsToReparse = await sql<{
-      id: string; type: string; status: string; fileUrl: string;
-      institutionName: string; confirmedLines: number;
-    }[]>`
+    const importsToReparse = await sql<
+      {
+        id: string;
+        type: string;
+        status: string;
+        fileUrl: string;
+        institutionName: string;
+        confirmedLines: number;
+      }[]
+    >`
       select i.id, i.type::text, i.status::text, i.file_url as "fileUrl",
              inst.name as "institutionName",
              (select count(*)::int from public.import_lines il
@@ -128,10 +153,14 @@ Reglas:
       order by i.created_at
     `;
 
-    console.warn(`[reparse] ${importsToReparse.length} imports to process${dryRun ? ' (DRY RUN)' : ''}`);
+    console.warn(
+      `[reparse] ${importsToReparse.length} imports to process${dryRun ? ' (DRY RUN)' : ''}`,
+    );
 
     for (const imp of importsToReparse) {
-      console.warn(`\n[reparse] ─── ${imp.id.slice(0, 8)} · ${imp.institutionName} ${imp.type} · ${imp.confirmedLines} confirmed lines`);
+      console.warn(
+        `\n[reparse] ─── ${imp.id.slice(0, 8)} · ${imp.institutionName} ${imp.type} · ${imp.confirmedLines} confirmed lines`,
+      );
 
       const parser = resolveParser(imp.institutionName, imp.type as 'tc' | 'banco' | 'broker');
       if (!parser) {
@@ -169,11 +198,18 @@ Reglas:
       const content: Anthropic.Messages.ContentBlockParam[] = [];
       if (isCsv) {
         content.push({ type: 'text', text: parser.userPrompt });
-        content.push({ type: 'text', text: `\n\n--- ARCHIVO (texto crudo) ---\n${new TextDecoder().decode(bytes)}` });
+        content.push({
+          type: 'text',
+          text: `\n\n--- ARCHIVO (texto crudo) ---\n${new TextDecoder().decode(bytes)}`,
+        });
       } else {
         content.push({
           type: 'document',
-          source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(bytes).toString('base64') },
+          source: {
+            type: 'base64',
+            media_type: 'application/pdf',
+            data: Buffer.from(bytes).toString('base64'),
+          },
         });
         content.push({ type: 'text', text: parser.userPrompt });
       }
@@ -197,7 +233,7 @@ Reglas:
 
       const text = response.content
         .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
-        .map(b => b.text)
+        .map((b) => b.text)
         .join('');
 
       // Extract JSON
@@ -222,7 +258,9 @@ Reglas:
       }
 
       const newLines = parsed.lines as (ParsedTxLine & { suggestedCategory?: string })[];
-      console.warn(`[reparse]   📄 LLM returned ${newLines.length} lines (was ${imp.confirmedLines} confirmed)`);
+      console.warn(
+        `[reparse]   📄 LLM returned ${newLines.length} lines (was ${imp.confirmedLines} confirmed)`,
+      );
 
       // Check which descriptions are already confirmed
       const confirmedDescs = await sql<{ desc: string }[]>`
@@ -230,7 +268,7 @@ Reglas:
         from public.import_lines il
         where il.import_id = ${imp.id} and il.transaction_id is not null
       `;
-      const confirmedSet = new Set(confirmedDescs.map(r => r.desc?.toLowerCase()));
+      const confirmedSet = new Set(confirmedDescs.map((r) => r.desc?.toLowerCase()));
 
       // Insert only lines NOT already confirmed (avoid duplicates)
       let inserted = 0;
@@ -260,8 +298,10 @@ Reglas:
       }
 
       const delta = newLines.length - imp.confirmedLines;
-      const icon = delta > 0 ? '🔴' : (inserted > 0 ? '🟡' : '🟢');
-      console.warn(`[reparse]   ${icon} delta=${delta > 0 ? '+' : ''}${delta}, inserted=${inserted} new pending lines`);
+      const icon = delta > 0 ? '🔴' : inserted > 0 ? '🟡' : '🟢';
+      console.warn(
+        `[reparse]   ${icon} delta=${delta > 0 ? '+' : ''}${delta}, inserted=${inserted} new pending lines`,
+      );
     }
 
     console.warn('\n[reparse] done');

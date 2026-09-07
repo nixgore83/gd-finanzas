@@ -12,10 +12,7 @@ export type GananciasData = {
   categoriesById: Map<string, ExportCategory>;
 };
 
-export async function loadGananciasData(
-  householdId: string,
-  year: number,
-): Promise<GananciasData> {
+export async function loadGananciasData(householdId: string, year: number): Promise<GananciasData> {
   const db = getDb();
 
   const start = `${year}-01-01`;

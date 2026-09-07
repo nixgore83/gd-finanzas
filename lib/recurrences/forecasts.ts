@@ -45,7 +45,7 @@ function toIso(year: number, month1: number, day: number): string {
 
 function addMonths(year: number, month1: number, delta: number): { year: number; month1: number } {
   // month1 is 1-based
-  const zero = (year * 12 + (month1 - 1)) + delta;
+  const zero = year * 12 + (month1 - 1) + delta;
   return { year: Math.floor(zero / 12), month1: (zero % 12) + 1 };
 }
 

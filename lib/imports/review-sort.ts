@@ -1,4 +1,9 @@
-import { buildComparator, simple, type Comparator, type ComparatorFactory } from '@/lib/sorting/compare';
+import {
+  buildComparator,
+  simple,
+  type Comparator,
+  type ComparatorFactory,
+} from '@/lib/sorting/compare';
 import type { SortCriterion } from '@/lib/sorting/criteria';
 
 export const REVIEW_SORT_FIELDS = ['date', 'description', 'amount', 'status', 'category'] as const;

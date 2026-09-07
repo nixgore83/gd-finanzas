@@ -32,8 +32,7 @@ const wantImports = all || has('--imports') || wantAccounts;
 const wantTransactions = all || has('--transactions') || wantAccounts;
 const wantBudgets = all || has('--budgets');
 
-const requested =
-  wantTransactions || wantImports || wantRecurrences || wantBudgets || wantAccounts;
+const requested = wantTransactions || wantImports || wantRecurrences || wantBudgets || wantAccounts;
 if (!requested) {
   console.error(
     'Specify at least one flag: --transactions --imports --recurrences --budgets --accounts --all  [--dry-run]',
@@ -76,9 +75,7 @@ async function main() {
     console.warn(`[wipe-smoke] dry-run: ${dryRun}`);
 
     const countOf = async (table: string, where: string = `household_id = '${hhId}'`) => {
-      const r = await sql.unsafe(
-        `select count(*)::int as n from public.${table} where ${where}`,
-      );
+      const r = await sql.unsafe(`select count(*)::int as n from public.${table} where ${where}`);
       return Number((r[0] as { n: number } | undefined)?.n ?? 0);
     };
 

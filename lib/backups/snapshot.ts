@@ -115,10 +115,7 @@ export async function loadHouseholdSnapshot(householdId: string): Promise<Househ
     .where(
       inArray(
         importLines.importId,
-        db
-          .select({ id: imports.id })
-          .from(imports)
-          .where(eq(imports.householdId, householdId)),
+        db.select({ id: imports.id }).from(imports).where(eq(imports.householdId, householdId)),
       ),
     );
 

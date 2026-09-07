@@ -29,8 +29,7 @@ export function buildServicioDomesticoCsv(txns: readonly ExportTx[]): string {
     .filter((r): r is NonNullable<typeof r> => r !== null)
     .sort(
       (a, b) =>
-        a.empleado_nombre.localeCompare(b.empleado_nombre) ||
-        a.periodo.localeCompare(b.periodo),
+        a.empleado_nombre.localeCompare(b.empleado_nombre) || a.periodo.localeCompare(b.periodo),
     );
 
   return toCsv(rows, [

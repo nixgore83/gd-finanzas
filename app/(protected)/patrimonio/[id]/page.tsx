@@ -32,7 +32,20 @@ function formatUsd(amount: string | number): string {
 
 function shortDate(iso: string): string {
   const parts = iso.split('-');
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   const mi = Number.parseInt(parts[1]!, 10) - 1;
   return `${parts[2]} ${months[mi]} ${parts[0]}`;
 }
@@ -73,12 +86,7 @@ export default async function SnapshotDetailPage({
       })
       .from(accounts)
       .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
-      .where(
-        and(
-          eq(accounts.householdId, session.householdId),
-          eq(accounts.archived, false),
-        ),
-      )
+      .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
       .orderBy(institutions.name, accounts.type, accounts.name);
 
     const allSnapshots = await loadSnapshots(session.householdId);
@@ -91,7 +99,9 @@ export default async function SnapshotDetailPage({
     try {
       const fx = await getFxRate({ date: detail.date });
       todayFxRate = fx.rate.toString();
-    } catch { /* no rate */ }
+    } catch {
+      /* no rate */
+    }
 
     return (
       <div className="space-y-8">
@@ -122,10 +132,7 @@ export default async function SnapshotDetailPage({
     balancesByType.set(b.accountType, list);
   }
 
-  const balancesTotal = detail.balances.reduce(
-    (acc, b) => acc.plus(b.balanceUsd),
-    new Decimal(0),
-  );
+  const balancesTotal = detail.balances.reduce((acc, b) => acc.plus(b.balanceUsd), new Decimal(0));
   const holdingsTotal = detail.holdings.reduce(
     (acc, h) => acc.plus(h.totalValueUsd),
     new Decimal(0),
@@ -137,7 +144,7 @@ export default async function SnapshotDetailPage({
       <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
         <div className="min-w-0">
           <Label>Patrimonio · Snapshot</Label>
-          <Display size="xl" className="mt-3 block tabular-nums text-primary">
+          <Display size="xl" className="text-primary mt-3 block tabular-nums">
             {formatUsd(detail.totalUsd)}
           </Display>
           <Body className="mt-2">{shortDate(detail.date)}</Body>
@@ -145,14 +152,14 @@ export default async function SnapshotDetailPage({
         <div className="flex gap-3">
           <Link
             href={`/patrimonio/${id}?edit=true`}
-            className="border border-border px-5 py-2.5 font-display text-sm text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+            className="border-border font-display text-muted-foreground hover:bg-card hover:text-foreground border px-5 py-2.5 text-sm transition-colors"
           >
             Editar
           </Link>
           <DeleteSnapshotButton snapshotId={id} />
           <Link
             href="/patrimonio"
-            className="border border-border px-5 py-2.5 font-display text-sm text-muted-foreground transition-colors hover:bg-card"
+            className="border-border font-display text-muted-foreground hover:bg-card border px-5 py-2.5 text-sm transition-colors"
           >
             Volver
           </Link>
@@ -165,7 +172,7 @@ export default async function SnapshotDetailPage({
       <section>
         <div className="flex items-baseline justify-between">
           <Display size="md">Saldos de cuentas</Display>
-          <Num className="text-sm text-primary">{formatUsd(balancesTotal.toNumber())}</Num>
+          <Num className="text-primary text-sm">{formatUsd(balancesTotal.toNumber())}</Num>
         </div>
         <Hair className="mt-3 mb-1" />
 
@@ -175,12 +182,12 @@ export default async function SnapshotDetailPage({
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-border border-b">
                   {['Cuenta', 'Owner', 'Saldo', 'FX', 'USD'].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
-                        'py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground',
+                        'text-muted-foreground py-2 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase',
                         i >= 2 ? 'text-right' : 'text-left',
                       )}
                     >
@@ -193,26 +200,40 @@ export default async function SnapshotDetailPage({
                 {detail.balances.map((b) => {
                   const isNeg = new Decimal(b.balanceUsd).isNegative();
                   return (
-                    <tr key={b.id} className="border-b border-border/40">
+                    <tr key={b.id} className="border-border/40 border-b">
                       <td className="py-3">
-                        <span className="font-display text-sm text-foreground">{b.accountName}</span>
-                        <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
-                          {ACCOUNT_TYPE_LABELS[b.accountType as keyof typeof ACCOUNT_TYPE_LABELS] ?? b.accountType}
+                        <span className="font-display text-foreground text-sm">
+                          {b.accountName}
+                        </span>
+                        <span className="text-muted-foreground ml-2 font-sans text-[9px] tracking-wide uppercase">
+                          {ACCOUNT_TYPE_LABELS[b.accountType as keyof typeof ACCOUNT_TYPE_LABELS] ??
+                            b.accountType}
                         </span>
                       </td>
-                      <td className="py-3 font-sans text-xs text-muted-foreground">{b.ownerTag}</td>
+                      <td className="text-muted-foreground py-3 font-sans text-xs">{b.ownerTag}</td>
                       <td className="py-3 text-right">
-                        <Num className={cn('text-sm', isNeg ? 'text-[color:var(--bad)]' : 'text-foreground')}>
-                          {Number.parseFloat(b.balance).toLocaleString('es-AR', { minimumFractionDigits: 2 })} {b.currency}
+                        <Num
+                          className={cn(
+                            'text-sm',
+                            isNeg ? 'text-[color:var(--bad)]' : 'text-foreground',
+                          )}
+                        >
+                          {Number.parseFloat(b.balance).toLocaleString('es-AR', {
+                            minimumFractionDigits: 2,
+                          })}{' '}
+                          {b.currency}
                         </Num>
                       </td>
                       <td className="py-3 text-right">
-                        <Num className="text-xs text-muted-foreground">
-                          {b.fxRateUsed ?? '—'}
-                        </Num>
+                        <Num className="text-muted-foreground text-xs">{b.fxRateUsed ?? '—'}</Num>
                       </td>
                       <td className="py-3 text-right">
-                        <Num className={cn('text-sm font-semibold', isNeg ? 'text-[color:var(--bad)]' : 'text-foreground')}>
+                        <Num
+                          className={cn(
+                            'text-sm font-semibold',
+                            isNeg ? 'text-[color:var(--bad)]' : 'text-foreground',
+                          )}
+                        >
                           {formatUsd(b.balanceUsd)}
                         </Num>
                       </td>
@@ -230,19 +251,19 @@ export default async function SnapshotDetailPage({
         <section>
           <div className="flex items-baseline justify-between">
             <Display size="md">Holdings</Display>
-            <Num className="text-sm text-primary">{formatUsd(holdingsTotal.toNumber())}</Num>
+            <Num className="text-primary text-sm">{formatUsd(holdingsTotal.toNumber())}</Num>
           </div>
           <Hair className="mt-3 mb-1" />
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-border border-b">
                   {['Ticker', 'Nombre', 'Tipo', 'Cant.', 'Precio', 'Total USD'].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
-                        'py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground',
+                        'text-muted-foreground py-2 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase',
                         i >= 3 ? 'text-right' : 'text-left',
                       )}
                     >
@@ -253,26 +274,31 @@ export default async function SnapshotDetailPage({
               </thead>
               <tbody>
                 {detail.holdings.map((h) => (
-                  <tr key={h.id} className="border-b border-border/40">
+                  <tr key={h.id} className="border-border/40 border-b">
                     <td className="py-3">
-                      <Num className="text-sm font-semibold text-foreground">{h.ticker}</Num>
+                      <Num className="text-foreground text-sm font-semibold">{h.ticker}</Num>
                     </td>
-                    <td className="py-3 font-display text-sm text-foreground">{h.name}</td>
+                    <td className="font-display text-foreground py-3 text-sm">{h.name}</td>
                     <td className="py-3">
-                      <span className="inline-block rounded-sm bg-primary/10 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-primary">
+                      <span className="bg-primary/10 text-primary inline-block rounded-sm px-2 py-0.5 font-sans text-[9px] font-semibold tracking-wide uppercase">
                         {h.assetType}
                       </span>
                     </td>
                     <td className="py-3 text-right">
-                      <Num className="text-sm text-foreground">{Number.parseFloat(h.quantity).toLocaleString('es-AR')}</Num>
-                    </td>
-                    <td className="py-3 text-right">
-                      <Num className="text-sm text-muted-foreground">
-                        {Number.parseFloat(h.pricePerUnit).toLocaleString('es-AR', { minimumFractionDigits: 2 })} {h.currency}
+                      <Num className="text-foreground text-sm">
+                        {Number.parseFloat(h.quantity).toLocaleString('es-AR')}
                       </Num>
                     </td>
                     <td className="py-3 text-right">
-                      <Num className="text-sm font-semibold text-foreground">
+                      <Num className="text-muted-foreground text-sm">
+                        {Number.parseFloat(h.pricePerUnit).toLocaleString('es-AR', {
+                          minimumFractionDigits: 2,
+                        })}{' '}
+                        {h.currency}
+                      </Num>
+                    </td>
+                    <td className="py-3 text-right">
+                      <Num className="text-foreground text-sm font-semibold">
                         {formatUsd(h.totalValueUsd)}
                       </Num>
                     </td>

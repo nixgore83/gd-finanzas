@@ -34,9 +34,7 @@ export async function findMatchCandidates(
       recurrenceId: transactions.recurrenceId,
     })
     .from(transactions)
-    .where(
-      and(eq(transactions.id, transactionId), eq(transactions.householdId, householdId)),
-    )
+    .where(and(eq(transactions.id, transactionId), eq(transactions.householdId, householdId)))
     .limit(1);
 
   if (!tx) return [];

@@ -16,7 +16,7 @@ export type ReportKey = (typeof LINKS)[number]['key'];
  */
 export function ReportsNav({ active }: { active: ReportKey }) {
   return (
-    <nav className="flex items-baseline gap-1 border-b border-border/60" aria-label="Reportes">
+    <nav className="border-border/60 flex items-baseline gap-1 border-b" aria-label="Reportes">
       {LINKS.map((link) => {
         const isActive = active === link.key;
         return (
@@ -25,10 +25,10 @@ export function ReportsNav({ active }: { active: ReportKey }) {
             href={link.href}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              'inline-block px-3 py-2.5 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors',
+              'inline-block px-3 py-2.5 font-sans text-[11px] font-semibold tracking-[0.18em] uppercase transition-colors',
               isActive
-                ? 'border-b-2 border-primary text-primary -mb-px'
-                : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+                ? 'border-primary text-primary -mb-px border-b-2'
+                : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent',
             )}
           >
             {link.label}

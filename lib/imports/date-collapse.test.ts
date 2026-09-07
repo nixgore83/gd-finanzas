@@ -57,10 +57,7 @@ describe('detectDateCollapse', () => {
   });
 
   it('basta UNA fecha distinta para no marcar (conservador)', () => {
-    const lines = [
-      ...Array.from({ length: 20 }, () => line('2026-07-02')),
-      line('2026-06-15'),
-    ];
+    const lines = [...Array.from({ length: 20 }, () => line('2026-07-02')), line('2026-06-15')];
     expect(detectDateCollapse(lines).collapsed).toBe(false);
   });
 
@@ -83,9 +80,7 @@ describe('detectDateCollapse', () => {
   it('cuotas + suficientes consumos reales colapsados → sí marca', () => {
     const lines = [
       ...Array.from({ length: 10 }, (_, i) => line('2026-07-02', `CUOTA ${i} C.02/06`)),
-      ...Array.from({ length: MIN_COLLAPSE_LINES }, (_, i) =>
-        line('2026-07-02', `COMERCIO ${i}`),
-      ),
+      ...Array.from({ length: MIN_COLLAPSE_LINES }, (_, i) => line('2026-07-02', `COMERCIO ${i}`)),
     ];
     const res = detectDateCollapse(lines);
     expect(res.collapsed).toBe(true);

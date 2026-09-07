@@ -61,14 +61,14 @@ function resolveColors() {
 export function EvolutionChart({ data, currency }: Props) {
   if (data.length === 0) {
     return (
-      <div className="flex h-80 items-center justify-center border border-dashed border-border text-sm text-muted-foreground">
+      <div className="border-border text-muted-foreground flex h-80 items-center justify-center border border-dashed text-sm">
         Sin datos para graficar.
       </div>
     );
   }
   const c = resolveColors();
   return (
-    <div className="h-80 border border-border bg-card/40 p-4">
+    <div className="border-border bg-card/40 h-80 border p-4">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: 8 }}>
           <CartesianGrid stroke={c.border} strokeDasharray="2 4" />

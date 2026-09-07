@@ -24,7 +24,7 @@ export default async function EnrollMfaPage() {
     return (
       <div className="space-y-3 text-center">
         <h1 className="text-xl font-semibold">No pudimos iniciar la activación</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Recargá la página. Si persiste, avisale a Nico.
         </p>
       </div>

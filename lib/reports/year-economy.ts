@@ -137,8 +137,7 @@ export function buildYearEconomyReport(input: {
     if (b.kind === 'income') slot.income += amount.toNumber();
     else slot.expense += amount.toNumber();
 
-    const isInv =
-      b.kind === 'expense' && b.categoryId !== null && investmentIds.has(b.categoryId);
+    const isInv = b.kind === 'expense' && b.categoryId !== null && investmentIds.has(b.categoryId);
     if (isInv) slot.investment += amount.toNumber();
 
     if (b.month <= monthsElapsed) {
@@ -171,8 +170,7 @@ export function buildYearEconomyReport(input: {
     if (b.kind === 'income') slot.income += amount.toNumber();
     else slot.expense += amount.toNumber();
 
-    const isInv =
-      b.kind === 'expense' && b.categoryId !== null && investmentIds.has(b.categoryId);
+    const isInv = b.kind === 'expense' && b.categoryId !== null && investmentIds.has(b.categoryId);
     if (isInv) slot.investment += amount.toNumber();
 
     if (b.categoryId) {

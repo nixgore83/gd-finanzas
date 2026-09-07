@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -113,10 +107,7 @@ export function TransferForm({
     () => accounts.find((a) => a.id === accountFromId),
     [accounts, accountFromId],
   );
-  const toAcc = useMemo(
-    () => accounts.find((a) => a.id === accountToId),
-    [accounts, accountToId],
-  );
+  const toAcc = useMemo(() => accounts.find((a) => a.id === accountToId), [accounts, accountToId]);
 
   // La moneda es del MOVIMIENTO, no de la cuenta: la de la cuenta solo la
   // pre-selecciona. Una TC argentina es bimonetaria y se paga en ARS o en USD.
@@ -219,7 +210,7 @@ export function TransferForm({
               disabled={isPending}
               aria-invalid={errors.date ? true : undefined}
             />
-            {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+            {errors.date && <p className="text-destructive text-sm">{errors.date}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -245,7 +236,7 @@ export function TransferForm({
                 </SelectContent>
               </Select>
               {errors.accountFromId && (
-                <p className="text-sm text-destructive">{errors.accountFromId}</p>
+                <p className="text-destructive text-sm">{errors.accountFromId}</p>
               )}
             </div>
 
@@ -271,7 +262,7 @@ export function TransferForm({
                 </SelectContent>
               </Select>
               {errors.accountToId && (
-                <p className="text-sm text-destructive">{errors.accountToId}</p>
+                <p className="text-destructive text-sm">{errors.accountToId}</p>
               )}
             </div>
           </div>
@@ -308,14 +299,12 @@ export function TransferForm({
                 </Select>
               </div>
               {fromAcc && currencyFrom !== fromAcc.currencyDefault && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Distinta de la moneda default de la cuenta ({fromAcc.currencyDefault}). OK si es
                   una TC bimonetaria o una caja en la otra moneda.
                 </p>
               )}
-              {errors.amountFrom && (
-                <p className="text-sm text-destructive">{errors.amountFrom}</p>
-              )}
+              {errors.amountFrom && <p className="text-destructive text-sm">{errors.amountFrom}</p>}
             </div>
 
             <div className="space-y-2">
@@ -352,11 +341,11 @@ export function TransferForm({
                 </Select>
               </div>
               {!sameCurrency && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Cross-currency: cargá el monto efectivamente recibido en {currencyTo}.
                 </p>
               )}
-              {errors.amountTo && <p className="text-sm text-destructive">{errors.amountTo}</p>}
+              {errors.amountTo && <p className="text-destructive text-sm">{errors.amountTo}</p>}
             </div>
           </div>
 
@@ -372,9 +361,7 @@ export function TransferForm({
               placeholder="MEP venta dólares, reposición caja…"
               aria-invalid={errors.description ? true : undefined}
             />
-            {errors.description && (
-              <p className="text-sm text-destructive">{errors.description}</p>
-            )}
+            {errors.description && <p className="text-destructive text-sm">{errors.description}</p>}
           </div>
 
           <div className="space-y-2">
@@ -387,11 +374,11 @@ export function TransferForm({
               defaultValue={initial?.notes ?? ''}
               disabled={isPending}
               className={cn(
-                'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+                'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
               )}
               aria-invalid={errors.notes ? true : undefined}
             />
-            {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
+            {errors.notes && <p className="text-destructive text-sm">{errors.notes}</p>}
           </div>
 
           <TagMultiSelect
@@ -400,7 +387,7 @@ export function TransferForm({
             onChange={setSelectedTagIds}
             disabled={isPending}
           />
-          {errors.tagIds && <p className="text-sm text-destructive">{errors.tagIds}</p>}
+          {errors.tagIds && <p className="text-destructive text-sm">{errors.tagIds}</p>}
 
           <div className="space-y-2">
             <Label htmlFor="fxRateOverride">FX rate (opcional — sobrescribe BCRA)</Label>
@@ -415,14 +402,14 @@ export function TransferForm({
               aria-invalid={errors.fxRateOverride ? true : undefined}
             />
             {initialFxInfo && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Cotización usada actualmente:{' '}
                 <span className="font-mono">{initialFxInfo.fxRateUsed}</span> (
                 {initialFxInfo.fxRateSource}). Vacío = recomputar con BCRA del día.
               </p>
             )}
             {errors.fxRateOverride && (
-              <p className="text-sm text-destructive">{errors.fxRateOverride}</p>
+              <p className="text-destructive text-sm">{errors.fxRateOverride}</p>
             )}
           </div>
 

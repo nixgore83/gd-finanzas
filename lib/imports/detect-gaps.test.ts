@@ -68,10 +68,7 @@ describe('computeMissingMonths', () => {
 
   it('no reporta meses previos a EARLIEST_TRACKED_MONTH', () => {
     const covered = new Set(['2025-11']);
-    expect(computeMissingMonths(covered, '2026-03', '2026-01')).toEqual([
-      '2026-01',
-      '2026-02',
-    ]);
+    expect(computeMissingMonths(covered, '2026-03', '2026-01')).toEqual(['2026-01', '2026-02']);
   });
 
   it('cobertura completa por período → sin gaps (fix del falso positivo)', () => {

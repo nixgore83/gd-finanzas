@@ -9,7 +9,11 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 
 export type CreateSnapshotResult =
   | { ok: true; id: string }
-  | { ok: false; error: 'invalid_input' | 'session' | 'duplicate_date' | 'unknown'; fields?: Record<string, string> };
+  | {
+      ok: false;
+      error: 'invalid_input' | 'session' | 'duplicate_date' | 'unknown';
+      fields?: Record<string, string>;
+    };
 
 export async function createSnapshot(input: unknown): Promise<CreateSnapshotResult> {
   let session;
@@ -74,7 +78,14 @@ export async function createSnapshot(input: unknown): Promise<CreateSnapshotResu
             accountId: h.accountId,
             ticker: h.ticker,
             name: h.name,
-            assetType: h.assetType as 'stock' | 'etf' | 'bond' | 'cedear' | 'fci' | 'crypto' | 'other',
+            assetType: h.assetType as
+              | 'stock'
+              | 'etf'
+              | 'bond'
+              | 'cedear'
+              | 'fci'
+              | 'crypto'
+              | 'other',
             quantity: h.quantity,
             pricePerUnit: h.pricePerUnit,
             currency: h.currency as 'ARS' | 'USD',

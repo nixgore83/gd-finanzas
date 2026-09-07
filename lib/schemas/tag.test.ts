@@ -50,8 +50,9 @@ describe('tagIdsSchema', () => {
   });
 
   it('rechaza > 20 items', () => {
-    const arr = Array.from({ length: 21 }, (_, i) =>
-      `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`,
+    const arr = Array.from(
+      { length: 21 },
+      (_, i) => `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`,
     );
     expect(() => tagIdsSchema.parse(arr)).toThrow();
   });

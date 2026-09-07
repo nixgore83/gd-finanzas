@@ -7,13 +7,7 @@ import { verifyMfaCode } from '@/app/actions/auth/mfa/verify';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Props = {
   factorId: string;
@@ -60,12 +54,12 @@ export function EnrollForm({ factorId, qrCode, secret }: Props) {
         <button
           type="button"
           onClick={() => setShowSecret((v) => !v)}
-          className="text-xs underline underline-offset-4 text-muted-foreground hover:opacity-80"
+          className="text-muted-foreground text-xs underline underline-offset-4 hover:opacity-80"
         >
           {showSecret ? 'Ocultar código manual' : '¿No podés escanear? Ver código manual'}
         </button>
         {showSecret && (
-          <code className="block break-all rounded bg-muted px-2 py-1 text-xs">{secret}</code>
+          <code className="bg-muted block rounded px-2 py-1 text-xs break-all">{secret}</code>
         )}
 
         <form action={handleSubmit} className="space-y-4">

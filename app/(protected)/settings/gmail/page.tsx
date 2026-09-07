@@ -31,12 +31,7 @@ export default async function GmailSettingsPage() {
     })
     .from(accounts)
     .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
-    .where(
-      and(
-        eq(accounts.householdId, session.householdId),
-        eq(accounts.archived, false),
-      ),
-    )
+    .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(institutions.name, accounts.type, accounts.name);
 
   return (
@@ -47,10 +42,9 @@ export default async function GmailSettingsPage() {
           Import desde Gmail
         </Display>
         <Body className="mt-2 max-w-2xl">
-          Configurá un label de Gmail por cada cuenta que recibe resúmenes por email.
-          El cron pollea los labels cada 4 horas, descarga los PDFs adjuntos y los
-          parsea automáticamente. Los mails procesados se mueven al label
-          &quot;gd-procesados&quot;.
+          Configurá un label de Gmail por cada cuenta que recibe resúmenes por email. El cron pollea
+          los labels cada 4 horas, descarga los PDFs adjuntos y los parsea automáticamente. Los
+          mails procesados se mueven al label &quot;gd-procesados&quot;.
         </Body>
       </header>
 

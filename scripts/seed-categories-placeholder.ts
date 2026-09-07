@@ -28,7 +28,9 @@ async function main() {
   try {
     const households = await sql<{ id: string }[]>`select id from public.households`;
     if (households.length === 0) {
-      console.warn('[seed-categories-placeholder] no hay households — corré db:seed:household primero');
+      console.warn(
+        '[seed-categories-placeholder] no hay households — corré db:seed:household primero',
+      );
       return;
     }
 

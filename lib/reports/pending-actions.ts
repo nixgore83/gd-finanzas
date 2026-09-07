@@ -1,6 +1,14 @@
 import { and, asc, count, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, budgets, forecasts, imports, institutions, recurrences, transactions } from '@/db/schema';
+import {
+  accounts,
+  budgets,
+  forecasts,
+  imports,
+  institutions,
+  recurrences,
+  transactions,
+} from '@/db/schema';
 import { detectImportGaps, type ImportGap } from '@/lib/imports/detect-gaps';
 import type { ImportType } from '@/lib/schemas/import';
 import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
@@ -122,94 +130,95 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const [importRows, forecastRows, budgetRows, importGaps, unmatchedTransferRows] = await Promise.all([
-    // Imports que requieren acción: revisar (parsed/reviewing) o fallados (error).
-    db
-      .select({
-        id: imports.id,
-        fileName: imports.fileName,
-        type: imports.type,
-        status: imports.status,
-        errorMessage: imports.errorMessage,
-        institutionName: institutions.name,
-        accountName: accounts.name,
-        createdAt: imports.createdAt,
-      })
-      .from(imports)
-      .leftJoin(institutions, eq(institutions.id, imports.institutionId))
-      .leftJoin(accounts, eq(accounts.id, imports.accountId))
-      .where(
-        and(
-          eq(imports.householdId, householdId),
-          inArray(imports.status, ['parsed', 'reviewing', 'error']),
-        ),
-      )
-      .orderBy(desc(imports.createdAt)),
+  const [importRows, forecastRows, budgetRows, importGaps, unmatchedTransferRows] =
+    await Promise.all([
+      // Imports que requieren acción: revisar (parsed/reviewing) o fallados (error).
+      db
+        .select({
+          id: imports.id,
+          fileName: imports.fileName,
+          type: imports.type,
+          status: imports.status,
+          errorMessage: imports.errorMessage,
+          institutionName: institutions.name,
+          accountName: accounts.name,
+          createdAt: imports.createdAt,
+        })
+        .from(imports)
+        .leftJoin(institutions, eq(institutions.id, imports.institutionId))
+        .leftJoin(accounts, eq(accounts.id, imports.accountId))
+        .where(
+          and(
+            eq(imports.householdId, householdId),
+            inArray(imports.status, ['parsed', 'reviewing', 'error']),
+          ),
+        )
+        .orderBy(desc(imports.createdAt)),
 
-    // Previsiones vencidas: missed o pending con fecha ya pasada.
-    db
-      .select({
-        id: forecasts.id,
-        recurrenceName: recurrences.name,
-        expectedDate: forecasts.expectedDate,
-        expectedAmount: forecasts.expectedAmount,
-        currency: forecasts.currency,
-        status: forecasts.status,
-      })
-      .from(forecasts)
-      .innerJoin(recurrences, eq(recurrences.id, forecasts.recurrenceId))
-      .where(
-        and(
-          eq(recurrences.householdId, householdId),
-          or(
-            eq(forecasts.status, 'missed'),
-            and(eq(forecasts.status, 'pending'), lt(forecasts.expectedDate, today)),
+      // Previsiones vencidas: missed o pending con fecha ya pasada.
+      db
+        .select({
+          id: forecasts.id,
+          recurrenceName: recurrences.name,
+          expectedDate: forecasts.expectedDate,
+          expectedAmount: forecasts.expectedAmount,
+          currency: forecasts.currency,
+          status: forecasts.status,
+        })
+        .from(forecasts)
+        .innerJoin(recurrences, eq(recurrences.id, forecasts.recurrenceId))
+        .where(
+          and(
+            eq(recurrences.householdId, householdId),
+            or(
+              eq(forecasts.status, 'missed'),
+              and(eq(forecasts.status, 'pending'), lt(forecasts.expectedDate, today)),
+            ),
+          ),
+        )
+        .orderBy(asc(forecasts.expectedDate)),
+
+      // ¿Hay budget cargado para el mes en curso?
+      db
+        .select({ c: count() })
+        .from(budgets)
+        .where(
+          and(
+            eq(budgets.householdId, householdId),
+            eq(budgets.year, year),
+            eq(budgets.month, month),
           ),
         ),
-      )
-      .orderBy(asc(forecasts.expectedDate)),
 
-    // ¿Hay budget cargado para el mes en curso?
-    db
-      .select({ c: count() })
-      .from(budgets)
-      .where(
-        and(
-          eq(budgets.householdId, householdId),
-          eq(budgets.year, year),
-          eq(budgets.month, month),
-        ),
-      ),
+      detectImportGaps(householdId),
 
-    detectImportGaps(householdId),
-
-    // Transferencias sin parear (pata única)
-    db
-      .select({
-        id: transactions.id,
-        date: transactions.date,
-        amountOriginal: transactions.amountOriginal,
-        currencyOriginal: transactions.currencyOriginal,
-        description: transactions.description,
-        accName: accounts.name,
-        accType: accounts.type,
-        accCardBrand: accounts.cardBrand,
-        accOwnerTag: accounts.ownerTag,
-        accCurrency: accounts.currencyDefault,
-        accInstitutionName: institutions.name,
-      })
-      .from(transactions)
-      .leftJoin(accounts, eq(accounts.id, transactions.accountId))
-      .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
-      .where(
-        and(
-          eq(transactions.householdId, householdId),
-          eq(transactions.kind, 'transfer'),
-          isNull(transactions.transferPairId),
-        ),
-      )
-      .orderBy(asc(transactions.date)),
-  ]);
+      // Transferencias sin parear (pata única)
+      db
+        .select({
+          id: transactions.id,
+          date: transactions.date,
+          amountOriginal: transactions.amountOriginal,
+          currencyOriginal: transactions.currencyOriginal,
+          description: transactions.description,
+          accName: accounts.name,
+          accType: accounts.type,
+          accCardBrand: accounts.cardBrand,
+          accOwnerTag: accounts.ownerTag,
+          accCurrency: accounts.currencyDefault,
+          accInstitutionName: institutions.name,
+        })
+        .from(transactions)
+        .leftJoin(accounts, eq(accounts.id, transactions.accountId))
+        .leftJoin(institutions, eq(institutions.id, accounts.institutionId))
+        .where(
+          and(
+            eq(transactions.householdId, householdId),
+            eq(transactions.kind, 'transfer'),
+            isNull(transactions.transferPairId),
+          ),
+        )
+        .orderBy(asc(transactions.date)),
+    ]);
 
   const importsToReview: PendingImportReview[] = [];
   const importsErrored: PendingImportError[] = [];

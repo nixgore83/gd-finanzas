@@ -16,18 +16,16 @@ export const tagInputSchema = z.object({
     .trim()
     .min(1, { message: 'Nombre requerido' })
     .max(50, { message: 'Máximo 50 caracteres' }),
-  color: z
-    .union([z.string(), z.null(), z.undefined()])
-    .transform((v, ctx) => {
-      if (v === undefined || v === null) return null;
-      const trimmed = v.trim();
-      if (trimmed === '') return null;
-      if (!HEX_RE.test(trimmed)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Color inválido (#rrggbb)' });
-        return z.NEVER;
-      }
-      return trimmed.toLowerCase();
-    }),
+  color: z.union([z.string(), z.null(), z.undefined()]).transform((v, ctx) => {
+    if (v === undefined || v === null) return null;
+    const trimmed = v.trim();
+    if (trimmed === '') return null;
+    if (!HEX_RE.test(trimmed)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Color inválido (#rrggbb)' });
+      return z.NEVER;
+    }
+    return trimmed.toLowerCase();
+  }),
 });
 
 export type TagInput = z.infer<typeof tagInputSchema>;

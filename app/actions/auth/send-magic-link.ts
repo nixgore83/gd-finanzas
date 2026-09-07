@@ -7,9 +7,7 @@ import { getServerEnv } from '@/lib/env';
 
 const inputSchema = z.object({ email: emailSchema });
 
-export type SendMagicLinkResult =
-  | { ok: true }
-  | { ok: false; error: 'invalid_email' | 'unknown' };
+export type SendMagicLinkResult = { ok: true } | { ok: false; error: 'invalid_email' | 'unknown' };
 
 /**
  * Sends a magic link if the email is in ALLOWED_EMAILS.

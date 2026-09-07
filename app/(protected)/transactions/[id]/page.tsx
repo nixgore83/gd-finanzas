@@ -130,11 +130,11 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
             }))}
           />
 
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+          <div className="border-destructive/40 bg-destructive/5 rounded-md border p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">Borrar pata</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Borra solo esta pata (no tiene par). Hard delete.
                 </p>
               </div>
@@ -170,7 +170,9 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
     const [fromRow] = await db
       .select({ amountOriginal: transactions.amountOriginal })
       .from(transactions)
-      .where(and(eq(transactions.id, fromLeg.id), eq(transactions.householdId, session.householdId)))
+      .where(
+        and(eq(transactions.id, fromLeg.id), eq(transactions.householdId, session.householdId)),
+      )
       .limit(1);
     const [toRow] = await db
       .select({ amountOriginal: transactions.amountOriginal })
@@ -210,11 +212,11 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
           initialFxInfo={{ fxRateUsed: tx.fxRateUsed, fxRateSource: tx.fxRateSource }}
         />
 
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+        <div className="border-destructive/40 bg-destructive/5 rounded-md border p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">Borrar transferencia</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Borra ambas patas del par. Hard delete, no se puede deshacer.
               </p>
             </div>
@@ -283,9 +285,7 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
           transactionSubtype: tx.transactionSubtype as 'standard' | 'domestic_service',
           deducibleGanancias: tx.deducibleGanancias,
           meta:
-            tx.transactionSubtype === 'domestic_service' &&
-            tx.meta &&
-            typeof tx.meta === 'object'
+            tx.transactionSubtype === 'domestic_service' && tx.meta && typeof tx.meta === 'object'
               ? (tx.meta as {
                   empleado_nombre: string;
                   empleado_cuil: string;
@@ -298,8 +298,8 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
       />
 
       {counterparty && (
-        <div className="rounded-md border border-border bg-card/40 p-4">
-          <p className="mb-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="border-border bg-card/40 rounded-md border p-4">
+          <p className="text-muted-foreground mb-1.5 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase">
             Contraparte
           </p>
           <CounterpartyTag counterparty={counterparty} className="text-xs" />
@@ -327,13 +327,11 @@ export default async function EditTransactionPage({ params }: { params: RoutePar
         />
       ) : null}
 
-      <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+      <div className="border-destructive/40 bg-destructive/5 rounded-md border p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">Borrar transacción</p>
-            <p className="text-xs text-muted-foreground">
-              Hard delete. No se puede deshacer.
-            </p>
+            <p className="text-muted-foreground text-xs">Hard delete. No se puede deshacer.</p>
           </div>
           <DeleteTransactionButton id={tx.id} variant="destructive" size="default" />
         </div>

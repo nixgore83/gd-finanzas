@@ -81,7 +81,18 @@ type Props = {
   tags: TagOption[];
   /** Etiquetas de contraparte ya usadas en transacciones del household. */
   knownCounterpartyLabels: string[];
-  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; accountNumber: string | null; transferRefs: string[] | null }>;
+  accounts: Array<{
+    id: string;
+    name: string;
+    type: AccountForDisplay['type'];
+    cardBrand: AccountForDisplay['cardBrand'];
+    institutionName: string | null;
+    currency: 'ARS' | 'USD';
+    institutionId: string | null;
+    ownerTag: string;
+    accountNumber: string | null;
+    transferRefs: string[] | null;
+  }>;
   importInstitutionId: string | null;
   importAccountId: string | null;
   /** Nº de cuenta propia del extracto extraído por el parser (encabezado). */
@@ -110,10 +121,26 @@ const PAGE_SIZE = 50;
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'edited' | 'rejected';
 
-export function ImportReview({ importId, status, lines, tree, tags, knownCounterpartyLabels, accounts, importInstitutionId, importAccountId, statementAccountRef, suggestedAccountId, pdfUrl, summary }: Props) {
+export function ImportReview({
+  importId,
+  status,
+  lines,
+  tree,
+  tags,
+  knownCounterpartyLabels,
+  accounts,
+  importInstitutionId,
+  importAccountId,
+  statementAccountRef,
+  suggestedAccountId,
+  pdfUrl,
+  summary,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(null);
+  const [confirmDone, setConfirmDone] = useState<{ count: number; autoMatchCount: number } | null>(
+    null,
+  );
   const [sortCriteria, setSortCriteria] = useState<SortCriterion<ReviewSortField>[]>([
     { field: 'category', dir: 'asc' },
   ]);
@@ -124,13 +151,11 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   };
   // Preferencia de cuenta destino: cuenta sugerida por nº de extracto > la del
   // import > la de la institución > la primera.
-  const defaultAccount = (suggestedAccountId
-    ? accounts.find((a) => a.id === suggestedAccountId)
-    : null) ?? (importAccountId
-    ? accounts.find((a) => a.id === importAccountId)
-    : null) ?? (importInstitutionId
-    ? accounts.find((a) => a.institutionId === importInstitutionId)
-    : null) ?? accounts[0];
+  const defaultAccount =
+    (suggestedAccountId ? accounts.find((a) => a.id === suggestedAccountId) : null) ??
+    (importAccountId ? accounts.find((a) => a.id === importAccountId) : null) ??
+    (importInstitutionId ? accounts.find((a) => a.institutionId === importInstitutionId) : null) ??
+    accounts[0];
   const [accountId, setAccountId] = useState<string>(defaultAccount?.id ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
@@ -142,7 +167,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   // Filtros de la lista (todo client-side sobre `lines`). Con cientos de filas,
   // permiten aislar un grupo homogéneo (ej. "TRANSF MOBILE") y bulk-categorizarlo.
   const [textFilter, setTextFilter] = useState('');
-  const [catFilter, setCatFilter] = useState<'all' | 'uncat' | 'categorized' | 'transfer' | 'dup'>('all');
+  const [catFilter, setCatFilter] = useState<'all' | 'uncat' | 'categorized' | 'transfer' | 'dup'>(
+    'all',
+  );
   const [kindFilter, setKindFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   // Rango de fechas: los resúmenes arrastran movimientos del ejercicio anterior
@@ -151,10 +178,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(0);
 
-  const lineSummary = useMemo(
-    () => summarizeLineStatuses(lines.map((l) => l.status)),
-    [lines],
-  );
+  const lineSummary = useMemo(() => summarizeLineStatuses(lines.map((l) => l.status)), [lines]);
 
   const totals = useMemo(() => computeTotalsByCurrency(lines), [lines]);
 
@@ -223,7 +247,8 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
     return (l: LineRow): boolean => {
       const p = l.parsedData;
       if (q) {
-        const hay = `${p.description ?? ''} ${p.counterparty?.label ?? ''} ${p.counterparty?.name ?? ''}`.toLowerCase();
+        const hay =
+          `${p.description ?? ''} ${p.counterparty?.label ?? ''} ${p.counterparty?.name ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (kindFilter !== 'all' && p.kind !== kindFilter) return false;
@@ -242,7 +267,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   // Líneas que ya existen como transacción por otro import. Sólo cuentan las que
   // todavía se pueden descartar: una ya confirmada o rechazada no es accionable.
   const dupCount = useMemo(
-    () => lines.filter((l) => l.alreadyImported && l.transactionId === null && l.status !== 'rejected').length,
+    () =>
+      lines.filter((l) => l.alreadyImported && l.transactionId === null && l.status !== 'rejected')
+        .length,
     [lines],
   );
 
@@ -273,22 +300,52 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   }
 
   const filtersActive =
-    textFilter.trim() !== '' || catFilter !== 'all' || kindFilter !== 'all' || statusFilter !== 'all';
+    textFilter.trim() !== '' ||
+    catFilter !== 'all' ||
+    kindFilter !== 'all' ||
+    statusFilter !== 'all';
 
   // Paginación client-side: mantiene ≤PAGE_SIZE filas en el DOM (367+ filas sin lag).
   const totalPages = Math.max(1, Math.ceil(visibleLines.length / PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages - 1);
-  const pageLines = visibleLines.slice(pageClamped * PAGE_SIZE, pageClamped * PAGE_SIZE + PAGE_SIZE);
+  const pageLines = visibleLines.slice(
+    pageClamped * PAGE_SIZE,
+    pageClamped * PAGE_SIZE + PAGE_SIZE,
+  );
 
   // Cada cambio de filtro vuelve a la página 1 (evita quedar en una página vacía)
   // y descongela la lista (el cambio de filtro es una acción explícita del usuario).
   // Se hace en los setters (no en un effect) para no disparar renders en cascada.
-  function applyTextFilter(v: string) { setTextFilter(v); setPage(0); setPinnedIds(null); }
-  function applyCatFilter(v: typeof catFilter) { setCatFilter(v); setPage(0); setPinnedIds(null); }
-  function applyKindFilter(v: typeof kindFilter) { setKindFilter(v); setPage(0); setPinnedIds(null); }
-  function applyStatusFilter(v: FilterStatus) { setStatusFilter(v); setPage(0); setPinnedIds(null); }
-  function applyDateFrom(v: string) { setDateFrom(v); setPage(0); setPinnedIds(null); }
-  function applyDateTo(v: string) { setDateTo(v); setPage(0); setPinnedIds(null); }
+  function applyTextFilter(v: string) {
+    setTextFilter(v);
+    setPage(0);
+    setPinnedIds(null);
+  }
+  function applyCatFilter(v: typeof catFilter) {
+    setCatFilter(v);
+    setPage(0);
+    setPinnedIds(null);
+  }
+  function applyKindFilter(v: typeof kindFilter) {
+    setKindFilter(v);
+    setPage(0);
+    setPinnedIds(null);
+  }
+  function applyStatusFilter(v: FilterStatus) {
+    setStatusFilter(v);
+    setPage(0);
+    setPinnedIds(null);
+  }
+  function applyDateFrom(v: string) {
+    setDateFrom(v);
+    setPage(0);
+    setPinnedIds(null);
+  }
+  function applyDateTo(v: string) {
+    setDateTo(v);
+    setPage(0);
+    setPinnedIds(null);
+  }
 
   function clearFilters() {
     setTextFilter('');
@@ -333,7 +390,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
       return;
     }
     if (!uniformKind) {
-      toast.error('Las líneas seleccionadas son de tipos distintos (ingreso y gasto). Filtrá por tipo antes.');
+      toast.error(
+        'Las líneas seleccionadas son de tipos distintos (ingreso y gasto). Filtrá por tipo antes.',
+      );
       return;
     }
     pinList();
@@ -476,7 +535,11 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
     }
     pinList();
     startTransition(async () => {
-      const res = await bulkSetTags({ importId, lineIds: [...selectedIds], tagIds: [...bulkTagIds] });
+      const res = await bulkSetTags({
+        importId,
+        lineIds: [...selectedIds],
+        tagIds: [...bulkTagIds],
+      });
       if (res.ok) {
         toast.success(`Tags aplicados a ${res.updated} líneas`);
         setSelectedIds(new Set());
@@ -526,7 +589,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
     startTransition(async () => {
       const res = await setLineStatus({ importId, lineIds: [...selectedIds], status: 'pending' });
       if (res.ok) {
-        toast.success(`${res.updated} ${res.updated === 1 ? 'línea vuelta' : 'líneas vueltas'} a pendiente`);
+        toast.success(
+          `${res.updated} ${res.updated === 1 ? 'línea vuelta' : 'líneas vueltas'} a pendiente`,
+        );
         setSelectedIds(new Set());
         router.refresh();
       } else {
@@ -673,33 +738,38 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
         sameCounterpartyIdentity(cp, l.parsedData.counterparty),
     );
     if (siblings.length === 0) return;
-    toast(`Hay ${siblings.length} línea${siblings.length === 1 ? '' : 's'} más de la misma contraparte.`, {
-      duration: 12_000,
-      action: {
-        label: `Etiquetar "${label}"`,
-        onClick: () => {
-          startTransition(async () => {
-            const res = await bulkSetCounterpartyLabel({
-              importId,
-              lineIds: siblings.map((l) => l.id),
-              label,
+    toast(
+      `Hay ${siblings.length} línea${siblings.length === 1 ? '' : 's'} más de la misma contraparte.`,
+      {
+        duration: 12_000,
+        action: {
+          label: `Etiquetar "${label}"`,
+          onClick: () => {
+            startTransition(async () => {
+              const res = await bulkSetCounterpartyLabel({
+                importId,
+                lineIds: siblings.map((l) => l.id),
+                label,
+              });
+              if (res.ok) {
+                toast.success(`Etiqueta aplicada a ${res.updated} líneas más`);
+                router.refresh();
+              } else {
+                toast.error(`Error: ${res.error}`);
+              }
             });
-            if (res.ok) {
-              toast.success(`Etiqueta aplicada a ${res.updated} líneas más`);
-              router.refresh();
-            } else {
-              toast.error(`Error: ${res.error}`);
-            }
-          });
+          },
         },
       },
-    });
+    );
   }
 
   function doConfirm() {
     const confirmErr = importConfirmError(lineSummary);
     if (confirmErr === 'unresolved_lines') {
-      toast.error('No podés confirmar la importación hasta que resuelvas todas las líneas (aceptándolas o rechazándolas).');
+      toast.error(
+        'No podés confirmar la importación hasta que resuelvas todas las líneas (aceptándolas o rechazándolas).',
+      );
       return;
     }
     const hasToConfirm = lineSummary.accepted + lineSummary.edited > 0;
@@ -714,9 +784,8 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
     startTransition(async () => {
       const res = await confirmImport({ importId, accountId });
       if (res.ok) {
-        const matchMsg = res.autoMatchCount > 0
-          ? ` · ${res.autoMatchCount} linkeadas con previsiones`
-          : '';
+        const matchMsg =
+          res.autoMatchCount > 0 ? ` · ${res.autoMatchCount} linkeadas con previsiones` : '';
         if (res.rejectedCount > 0) {
           toast.warning(
             `${res.createdCount} confirmadas${matchMsg} · ${res.rejectedCount} con error (ver detalle abajo)`,
@@ -738,9 +807,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">
-          Líneas extraídas · {lines.length}
-        </h2>
+        <h2 className="text-lg font-semibold">Líneas extraídas · {lines.length}</h2>
         <div className="flex flex-wrap gap-2 text-xs">
           <Badge label="Pending" count={lineSummary.pending} tone="slate" />
           <Badge label="Aceptadas" count={lineSummary.accepted} tone="emerald" />
@@ -750,7 +817,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
       </div>
 
       {/* Barra de filtros: aísla un subconjunto homogéneo para revisar/categorizar. */}
-      <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+      <div className="bg-muted/20 space-y-2 rounded-md border p-3">
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={textFilter}
@@ -758,7 +825,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             placeholder="Buscar en descripción / contraparte…"
             className="h-9 w-full max-w-xs"
           />
-          <span className="text-xs text-muted-foreground">
+          <span className="text-muted-foreground text-xs">
             Mostrando <span className="font-medium tabular-nums">{visibleLines.length}</span> de{' '}
             <span className="tabular-nums">{lines.length}</span>
           </span>
@@ -768,7 +835,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             </Button>
           )}
           {pinnedIds !== null && (
-            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="text-muted-foreground flex items-center gap-2 text-xs">
               <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
                 Lista congelada — tus cambios no la reordenan
               </span>
@@ -780,10 +847,24 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <FilterGroup label="Categoría">
-            <FilterChip active={catFilter === 'all'} onClick={() => applyCatFilter('all')}>Todas</FilterChip>
-            <FilterChip active={catFilter === 'uncat'} onClick={() => applyCatFilter('uncat')}>Sin categorizar</FilterChip>
-            <FilterChip active={catFilter === 'categorized'} onClick={() => applyCatFilter('categorized')}>Categorizadas</FilterChip>
-            <FilterChip active={catFilter === 'transfer'} onClick={() => applyCatFilter('transfer')}>Transfers</FilterChip>
+            <FilterChip active={catFilter === 'all'} onClick={() => applyCatFilter('all')}>
+              Todas
+            </FilterChip>
+            <FilterChip active={catFilter === 'uncat'} onClick={() => applyCatFilter('uncat')}>
+              Sin categorizar
+            </FilterChip>
+            <FilterChip
+              active={catFilter === 'categorized'}
+              onClick={() => applyCatFilter('categorized')}
+            >
+              Categorizadas
+            </FilterChip>
+            <FilterChip
+              active={catFilter === 'transfer'}
+              onClick={() => applyCatFilter('transfer')}
+            >
+              Transfers
+            </FilterChip>
             {dupCount > 0 && (
               <FilterChip active={catFilter === 'dup'} onClick={() => applyCatFilter('dup')}>
                 Ya existen ({dupCount})
@@ -791,30 +872,61 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             )}
           </FilterGroup>
           <FilterGroup label="Tipo">
-            <FilterChip active={kindFilter === 'all'} onClick={() => applyKindFilter('all')}>Todos</FilterChip>
-            <FilterChip active={kindFilter === 'expense'} onClick={() => applyKindFilter('expense')}>Gasto</FilterChip>
-            <FilterChip active={kindFilter === 'income'} onClick={() => applyKindFilter('income')}>Ingreso</FilterChip>
+            <FilterChip active={kindFilter === 'all'} onClick={() => applyKindFilter('all')}>
+              Todos
+            </FilterChip>
+            <FilterChip
+              active={kindFilter === 'expense'}
+              onClick={() => applyKindFilter('expense')}
+            >
+              Gasto
+            </FilterChip>
+            <FilterChip active={kindFilter === 'income'} onClick={() => applyKindFilter('income')}>
+              Ingreso
+            </FilterChip>
           </FilterGroup>
           <FilterGroup label="Estado">
-            <FilterChip active={statusFilter === 'all'} onClick={() => applyStatusFilter('all')}>Todos</FilterChip>
-            <FilterChip active={statusFilter === 'pending'} onClick={() => applyStatusFilter('pending')}>Pending</FilterChip>
-            <FilterChip active={statusFilter === 'accepted'} onClick={() => applyStatusFilter('accepted')}>Aceptadas</FilterChip>
-            <FilterChip active={statusFilter === 'edited'} onClick={() => applyStatusFilter('edited')}>Editadas</FilterChip>
-            <FilterChip active={statusFilter === 'rejected'} onClick={() => applyStatusFilter('rejected')}>Rechazadas</FilterChip>
+            <FilterChip active={statusFilter === 'all'} onClick={() => applyStatusFilter('all')}>
+              Todos
+            </FilterChip>
+            <FilterChip
+              active={statusFilter === 'pending'}
+              onClick={() => applyStatusFilter('pending')}
+            >
+              Pending
+            </FilterChip>
+            <FilterChip
+              active={statusFilter === 'accepted'}
+              onClick={() => applyStatusFilter('accepted')}
+            >
+              Aceptadas
+            </FilterChip>
+            <FilterChip
+              active={statusFilter === 'edited'}
+              onClick={() => applyStatusFilter('edited')}
+            >
+              Editadas
+            </FilterChip>
+            <FilterChip
+              active={statusFilter === 'rejected'}
+              onClick={() => applyStatusFilter('rejected')}
+            >
+              Rechazadas
+            </FilterChip>
           </FilterGroup>
           <FilterGroup label="Fecha del movimiento">
             <input
               type="date"
               aria-label="Desde"
-              className="h-7 rounded-md border bg-background px-2 text-xs"
+              className="bg-background h-7 rounded-md border px-2 text-xs"
               value={dateFrom}
               onChange={(e) => applyDateFrom(e.target.value)}
             />
-            <span className="text-xs text-muted-foreground">→</span>
+            <span className="text-muted-foreground text-xs">→</span>
             <input
               type="date"
               aria-label="Hasta"
-              className="h-7 rounded-md border bg-background px-2 text-xs"
+              className="bg-background h-7 rounded-md border px-2 text-xs"
               value={dateTo}
               onChange={(e) => applyDateTo(e.target.value)}
             />
@@ -839,9 +951,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                 {dupCount === 1 ? '' : 'n'} en esta cuenta
               </p>
               <p className="text-xs">
-                Coinciden en fecha (±1 día) y monto con movimientos cargados por otro
-                import. Confirmarlas duplicaría la cuenta. Revisalas antes de descartar:
-                un mismo importe puede repetirse el mismo día de forma legítima.
+                Coinciden en fecha (±1 día) y monto con movimientos cargados por otro import.
+                Confirmarlas duplicaría la cuenta. Revisalas antes de descartar: un mismo importe
+                puede repetirse el mismo día de forma legítima.
               </p>
             </div>
             <Button
@@ -874,7 +986,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                 : `Seleccionar las ${selectableFilteredIds.length} filtradas`}
             </Button>
             {filtersActive && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 Filtrá un grupo homogéneo y asignale categoría/transfer en lote desde la barra azul.
               </span>
             )}
@@ -977,7 +1089,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                 value={bulkCurrency}
                 onValueChange={(v) => setBulkCurrency(v as 'ARS' | 'USD')}
               >
-                <SelectTrigger className="h-9 w-24 bg-background">
+                <SelectTrigger className="bg-background h-9 w-24">
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1171,12 +1283,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
               </div>
             </div>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedIds(new Set())}
-          >
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
             Limpiar selección
           </Button>
         </div>
@@ -1187,23 +1294,58 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
           <thead className="bg-muted/40">
             <tr className="text-left">
               {!readOnly && (
-                <th className="px-2 py-2 w-8">
+                <th className="w-8 px-2 py-2">
                   <input
                     type="checkbox"
                     aria-label="Seleccionar todas las filtradas"
                     checked={allFilteredSelected}
                     onChange={toggleAllFiltered}
-                    className="size-4 rounded border-input"
+                    className="border-input size-4 rounded"
                   />
                 </th>
               )}
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Fecha" field="date" criteria={sortCriteria} onSort={handleSort} /></th>
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Descripción" field="description" criteria={sortCriteria} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium">
+                <SortableHeader
+                  label="Fecha"
+                  field="date"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
+              </th>
+              <th className="px-2 py-2 font-medium">
+                <SortableHeader
+                  label="Descripción"
+                  field="description"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
+              </th>
               <th className="px-2 py-2 font-medium">Tipo</th>
-              <th className="px-2 py-2 text-right font-medium"><SortableHeader label="Monto" field="amount" criteria={sortCriteria} onSort={handleSort} /></th>
+              <th className="px-2 py-2 text-right font-medium">
+                <SortableHeader
+                  label="Monto"
+                  field="amount"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
+              </th>
               <th className="px-2 py-2 font-medium">Mon.</th>
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Categoría" field="category" criteria={sortCriteria} onSort={handleSort} /></th>
-              <th className="px-2 py-2 font-medium"><SortableHeader label="Estado" field="status" criteria={sortCriteria} onSort={handleSort} /></th>
+              <th className="px-2 py-2 font-medium">
+                <SortableHeader
+                  label="Categoría"
+                  field="category"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
+              </th>
+              <th className="px-2 py-2 font-medium">
+                <SortableHeader
+                  label="Estado"
+                  field="status"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
+              </th>
               {!readOnly && <th className="px-2 py-2 font-medium">Acciones</th>}
             </tr>
           </thead>
@@ -1232,7 +1374,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
               <tr>
                 <td
                   colSpan={readOnly ? 7 : 9}
-                  className="px-3 py-6 text-center text-muted-foreground"
+                  className="text-muted-foreground px-3 py-6 text-center"
                 >
                   Sin líneas. ¿Ya parseaste el archivo?
                 </td>
@@ -1242,10 +1384,14 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
               <tr>
                 <td
                   colSpan={readOnly ? 7 : 9}
-                  className="px-3 py-6 text-center text-muted-foreground"
+                  className="text-muted-foreground px-3 py-6 text-center"
                 >
                   Ninguna línea coincide con los filtros.{' '}
-                  <button type="button" onClick={clearFilters} className="text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-primary hover:underline"
+                  >
                     Limpiar filtros
                   </button>
                 </td>
@@ -1257,9 +1403,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {pageClamped * PAGE_SIZE + 1}–{Math.min((pageClamped + 1) * PAGE_SIZE, visibleLines.length)} de{' '}
-            {visibleLines.length}
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {pageClamped * PAGE_SIZE + 1}–
+            {Math.min((pageClamped + 1) * PAGE_SIZE, visibleLines.length)} de {visibleLines.length}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -1288,9 +1434,9 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
       )}
 
       {totals.length > 0 && (
-        <div className="rounded-md border bg-muted/20 p-3">
+        <div className="bg-muted/20 rounded-md border p-3">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-muted-foreground text-xs font-medium">
               Totales extraídos (excluye rechazadas)
             </p>
             {pdfUrl && (
@@ -1298,7 +1444,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                 href={pdfUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-medium text-primary hover:underline"
+                className="text-primary text-xs font-medium hover:underline"
               >
                 Abrir PDF para verificar ↗
               </a>
@@ -1308,7 +1454,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             {totals.map((t) => (
               <div
                 key={t.currency}
-                className="flex items-center justify-between rounded border bg-card px-3 py-2"
+                className="bg-card flex items-center justify-between rounded border px-3 py-2"
               >
                 <span className="font-medium">
                   {t.currency} · {t.count} {t.count === 1 ? 'línea' : 'líneas'}
@@ -1320,9 +1466,7 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
                   <span className="text-emerald-700">
                     Ingresos {formatAmount(t.income, t.currency)}
                   </span>
-                  <span className="font-semibold">
-                    Neto {formatAmount(t.net, t.currency)}
-                  </span>
+                  <span className="font-semibold">Neto {formatAmount(t.net, t.currency)}</span>
                 </span>
               </div>
             ))}
@@ -1332,15 +1476,16 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
           {summary && (summary.totalExpense || summary.totalIncome) ? (
             <SummaryValidation totals={totals} summary={summary} />
           ) : (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Subtotales del resumen no disponibles — re-parseá para extraerlos o verificá manualmente.
+            <p className="text-muted-foreground mt-2 text-xs">
+              Subtotales del resumen no disponibles — re-parseá para extraerlos o verificá
+              manualmente.
             </p>
           )}
         </div>
       )}
 
       {!readOnly && (
-        <div className="space-y-3 rounded-md border bg-card p-4">
+        <div className="bg-card space-y-3 rounded-md border p-4">
           {lineSummary.pending > 0 && (
             <div className="flex gap-2">
               <Button
@@ -1364,72 +1509,76 @@ export function ImportReview({ importId, status, lines, tree, tags, knownCounter
             </div>
           )}
           <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="accountId">
-              Cuenta del extracto (común a todas las líneas)
-            </label>
-            <Select
-              value={accountId}
-              onValueChange={(v) => {
-                setAccountId(v);
-                // Si el extracto trae un nº no reconocido, lo "aprendemos" en la
-                // cuenta elegida para auto-sugerirla en imports futuros.
-                if (statementAccountRef && !suggestedAccountId && v) {
-                  startTransition(async () => {
-                    const res = await learnAccountNumber({
-                      accountId: v,
-                      accountNumber: statementAccountRef,
-                      importId,
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" htmlFor="accountId">
+                Cuenta del extracto (común a todas las líneas)
+              </label>
+              <Select
+                value={accountId}
+                onValueChange={(v) => {
+                  setAccountId(v);
+                  // Si el extracto trae un nº no reconocido, lo "aprendemos" en la
+                  // cuenta elegida para auto-sugerirla en imports futuros.
+                  if (statementAccountRef && !suggestedAccountId && v) {
+                    startTransition(async () => {
+                      const res = await learnAccountNumber({
+                        accountId: v,
+                        accountNumber: statementAccountRef,
+                        importId,
+                      });
+                      if (res.ok && res.updated) {
+                        toast.success(
+                          `Nº ${statementAccountRef} guardado en la cuenta — la próxima se sugiere sola`,
+                        );
+                        router.refresh();
+                      }
                     });
-                    if (res.ok && res.updated) {
-                      toast.success(
-                        `Nº ${statementAccountRef} guardado en la cuenta — la próxima se sugiere sola`,
-                      );
-                      router.refresh();
-                    }
-                  });
-                }
-              }}
-            >
-              <SelectTrigger id="accountId" className="w-72">
-                <SelectValue placeholder="Elegí una cuenta" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {accountLabel(a)}
-                  </SelectItem>
+                  }
+                }}
+              >
+                <SelectTrigger id="accountId" className="w-72">
+                  <SelectValue placeholder="Elegí una cuenta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {accountLabel(a)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {statementAccountRef &&
+                (suggestedAccountId ? (
+                  <p className="text-xs text-emerald-700">
+                    ✓ Cuenta sugerida por el Nº{' '}
+                    <span className="font-mono">{statementAccountRef}</span> del extracto.
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-700">
+                    Extracto de la cuenta Nº{' '}
+                    <span className="font-mono">{statementAccountRef}</span> (no reconocido). Al
+                    elegir la cuenta correcta, guardamos el número para sugerirla sola la próxima
+                    vez.
+                  </p>
                 ))}
-              </SelectContent>
-            </Select>
-            {statementAccountRef &&
-              (suggestedAccountId ? (
-                <p className="text-xs text-emerald-700">
-                  ✓ Cuenta sugerida por el Nº <span className="font-mono">{statementAccountRef}</span> del extracto.
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {lineSummary.pending > 0 && (
+                <p className="mr-2 self-center text-xs text-amber-600 dark:text-amber-400">
+                  Quedan {lineSummary.pending} {lineSummary.pending === 1 ? 'línea' : 'líneas'} sin
+                  resolver.
                 </p>
-              ) : (
-                <p className="text-xs text-amber-700">
-                  Extracto de la cuenta Nº <span className="font-mono">{statementAccountRef}</span> (no reconocido).
-                  Al elegir la cuenta correcta, guardamos el número para sugerirla sola la próxima vez.
-                </p>
-              ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {lineSummary.pending > 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 self-center mr-2">
-                Quedan {lineSummary.pending} {lineSummary.pending === 1 ? 'línea' : 'líneas'} sin resolver.
-              </p>
-            )}
-            <Button
-              type="button"
-              onClick={doConfirm}
-              disabled={isPending || lineSummary.pending > 0}
-            >
-              {lineSummary.accepted + lineSummary.edited === 0
-                ? 'Confirmar import'
-                : `Confirmar import (${lineSummary.accepted + lineSummary.edited})`}
-            </Button>
-          </div>
+              )}
+              <Button
+                type="button"
+                onClick={doConfirm}
+                disabled={isPending || lineSummary.pending > 0}
+              >
+                {lineSummary.accepted + lineSummary.edited === 0
+                  ? 'Confirmar import'
+                  : `Confirmar import (${lineSummary.accepted + lineSummary.edited})`}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1480,7 +1629,17 @@ function LineRowEditor({
   importId: string;
   tree: CategoryNode[];
   tags: TagOption[];
-  accounts: Array<{ id: string; name: string; type: AccountForDisplay['type']; cardBrand: AccountForDisplay['cardBrand']; institutionName: string | null; currency: 'ARS' | 'USD'; institutionId: string | null; ownerTag: string; transferRefs: string[] | null }>;
+  accounts: Array<{
+    id: string;
+    name: string;
+    type: AccountForDisplay['type'];
+    cardBrand: AccountForDisplay['cardBrand'];
+    institutionName: string | null;
+    currency: 'ARS' | 'USD';
+    institutionId: string | null;
+    ownerTag: string;
+    transferRefs: string[] | null;
+  }>;
   currentAccountId: string;
   readOnly: boolean;
   isPending: boolean;
@@ -1526,7 +1685,9 @@ function LineRowEditor({
   // Item 14: para líneas transfer, buscar si matchea una transacción YA existente
   // (la pata del otro extracto). Si hay match, se informa y se pre-carga la cuenta
   // destino; el pareo real lo hace el match-al-confirmar (#44).
-  const [transferMatch, setTransferMatch] = useState<LineTransferMatch | null | undefined>(undefined);
+  const [transferMatch, setTransferMatch] = useState<LineTransferMatch | null | undefined>(
+    undefined,
+  );
   useEffect(() => {
     if (!editing || transferMatch !== undefined || !draft.isTransfer || !currentAccountId) return;
     let cancelled = false;
@@ -1639,659 +1800,685 @@ function LineRowEditor({
 
   return (
     <>
-    <tr
-      className={cn(
-        'border-t align-top',
-        isSelected && !readOnly && 'bg-blue-50/50',
-        editing && !readOnly && 'bg-blue-50/40',
-        line.status === 'rejected' && 'opacity-70',
-        dimmed && 'opacity-50',
-        !readOnly && !editing && 'cursor-pointer',
-      )}
-      onClick={(e) => {
-        if (readOnly || editing) return;
-        const tag = (e.target as HTMLElement).closest('button, input, select, a, [role="combobox"]');
-        if (tag) return;
-        onToggleSelect();
-      }}
-    >
-      {!readOnly && (
-        <td className="px-2 py-1.5">
-          <input
-            type="checkbox"
-            aria-label="Seleccionar línea"
-            checked={isSelected}
-            onChange={onToggleSelect}
-            disabled={editing || line.transactionId !== null}
-            className="size-4 rounded border-input"
-          />
-        </td>
-      )}
-      <td className="px-2 py-1.5 tabular-nums">
-        {line.parsedData.notes?.includes(DATE_COLLAPSE_LINE_MARKER) ? (
-          <span
-            className="rounded bg-amber-100 px-1 text-amber-900"
-            title="El parser no pudo extraer la fecha real del consumo (todas las líneas quedaron con la misma fecha). Verificala contra el PDF antes de aceptar."
-          >
-            {line.parsedData.date} ⚠
-          </span>
-        ) : (
-          line.parsedData.date
+      <tr
+        className={cn(
+          'border-t align-top',
+          isSelected && !readOnly && 'bg-blue-50/50',
+          editing && !readOnly && 'bg-blue-50/40',
+          line.status === 'rejected' && 'opacity-70',
+          dimmed && 'opacity-50',
+          !readOnly && !editing && 'cursor-pointer',
         )}
-      </td>
-      <td className="px-2 py-1.5">
-        {line.parsedData.description}
-        <CounterpartyTag counterparty={line.parsedData.counterparty} className="mt-0.5" />
-      </td>
-      <td className="px-2 py-1.5">
-        <div className="flex flex-wrap items-center gap-1">
-          {line.parsedData.kind === 'expense' ? (
-            <span className="text-[color:var(--bad)]">Gasto</span>
-          ) : (
-            <span className="text-[color:var(--good)]">Ingreso</span>
-          )}
-          {line.parsedData.isTransfer && (
-            <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
-              Transfer
-            </span>
-          )}
-          {line.parsedData.isRefund && (
-            <span className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
-              Devolución
-            </span>
-          )}
-          {line.parsedData.deducibleGanancias && (
-            <span className="inline-block rounded-full border border-violet-300 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800">
-              Deducible
-            </span>
-          )}
-          {line.parsedData.domesticService && (
-            <span className="inline-block rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
-              Doméstico
-            </span>
-          )}
-          {line.parsedData.forecastId && (
-            <span className="inline-block rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
-              Previsión
-            </span>
-          )}
-          {(line.parsedData.tagIds ?? []).map((tid) => {
-            const t = tags.find((x) => x.id === tid);
-            return t ? (
-              <span
-                key={tid}
-                className="inline-block rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700"
-              >
-                #{t.name}
-              </span>
-            ) : null;
-          })}
-        </div>
-      </td>
-      <td className="px-2 py-1.5 text-right tabular-nums">
-        <span className={line.parsedData.kind === 'income' ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]'}>
-          {line.parsedData.amountOriginal}
-        </span>
-        {line.alreadyImported && line.transactionId === null && line.status !== 'rejected' && (
-          <span
-            className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-900"
-            title="Ya hay un movimiento con esta fecha (±1 día) y monto en la cuenta, cargado por otro import. Confirmarla lo duplicaría."
-          >
-            ya existe
-          </span>
+        onClick={(e) => {
+          if (readOnly || editing) return;
+          const tag = (e.target as HTMLElement).closest(
+            'button, input, select, a, [role="combobox"]',
+          );
+          if (tag) return;
+          onToggleSelect();
+        }}
+      >
+        {!readOnly && (
+          <td className="px-2 py-1.5">
+            <input
+              type="checkbox"
+              aria-label="Seleccionar línea"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              disabled={editing || line.transactionId !== null}
+              className="border-input size-4 rounded"
+            />
+          </td>
         )}
-      </td>
-      <td className="px-2 py-1.5">{line.parsedData.currencyOriginal}</td>
-      <td className="px-2 py-1.5">
-        {line.parsedData.isTransfer ? (
-          counterpart ? (
-            <span className="text-amber-800">
-              {counterpart.name} ({counterpart.ownerTag})
-            </span>
-          ) : (
-            // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
-            // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
-            // Ya no bloquea el confirm: la línea entra como pata sola sin parear.
-            <span className="text-muted-foreground">
-              {counterpartyIsSelf ? (
-                <span title="El ordenante del movimiento sos vos mismo: el extracto no dice de qué cuenta propia salió. No hay contracuenta que asignar.">
-                  Ordenante = vos mismo · sin dato de origen
-                </span>
-              ) : (
-                'Sin contracuenta · queda sin parear'
-              )}
-            </span>
-          )
-        ) : readOnly || line.transactionId || editing ? (
-          categoryName ?? <span className="text-muted-foreground">—</span>
-        ) : (
-          // Combobox inline: categorizar un gasto/ingreso suelto en un clic.
-          <CategoryCombobox
-            options={categoriesForKind}
-            value={categoryId ?? ''}
-            onChange={quickCategory}
-            disabled={isPending}
-            placeholder="Categoría…"
-          />
-        )}
-      </td>
-      <td className="px-2 py-1.5">
-        <div className="flex flex-col gap-1">
-          <span
-            className={cn(
-              'inline-block rounded-full border px-2 py-0.5 text-xs',
-              STATUS_BADGE[line.status] ?? '',
-            )}
-          >
-            {STATUS_LABEL[line.status] ?? line.status}
-          </span>
-          {line.status === 'rejected' && (
-            <span className="text-[10px] leading-tight text-muted-foreground">
-              {rejectReason(line)}
-            </span>
-          )}
-          {line.transactionId && (
-            <a
-              href={`/transactions/${line.transactionId}`}
-              className="text-[10px] text-emerald-700 hover:underline"
+        <td className="px-2 py-1.5 tabular-nums">
+          {line.parsedData.notes?.includes(DATE_COLLAPSE_LINE_MARKER) ? (
+            <span
+              className="rounded bg-amber-100 px-1 text-amber-900"
+              title="El parser no pudo extraer la fecha real del consumo (todas las líneas quedaron con la misma fecha). Verificala contra el PDF antes de aceptar."
             >
-              → tx
-            </a>
-          )}
-        </div>
-      </td>
-      {!readOnly && (
-        <td className="px-2 py-1.5">
-          {line.transactionId ? (
-            <span className="text-xs text-muted-foreground">linkeada</span>
-          ) : editing ? (
-            <span className="text-xs font-medium text-blue-700">✎ editando ↓</span>
+              {line.parsedData.date} ⚠
+            </span>
           ) : (
-            // Rechazada: única acción posible es recuperarla a pendiente. Editar una
-            // rechazada no tiene sentido (primero se des-rechaza, después se edita) y
-            // es la red de seguridad ante falsos positivos del dedup automático.
-            <div className="flex flex-wrap gap-1">
-              {line.status === 'rejected' ? (
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                  onClick={() => onSetStatus(line.id, 'pending')}
-                  disabled={isPending}
+            line.parsedData.date
+          )}
+        </td>
+        <td className="px-2 py-1.5">
+          {line.parsedData.description}
+          <CounterpartyTag counterparty={line.parsedData.counterparty} className="mt-0.5" />
+        </td>
+        <td className="px-2 py-1.5">
+          <div className="flex flex-wrap items-center gap-1">
+            {line.parsedData.kind === 'expense' ? (
+              <span className="text-[color:var(--bad)]">Gasto</span>
+            ) : (
+              <span className="text-[color:var(--good)]">Ingreso</span>
+            )}
+            {line.parsedData.isTransfer && (
+              <span className="inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+                Transfer
+              </span>
+            )}
+            {line.parsedData.isRefund && (
+              <span className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                Devolución
+              </span>
+            )}
+            {line.parsedData.deducibleGanancias && (
+              <span className="inline-block rounded-full border border-violet-300 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800">
+                Deducible
+              </span>
+            )}
+            {line.parsedData.domesticService && (
+              <span className="inline-block rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
+                Doméstico
+              </span>
+            )}
+            {line.parsedData.forecastId && (
+              <span className="inline-block rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+                Previsión
+              </span>
+            )}
+            {(line.parsedData.tagIds ?? []).map((tid) => {
+              const t = tags.find((x) => x.id === tid);
+              return t ? (
+                <span
+                  key={tid}
+                  className="inline-block rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-700"
                 >
-                  Des-rechazar
-                </Button>
-              ) : (
-                <>
-                  {line.status === 'pending' && (
-                    <>
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => onSetStatus(line.id, 'accepted')}
-                        disabled={isPending}
-                      >
-                        ✓
-                      </Button>
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => onSetStatus(line.id, 'rejected')}
-                        disabled={isPending}
-                      >
-                        ✕
-                      </Button>
-                    </>
-                  )}
-                  {line.status !== 'pending' && (
-                    <>
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => onSetStatus(line.id, 'rejected')}
-                        disabled={isPending}
-                      >
-                        ✕
-                      </Button>
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => onSetStatus(line.id, 'pending')}
-                        disabled={isPending}
-                      >
-                        Volver
-                      </Button>
-                    </>
-                  )}
+                  #{t.name}
+                </span>
+              ) : null;
+            })}
+          </div>
+        </td>
+        <td className="px-2 py-1.5 text-right tabular-nums">
+          <span
+            className={
+              line.parsedData.kind === 'income'
+                ? 'text-[color:var(--good)]'
+                : 'text-[color:var(--bad)]'
+            }
+          >
+            {line.parsedData.amountOriginal}
+          </span>
+          {line.alreadyImported && line.transactionId === null && line.status !== 'rejected' && (
+            <span
+              className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-900"
+              title="Ya hay un movimiento con esta fecha (±1 día) y monto en la cuenta, cargado por otro import. Confirmarla lo duplicaría."
+            >
+              ya existe
+            </span>
+          )}
+        </td>
+        <td className="px-2 py-1.5">{line.parsedData.currencyOriginal}</td>
+        <td className="px-2 py-1.5">
+          {line.parsedData.isTransfer ? (
+            counterpart ? (
+              <span className="text-amber-800">
+                {counterpart.name} ({counterpart.ownerTag})
+              </span>
+            ) : (
+              // "Sin contraparte" era engañoso: esta columna es la CUENTA PROPIA destino
+              // del transfer, no la identidad de contraparte (que se ve bajo la descripción).
+              // Ya no bloquea el confirm: la línea entra como pata sola sin parear.
+              <span className="text-muted-foreground">
+                {counterpartyIsSelf ? (
+                  <span title="El ordenante del movimiento sos vos mismo: el extracto no dice de qué cuenta propia salió. No hay contracuenta que asignar.">
+                    Ordenante = vos mismo · sin dato de origen
+                  </span>
+                ) : (
+                  'Sin contracuenta · queda sin parear'
+                )}
+              </span>
+            )
+          ) : readOnly || line.transactionId || editing ? (
+            (categoryName ?? <span className="text-muted-foreground">—</span>)
+          ) : (
+            // Combobox inline: categorizar un gasto/ingreso suelto en un clic.
+            <CategoryCombobox
+              options={categoriesForKind}
+              value={categoryId ?? ''}
+              onChange={quickCategory}
+              disabled={isPending}
+              placeholder="Categoría…"
+            />
+          )}
+        </td>
+        <td className="px-2 py-1.5">
+          <div className="flex flex-col gap-1">
+            <span
+              className={cn(
+                'inline-block rounded-full border px-2 py-0.5 text-xs',
+                STATUS_BADGE[line.status] ?? '',
+              )}
+            >
+              {STATUS_LABEL[line.status] ?? line.status}
+            </span>
+            {line.status === 'rejected' && (
+              <span className="text-muted-foreground text-[10px] leading-tight">
+                {rejectReason(line)}
+              </span>
+            )}
+            {line.transactionId && (
+              <a
+                href={`/transactions/${line.transactionId}`}
+                className="text-[10px] text-emerald-700 hover:underline"
+              >
+                → tx
+              </a>
+            )}
+          </div>
+        </td>
+        {!readOnly && (
+          <td className="px-2 py-1.5">
+            {line.transactionId ? (
+              <span className="text-muted-foreground text-xs">linkeada</span>
+            ) : editing ? (
+              <span className="text-xs font-medium text-blue-700">✎ editando ↓</span>
+            ) : (
+              // Rechazada: única acción posible es recuperarla a pendiente. Editar una
+              // rechazada no tiene sentido (primero se des-rechaza, después se edita) y
+              // es la red de seguridad ante falsos positivos del dedup automático.
+              <div className="flex flex-wrap gap-1">
+                {line.status === 'rejected' ? (
                   <Button
                     size="sm"
                     type="button"
-                    variant="ghost"
-                    onClick={() => setEditing(true)}
+                    variant="outline"
+                    onClick={() => onSetStatus(line.id, 'pending')}
                     disabled={isPending}
                   >
-                    Editar
+                    Des-rechazar
                   </Button>
-                  {!line.parsedData.isTransfer && (
+                ) : (
+                  <>
+                    {line.status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                          onClick={() => onSetStatus(line.id, 'accepted')}
+                          disabled={isPending}
+                        >
+                          ✓
+                        </Button>
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                          onClick={() => onSetStatus(line.id, 'rejected')}
+                          disabled={isPending}
+                        >
+                          ✕
+                        </Button>
+                      </>
+                    )}
+                    {line.status !== 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                          onClick={() => onSetStatus(line.id, 'rejected')}
+                          disabled={isPending}
+                        >
+                          ✕
+                        </Button>
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                          onClick={() => onSetStatus(line.id, 'pending')}
+                          disabled={isPending}
+                        >
+                          Volver
+                        </Button>
+                      </>
+                    )}
                     <Button
                       size="sm"
                       type="button"
                       variant="ghost"
-                      onClick={() => {
-                        setDraft({ ...line.parsedData, isTransfer: true });
-                        setCategoryId(null);
-                        setEditing(true);
-                      }}
+                      onClick={() => setEditing(true)}
                       disabled={isPending}
-                      className="text-amber-700"
                     >
-                      ⇄ Transfer
+                      Editar
                     </Button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </td>
-      )}
-    </tr>
-    {editing && !readOnly && (
-      <tr className="border-t bg-blue-50/40">
-        <td colSpan={colCount} className="px-3 py-3">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-900">
-              Editando línea
-            </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field label="Fecha">
-                <Input
-                  value={draft.date}
-                  onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                  className="h-8 w-32"
-                />
-              </Field>
-              <Field label="Tipo">
-                <Select
-                  value={draft.kind}
-                  // Un reembolso es siempre un gasto negativo: con el checkbox tildado
-                  // el Tipo queda fijo en Gasto (no se puede cambiar a Ingreso).
-                  disabled={draft.isRefund}
-                  onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
-                >
-                  <SelectTrigger className="h-8 w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="expense">Gasto</SelectItem>
-                    <SelectItem value="income">Ingreso</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Monto">
-                <Input
-                  value={draft.amountOriginal}
-                  onChange={(e) => setDraft({ ...draft, amountOriginal: e.target.value })}
-                  className="h-8 w-32 text-right"
-                />
-              </Field>
-              <Field label="Moneda">
-                <Select
-                  value={draft.currencyOriginal}
-                  onValueChange={(v) => setDraft({ ...draft, currencyOriginal: v as 'ARS' | 'USD' })}
-                >
-                  <SelectTrigger className="h-8 w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ARS">ARS</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field label="Descripción" className="min-w-[240px] flex-1">
-                <Input
-                  value={draft.description}
-                  onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                  className="h-8 w-full"
-                />
-              </Field>
-              {/* Siempre visible: si la línea no tiene counterparty, al guardar se
-                  crea {label} (el preprocess del schema lo omite si queda vacío). */}
-              <Field label="Etiqueta contraparte" className="min-w-[180px]">
-                <Input
-                  value={draft.counterparty?.label ?? ''}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      counterparty: {
-                        ...(draft.counterparty ?? {}),
-                        label: e.target.value || undefined,
-                      },
-                    })
-                  }
-                  placeholder="ej. Niñera, Alquiler…"
-                  className="h-8 w-48"
-                />
-              </Field>
-              {/* Categoría y transfer son mutuamente excluyentes: si es transfer no se
-                  muestra el selector de categoría (antes quedaba clickeable e invitaba
-                  a un estado contradictorio). */}
-              {!draft.isTransfer && (
-                <Field label="Categoría">
-                  <CategoryCombobox
-                    options={categoriesForKind}
-                    value={categoryId ?? ''}
-                    onChange={(id) => {
-                      setCategoryId(id || null);
-                    }}
-                    placeholder="Buscar categoría…"
-                  />
-                </Field>
-              )}
-              {draft.isTransfer && (
-                <Field label="Contracuenta (transferencia)">
-                  <Combobox
-                    options={counterpartyAccountOptions(accounts, currentAccountId).map((a) => ({
-                      id: a.id,
-                      label: accountLabel(a),
-                    }))}
-                    value={draft.transferAccountId ?? ''}
-                    onChange={(id) => setDraft({ ...draft, transferAccountId: id || undefined })}
-                    placeholder="Buscar cuenta…"
-                  />
-                </Field>
-              )}
-            </div>
-            {/* Se puede dejar vacía: hay extractos que no dicen de qué cuenta propia
-                salió la plata (el ordenante es el propio titular). La línea se
-                confirma igual como pata sola. */}
-            {draft.isTransfer && !draft.transferAccountId && !transferMatch && (
-              <p className="max-w-xl text-xs text-muted-foreground">
-                {counterpartyIsSelf ? (
-                  <>
-                    El <span className="font-medium">ordenante sos vos mismo</span> — el
-                    extracto solo trae tu CUIL/CBU y no dice de qué cuenta propia salió.
-                    Dejala vacía:{' '}
+                    {!line.parsedData.isTransfer && (
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setDraft({ ...line.parsedData, isTransfer: true });
+                          setCategoryId(null);
+                          setEditing(true);
+                        }}
+                        disabled={isPending}
+                        className="text-amber-700"
+                      >
+                        ⇄ Transfer
+                      </Button>
+                    )}
                   </>
-                ) : (
-                  <>Si no sabés de qué cuenta vino, dejala vacía: </>
                 )}
-                se crea solo la pata de esta cuenta y queda{' '}
-                <span className="font-medium">pendiente de parear</span> (aparece en
-                Pendientes). Cuando importes el otro extracto se parean solas.
-              </p>
-            )}
-            {!draft.isTransfer && (
-              <label className="flex max-w-xl items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
-                <input
-                  type="checkbox"
-                  checked={draft.isRefund ?? false}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      // Un reembolso es siempre un gasto negativo → forzar Gasto y, si la
-                      // categoría elegida era de ingreso, resetearla para que se re-elija.
-                      setDraft({ ...draft, isRefund: true, kind: 'expense' });
-                      const cat = tree.find((c) => c.id === categoryId);
-                      if (cat && cat.kind !== 'expense') setCategoryId(null);
-                    } else {
-                      setDraft({ ...draft, isRefund: false });
-                    }
-                  }}
-                  className="mt-0.5 size-4 rounded border-input"
-                />
-                <span>
-                  <span className="font-medium">Es una devolución / reembolso recibido</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Entra como gasto negativo en la misma categoría (fija el Tipo en Gasto).
-                    Cargá el monto en positivo; se niega al confirmar.
-                  </span>
-                </span>
-              </label>
-            )}
-            {/* Item 14: aviso de match con una transacción existente (pata del otro
-                extracto ya importada). El pareo lo concreta el confirm. */}
-            {draft.isTransfer && transferMatch && (
-              <div className="max-w-xl rounded-md border border-emerald-300 bg-emerald-50/70 p-2 text-sm text-emerald-900">
-                ✓ Matchea con una transferencia existente en{' '}
-                <span className="font-medium">{transferMatch.accountLabel}</span>{' '}
-                ({transferMatch.date} · {transferMatch.amountOriginal}).
-                <span className="block text-xs text-emerald-800">
-                  Contracuenta pre-cargada — al confirmar, ambas patas se parean en vez de
-                  duplicarse.{' '}
-                  <a
-                    href={`/transactions/${transferMatch.transactionId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    Ver transacción ↗
-                  </a>
-                </span>
               </div>
             )}
-            {/* Previsión: linkear la línea a un forecast pendiente (1-click, regla
-                PRD §5.3). Siempre visible — el toggle de auto-match solo gobierna
-                el match automático al confirmar. */}
-            {!draft.isTransfer && (
-              <div className="max-w-xl">
-                {forecastCands === null ? (
-                  <p className="text-xs text-muted-foreground">Buscando previsiones…</p>
-                ) : forecastCands.length === 0 ? (
-                  draft.forecastId ? null : (
-                    <p className="text-xs text-muted-foreground">
-                      Sin previsiones candidatas (±5 días, ±10% del monto).
-                    </p>
-                  )
-                ) : (
-                  <Field label="Linkear a previsión">
-                    <div className="flex items-center gap-2">
-                      <Combobox
-                        options={forecastCands.map((c) => ({
-                          id: c.id,
-                          label: `${c.recurrenceName} · ${c.expectedDate} · ${c.currency} ${c.expectedAmount}`,
-                        }))}
-                        value={draft.forecastId ?? ''}
-                        onChange={(id) => setDraft({ ...draft, forecastId: id || undefined })}
-                        placeholder="Elegí una previsión…"
-                        widthClassName="w-96"
-                      />
-                      {draft.forecastId && (
-                        <Button
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setDraft({ ...draft, forecastId: undefined })}
-                        >
-                          Quitar
-                        </Button>
-                      )}
-                    </div>
+          </td>
+        )}
+      </tr>
+      {editing && !readOnly && (
+        <tr className="border-t bg-blue-50/40">
+          <td colSpan={colCount} className="px-3 py-3">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold tracking-wide text-blue-900 uppercase">
+                Editando línea
+              </p>
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Fecha">
+                  <Input
+                    value={draft.date}
+                    onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                    className="h-8 w-32"
+                  />
+                </Field>
+                <Field label="Tipo">
+                  <Select
+                    value={draft.kind}
+                    // Un reembolso es siempre un gasto negativo: con el checkbox tildado
+                    // el Tipo queda fijo en Gasto (no se puede cambiar a Ingreso).
+                    disabled={draft.isRefund}
+                    onValueChange={(v) => setDraft({ ...draft, kind: v as 'income' | 'expense' })}
+                  >
+                    <SelectTrigger className="h-8 w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="expense">Gasto</SelectItem>
+                      <SelectItem value="income">Ingreso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Monto">
+                  <Input
+                    value={draft.amountOriginal}
+                    onChange={(e) => setDraft({ ...draft, amountOriginal: e.target.value })}
+                    className="h-8 w-32 text-right"
+                  />
+                </Field>
+                <Field label="Moneda">
+                  <Select
+                    value={draft.currencyOriginal}
+                    onValueChange={(v) =>
+                      setDraft({ ...draft, currencyOriginal: v as 'ARS' | 'USD' })
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ARS">ARS</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Descripción" className="min-w-[240px] flex-1">
+                  <Input
+                    value={draft.description}
+                    onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                    className="h-8 w-full"
+                  />
+                </Field>
+                {/* Siempre visible: si la línea no tiene counterparty, al guardar se
+                  crea {label} (el preprocess del schema lo omite si queda vacío). */}
+                <Field label="Etiqueta contraparte" className="min-w-[180px]">
+                  <Input
+                    value={draft.counterparty?.label ?? ''}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        counterparty: {
+                          ...(draft.counterparty ?? {}),
+                          label: e.target.value || undefined,
+                        },
+                      })
+                    }
+                    placeholder="ej. Niñera, Alquiler…"
+                    className="h-8 w-48"
+                  />
+                </Field>
+                {/* Categoría y transfer son mutuamente excluyentes: si es transfer no se
+                  muestra el selector de categoría (antes quedaba clickeable e invitaba
+                  a un estado contradictorio). */}
+                {!draft.isTransfer && (
+                  <Field label="Categoría">
+                    <CategoryCombobox
+                      options={categoriesForKind}
+                      value={categoryId ?? ''}
+                      onChange={(id) => {
+                        setCategoryId(id || null);
+                      }}
+                      placeholder="Buscar categoría…"
+                    />
+                  </Field>
+                )}
+                {draft.isTransfer && (
+                  <Field label="Contracuenta (transferencia)">
+                    <Combobox
+                      options={counterpartyAccountOptions(accounts, currentAccountId).map((a) => ({
+                        id: a.id,
+                        label: accountLabel(a),
+                      }))}
+                      value={draft.transferAccountId ?? ''}
+                      onChange={(id) => setDraft({ ...draft, transferAccountId: id || undefined })}
+                      placeholder="Buscar cuenta…"
+                    />
                   </Field>
                 )}
               </div>
-            )}
-            {/* Tags: disponibles en cualquier línea — en transferencias son el
-                clasificador (no llevan categoría). */}
-            {tags.length > 0 && (
-              <Field label="Tags">
-                <div className="flex flex-wrap gap-1">
-                  {tags.map((t) => {
-                    const active = (draft.tagIds ?? []).includes(t.id);
-                    return (
-                      <FilterChip
-                        key={t.id}
-                        active={active}
-                        onClick={() => {
-                          const current = draft.tagIds ?? [];
-                          setDraft({
-                            ...draft,
-                            tagIds: active
-                              ? current.filter((id) => id !== t.id)
-                              : [...current, t.id],
-                          });
-                        }}
-                      >
-                        {t.name}
-                      </FilterChip>
-                    );
-                  })}
-                </div>
-              </Field>
-            )}
-            {!draft.isTransfer && draft.kind === 'expense' && (
-              <div className="space-y-2">
-                <label className="flex max-w-xl items-start gap-2 text-sm">
+              {/* Se puede dejar vacía: hay extractos que no dicen de qué cuenta propia
+                salió la plata (el ordenante es el propio titular). La línea se
+                confirma igual como pata sola. */}
+              {draft.isTransfer && !draft.transferAccountId && !transferMatch && (
+                <p className="text-muted-foreground max-w-xl text-xs">
+                  {counterpartyIsSelf ? (
+                    <>
+                      El <span className="font-medium">ordenante sos vos mismo</span> — el extracto
+                      solo trae tu CUIL/CBU y no dice de qué cuenta propia salió. Dejala vacía:{' '}
+                    </>
+                  ) : (
+                    <>Si no sabés de qué cuenta vino, dejala vacía: </>
+                  )}
+                  se crea solo la pata de esta cuenta y queda{' '}
+                  <span className="font-medium">pendiente de parear</span> (aparece en Pendientes).
+                  Cuando importes el otro extracto se parean solas.
+                </p>
+              )}
+              {!draft.isTransfer && (
+                <label className="flex max-w-xl items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2 text-sm dark:border-emerald-900 dark:bg-emerald-950/30">
                   <input
                     type="checkbox"
-                    checked={draft.deducibleGanancias ?? false}
-                    onChange={(e) => setDraft({ ...draft, deducibleGanancias: e.target.checked })}
-                    className="mt-0.5 size-4 rounded border-input"
+                    checked={draft.isRefund ?? false}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        // Un reembolso es siempre un gasto negativo → forzar Gasto y, si la
+                        // categoría elegida era de ingreso, resetearla para que se re-elija.
+                        setDraft({ ...draft, isRefund: true, kind: 'expense' });
+                        const cat = tree.find((c) => c.id === categoryId);
+                        if (cat && cat.kind !== 'expense') setCategoryId(null);
+                      } else {
+                        setDraft({ ...draft, isRefund: false });
+                      }
+                    }}
+                    className="border-input mt-0.5 size-4 rounded"
                   />
                   <span>
-                    <span className="font-medium">Deducible Ganancias</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Entra al CSV de deducibles del export contador.
+                    <span className="font-medium">Es una devolución / reembolso recibido</span>
+                    <span className="text-muted-foreground block text-xs">
+                      Entra como gasto negativo en la misma categoría (fija el Tipo en Gasto). Cargá
+                      el monto en positivo; se niega al confirmar.
                     </span>
                   </span>
                 </label>
-                {!draft.isRefund && (
+              )}
+              {/* Item 14: aviso de match con una transacción existente (pata del otro
+                extracto ya importada). El pareo lo concreta el confirm. */}
+              {draft.isTransfer && transferMatch && (
+                <div className="max-w-xl rounded-md border border-emerald-300 bg-emerald-50/70 p-2 text-sm text-emerald-900">
+                  ✓ Matchea con una transferencia existente en{' '}
+                  <span className="font-medium">{transferMatch.accountLabel}</span> (
+                  {transferMatch.date} · {transferMatch.amountOriginal}).
+                  <span className="block text-xs text-emerald-800">
+                    Contracuenta pre-cargada — al confirmar, ambas patas se parean en vez de
+                    duplicarse.{' '}
+                    <a
+                      href={`/transactions/${transferMatch.transactionId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      Ver transacción ↗
+                    </a>
+                  </span>
+                </div>
+              )}
+              {/* Previsión: linkear la línea a un forecast pendiente (1-click, regla
+                PRD §5.3). Siempre visible — el toggle de auto-match solo gobierna
+                el match automático al confirmar. */}
+              {!draft.isTransfer && (
+                <div className="max-w-xl">
+                  {forecastCands === null ? (
+                    <p className="text-muted-foreground text-xs">Buscando previsiones…</p>
+                  ) : forecastCands.length === 0 ? (
+                    draft.forecastId ? null : (
+                      <p className="text-muted-foreground text-xs">
+                        Sin previsiones candidatas (±5 días, ±10% del monto).
+                      </p>
+                    )
+                  ) : (
+                    <Field label="Linkear a previsión">
+                      <div className="flex items-center gap-2">
+                        <Combobox
+                          options={forecastCands.map((c) => ({
+                            id: c.id,
+                            label: `${c.recurrenceName} · ${c.expectedDate} · ${c.currency} ${c.expectedAmount}`,
+                          }))}
+                          value={draft.forecastId ?? ''}
+                          onChange={(id) => setDraft({ ...draft, forecastId: id || undefined })}
+                          placeholder="Elegí una previsión…"
+                          widthClassName="w-96"
+                        />
+                        {draft.forecastId && (
+                          <Button
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setDraft({ ...draft, forecastId: undefined })}
+                          >
+                            Quitar
+                          </Button>
+                        )}
+                      </div>
+                    </Field>
+                  )}
+                </div>
+              )}
+              {/* Tags: disponibles en cualquier línea — en transferencias son el
+                clasificador (no llevan categoría). */}
+              {tags.length > 0 && (
+                <Field label="Tags">
+                  <div className="flex flex-wrap gap-1">
+                    {tags.map((t) => {
+                      const active = (draft.tagIds ?? []).includes(t.id);
+                      return (
+                        <FilterChip
+                          key={t.id}
+                          active={active}
+                          onClick={() => {
+                            const current = draft.tagIds ?? [];
+                            setDraft({
+                              ...draft,
+                              tagIds: active
+                                ? current.filter((id) => id !== t.id)
+                                : [...current, t.id],
+                            });
+                          }}
+                        >
+                          {t.name}
+                        </FilterChip>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
+              {!draft.isTransfer && draft.kind === 'expense' && (
+                <div className="space-y-2">
                   <label className="flex max-w-xl items-start gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={!!draft.domesticService}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          domesticService: e.target.checked
-                            ? {
-                                empleado_nombre: draft.domesticService?.empleado_nombre ?? '',
-                                empleado_cuil: draft.domesticService?.empleado_cuil ?? '',
-                                concepto: draft.domesticService?.concepto ?? 'sueldo',
-                                periodo: draft.domesticService?.periodo ?? draft.date.slice(0, 7),
-                              }
-                            : undefined,
-                        })
-                      }
-                      className="mt-0.5 size-4 rounded border-input"
+                      checked={draft.deducibleGanancias ?? false}
+                      onChange={(e) => setDraft({ ...draft, deducibleGanancias: e.target.checked })}
+                      className="border-input mt-0.5 size-4 rounded"
                     />
                     <span>
-                      <span className="font-medium">Servicio doméstico</span>
-                      <span className="block text-xs text-muted-foreground">
-                        Alimenta el CSV 03 (por empleado/mes) del export contador.
+                      <span className="font-medium">Deducible Ganancias</span>
+                      <span className="text-muted-foreground block text-xs">
+                        Entra al CSV de deducibles del export contador.
                       </span>
                     </span>
                   </label>
-                )}
-                {draft.domesticService && (
-                  <div className="flex flex-wrap items-end gap-3 rounded-md border border-sky-200 bg-sky-50/50 p-2">
-                    <Field label="Empleado/a">
-                      <Input
-                        value={draft.domesticService.empleado_nombre}
+                  {!draft.isRefund && (
+                    <label className="flex max-w-xl items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!draft.domesticService}
                         onChange={(e) =>
                           setDraft({
                             ...draft,
-                            domesticService: { ...draft.domesticService!, empleado_nombre: e.target.value },
+                            domesticService: e.target.checked
+                              ? {
+                                  empleado_nombre: draft.domesticService?.empleado_nombre ?? '',
+                                  empleado_cuil: draft.domesticService?.empleado_cuil ?? '',
+                                  concepto: draft.domesticService?.concepto ?? 'sueldo',
+                                  periodo: draft.domesticService?.periodo ?? draft.date.slice(0, 7),
+                                }
+                              : undefined,
                           })
                         }
-                        placeholder="Nombre y apellido"
-                        className="h-8 w-48"
+                        className="border-input mt-0.5 size-4 rounded"
                       />
-                    </Field>
-                    <Field label="CUIL">
-                      <Input
-                        value={draft.domesticService.empleado_cuil}
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            domesticService: { ...draft.domesticService!, empleado_cuil: e.target.value },
-                          })
-                        }
-                        placeholder="27-12345678-9"
-                        className="h-8 w-36"
-                      />
-                    </Field>
-                    <Field label="Concepto">
-                      <Select
-                        value={draft.domesticService.concepto}
-                        onValueChange={(v) =>
-                          setDraft({
-                            ...draft,
-                            domesticService: {
-                              ...draft.domesticService!,
-                              concepto: v as 'sueldo' | 'aporte' | 'aguinaldo',
-                            },
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sueldo">Sueldo</SelectItem>
-                          <SelectItem value="aporte">Aporte</SelectItem>
-                          <SelectItem value="aguinaldo">Aguinaldo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="Período">
-                      <Input
-                        value={draft.domesticService.periodo}
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            domesticService: { ...draft.domesticService!, periodo: e.target.value },
-                          })
-                        }
-                        placeholder="YYYY-MM"
-                        className="h-8 w-28"
-                      />
-                    </Field>
-                  </div>
+                      <span>
+                        <span className="font-medium">Servicio doméstico</span>
+                        <span className="text-muted-foreground block text-xs">
+                          Alimenta el CSV 03 (por empleado/mes) del export contador.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                  {draft.domesticService && (
+                    <div className="flex flex-wrap items-end gap-3 rounded-md border border-sky-200 bg-sky-50/50 p-2">
+                      <Field label="Empleado/a">
+                        <Input
+                          value={draft.domesticService.empleado_nombre}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              domesticService: {
+                                ...draft.domesticService!,
+                                empleado_nombre: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="Nombre y apellido"
+                          className="h-8 w-48"
+                        />
+                      </Field>
+                      <Field label="CUIL">
+                        <Input
+                          value={draft.domesticService.empleado_cuil}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              domesticService: {
+                                ...draft.domesticService!,
+                                empleado_cuil: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="27-12345678-9"
+                          className="h-8 w-36"
+                        />
+                      </Field>
+                      <Field label="Concepto">
+                        <Select
+                          value={draft.domesticService.concepto}
+                          onValueChange={(v) =>
+                            setDraft({
+                              ...draft,
+                              domesticService: {
+                                ...draft.domesticService!,
+                                concepto: v as 'sueldo' | 'aporte' | 'aguinaldo',
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sueldo">Sueldo</SelectItem>
+                            <SelectItem value="aporte">Aporte</SelectItem>
+                            <SelectItem value="aguinaldo">Aguinaldo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Período">
+                        <Input
+                          value={draft.domesticService.periodo}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              domesticService: {
+                                ...draft.domesticService!,
+                                periodo: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="YYYY-MM"
+                          className="h-8 w-28"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" type="button" onClick={save} disabled={isPending}>
+                  Guardar
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={cancelEdit}
+                  disabled={isPending}
+                >
+                  Cancelar
+                </Button>
+                {draft.isTransfer ? (
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() =>
+                      setDraft({ ...draft, isTransfer: false, transferAccountId: undefined })
+                    }
+                    className="text-amber-700"
+                  >
+                    No es transfer
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setDraft({ ...draft, isTransfer: true, isRefund: false });
+                      setCategoryId(null);
+                    }}
+                    className="text-amber-700"
+                  >
+                    ⇄ Marcar como transfer
+                  </Button>
                 )}
               </div>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" type="button" onClick={save} disabled={isPending}>
-                Guardar
-              </Button>
-              <Button size="sm" type="button" variant="outline" onClick={cancelEdit} disabled={isPending}>
-                Cancelar
-              </Button>
-              {draft.isTransfer ? (
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setDraft({ ...draft, isTransfer: false, transferAccountId: undefined })}
-                  className="text-amber-700"
-                >
-                  No es transfer
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setDraft({ ...draft, isTransfer: true, isRefund: false });
-                    setCategoryId(null);
-                  }}
-                  className="text-amber-700"
-                >
-                  ⇄ Marcar como transfer
-                </Button>
-              )}
             </div>
-          </div>
-        </td>
-      </tr>
-    )}
+          </td>
+        </tr>
+      )}
     </>
   );
 }
@@ -2307,7 +2494,7 @@ function Field({
 }) {
   return (
     <div className={cn('space-y-1', className)}>
-      <label className="block text-xs font-medium text-muted-foreground">{label}</label>
+      <label className="text-muted-foreground block text-xs font-medium">{label}</label>
       {children}
     </div>
   );
@@ -2340,7 +2527,7 @@ function Badge({
 function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs font-medium text-muted-foreground">{label}:</span>
+      <span className="text-muted-foreground text-xs font-medium">{label}:</span>
       <div className="flex flex-wrap gap-1">{children}</div>
     </div>
   );
@@ -2468,7 +2655,9 @@ function Combobox({
     <div ref={ref} className={cn('relative', widthClassName)}>
       <button
         type="button"
-        onClick={() => { if (!disabled) setOpen(!open); }}
+        onClick={() => {
+          if (!disabled) setOpen(!open);
+        }}
         disabled={disabled}
         className={cn(
           'flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm',
@@ -2476,15 +2665,33 @@ function Combobox({
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         )}
       >
-        <span className={cn('truncate', selected || (allowFreeText && value) ? '' : 'text-muted-foreground')}>
+        <span
+          className={cn(
+            'truncate',
+            selected || (allowFreeText && value) ? '' : 'text-muted-foreground',
+          )}
+        >
           {selected
-            ? (selected.indent ? `↳ ${selected.label}` : selected.label)
-            : (allowFreeText && value ? value : (placeholder ?? 'Elegí…'))}
+            ? selected.indent
+              ? `↳ ${selected.label}`
+              : selected.label
+            : allowFreeText && value
+              ? value
+              : (placeholder ?? 'Elegí…')}
         </span>
-        <svg className="ml-1 h-4 w-4 shrink-0 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+        <svg
+          className="ml-1 h-4 w-4 shrink-0 opacity-50"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+        <div className="bg-popover absolute z-50 mt-1 w-full rounded-md border shadow-md">
           <div className="p-1.5">
             <input
               autoFocus
@@ -2492,7 +2699,7 @@ function Combobox({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar…"
-              className="h-8 w-full rounded border-0 bg-transparent px-2 text-sm outline-none ring-1 ring-input focus:ring-primary"
+              className="ring-input focus:ring-primary h-8 w-full rounded border-0 bg-transparent px-2 text-sm ring-1 outline-none"
             />
           </div>
           <div className="max-h-56 overflow-y-auto p-1">
@@ -2501,26 +2708,34 @@ function Combobox({
               !options.some((o) => o.label.toLowerCase() === search.trim().toLowerCase()) && (
                 <button
                   type="button"
-                  onClick={() => { onChange(search.trim()); setOpen(false); setSearch(''); }}
-                  className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  onClick={() => {
+                    onChange(search.trim());
+                    setOpen(false);
+                    setSearch('');
+                  }}
+                  className="hover:bg-accent flex w-full items-center rounded px-2 py-1.5 text-left text-sm"
                 >
                   Usar «{search.trim()}»
                 </button>
               )}
             {filtered.length === 0 && !(allowFreeText && search.trim() !== '') && (
-              <p className="px-2 py-1.5 text-sm text-muted-foreground">Sin resultados</p>
+              <p className="text-muted-foreground px-2 py-1.5 text-sm">Sin resultados</p>
             )}
             {filtered.map((o) => (
               <button
                 key={o.id}
                 type="button"
-                onClick={() => { onChange(o.id); setOpen(false); setSearch(''); }}
+                onClick={() => {
+                  onChange(o.id);
+                  setOpen(false);
+                  setSearch('');
+                }}
                 className={cn(
-                  'flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                  'hover:bg-accent flex w-full items-center rounded px-2 py-1.5 text-left text-sm',
                   o.id === value && 'bg-accent font-medium',
                 )}
               >
-                {o.indent ? <span className="mr-1 text-muted-foreground">↳</span> : null}
+                {o.indent ? <span className="text-muted-foreground mr-1">↳</span> : null}
                 {o.label}
               </button>
             ))}
@@ -2577,22 +2792,26 @@ function SummaryValidation({
   const expenseDelta = pdfExpense !== null ? extractedExpense - pdfExpense : null;
   const incomeDelta = pdfIncome !== null ? extractedIncome - pdfIncome : null;
 
-  const expenseOk = expenseDelta !== null && pdfExpense !== null
-    ? Math.abs(expenseDelta) < Math.max(pdfExpense * 0.01, 1)
-    : null;
-  const incomeOk = incomeDelta !== null && pdfIncome !== null
-    ? Math.abs(incomeDelta) < Math.max(pdfIncome * 0.01, 1)
-    : null;
+  const expenseOk =
+    expenseDelta !== null && pdfExpense !== null
+      ? Math.abs(expenseDelta) < Math.max(pdfExpense * 0.01, 1)
+      : null;
+  const incomeOk =
+    incomeDelta !== null && pdfIncome !== null
+      ? Math.abs(incomeDelta) < Math.max(pdfIncome * 0.01, 1)
+      : null;
 
   const allOk = (expenseOk === null || expenseOk) && (incomeOk === null || incomeOk);
 
   return (
-    <div className={cn(
-      'mt-3 rounded border p-3 text-sm',
-      allOk
-        ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'
-        : 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200',
-    )}>
+    <div
+      className={cn(
+        'mt-3 rounded border p-3 text-sm',
+        allOk
+          ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'
+          : 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200',
+      )}
+    >
       <p className="mb-2 font-medium">
         {allOk ? '✓ Totales coinciden con el resumen' : '✕ Diferencia detectada vs resumen'}
       </p>
@@ -2605,7 +2824,9 @@ function SummaryValidation({
               {formatAmount(String(pdfExpense), summaryCcy as 'ARS' | 'USD')}
               {expenseDelta !== null && Math.abs(expenseDelta) >= 0.01 && (
                 <span className={expenseOk ? '' : 'font-bold'}>
-                  {' · Δ '}{expenseDelta > 0 ? '+' : ''}{formatAmount(String(expenseDelta), summaryCcy as 'ARS' | 'USD')}
+                  {' · Δ '}
+                  {expenseDelta > 0 ? '+' : ''}
+                  {formatAmount(String(expenseDelta), summaryCcy as 'ARS' | 'USD')}
                 </span>
               )}
             </span>
@@ -2614,12 +2835,15 @@ function SummaryValidation({
         {pdfIncome !== null && (
           <div className="flex items-center gap-2">
             <span className={incomeOk ? '' : 'font-semibold'}>
-              Ingresos: extraído {formatAmount(String(extractedIncome), summaryCcy as 'ARS' | 'USD')}
+              Ingresos: extraído{' '}
+              {formatAmount(String(extractedIncome), summaryCcy as 'ARS' | 'USD')}
               {' · resumen dice '}
               {formatAmount(String(pdfIncome), summaryCcy as 'ARS' | 'USD')}
               {incomeDelta !== null && Math.abs(incomeDelta) >= 0.01 && (
                 <span className={incomeOk ? '' : 'font-bold'}>
-                  {' · Δ '}{incomeDelta > 0 ? '+' : ''}{formatAmount(String(incomeDelta), summaryCcy as 'ARS' | 'USD')}
+                  {' · Δ '}
+                  {incomeDelta > 0 ? '+' : ''}
+                  {formatAmount(String(incomeDelta), summaryCcy as 'ARS' | 'USD')}
                 </span>
               )}
             </span>

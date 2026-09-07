@@ -174,7 +174,14 @@ function label(t: RouteTarget): string {
 
 /** ¿Esta cuenta de la DB satisface el descriptor de la regla? */
 function accountMatches(
-  acc: { type: string; currency: string; cardBrand: string | null; ownerTag: string | null; institutionName: string | null; accountNumber: string | null },
+  acc: {
+    type: string;
+    currency: string;
+    cardBrand: string | null;
+    ownerTag: string | null;
+    institutionName: string | null;
+    accountNumber: string | null;
+  },
   t: RouteTarget,
 ): boolean {
   if ((acc.institutionName ?? '').toLowerCase() !== t.institutionName.toLowerCase()) return false;
@@ -247,7 +254,9 @@ async function main() {
   let files = walk(DIR);
   if (ONLY) {
     const needle = ONLY.replace(/\\/g, '/').toLowerCase();
-    files = files.filter((f) => relative(DIR, f).replace(/\\/g, '/').toLowerCase().startsWith(needle));
+    files = files.filter((f) =>
+      relative(DIR, f).replace(/\\/g, '/').toLowerCase().startsWith(needle),
+    );
   }
 
   const planned: PlannedFile[] = files.map((full) => {
@@ -326,14 +335,25 @@ async function main() {
     }
 
     if (knownHashes.has(hash)) {
-      rows.push({ ...base, status: 'YA_CARGADO', accountId: acct.id, institutionId: acct.institutionId });
+      rows.push({
+        ...base,
+        status: 'YA_CARGADO',
+        accountId: acct.id,
+        institutionId: acct.institutionId,
+      });
       continue;
     }
 
     // Verificación por contenido (best-effort, sin LLM).
     const conflict = contentConflict(pageText, target);
     if (conflict) {
-      rows.push({ ...base, status: 'CONFLICTO', accountId: acct.id, institutionId: acct.institutionId, detail: conflict });
+      rows.push({
+        ...base,
+        status: 'CONFLICTO',
+        accountId: acct.id,
+        institutionId: acct.institutionId,
+        detail: conflict,
+      });
       continue;
     }
 
@@ -394,10 +414,14 @@ async function main() {
     const parsed = await parseImportInternal(created.importId, household.id);
     if (parsed.ok) {
       ok++;
-      console.warn(`[bulk] ✔ ${tag} — ${parsed.lineCount} líneas (${created.importId.slice(0, 8)})`);
+      console.warn(
+        `[bulk] ✔ ${tag} — ${parsed.lineCount} líneas (${created.importId.slice(0, 8)})`,
+      );
     } else {
       failed++;
-      console.warn(`[bulk] ⚠ ${tag} — subido pero el parseo falló: ${parsed.error} (${created.importId.slice(0, 8)})`);
+      console.warn(
+        `[bulk] ⚠ ${tag} — subido pero el parseo falló: ${parsed.error} (${created.importId.slice(0, 8)})`,
+      );
     }
   }
 

@@ -43,7 +43,10 @@ function parseEsArAmount(s: string): number {
 }
 
 function extractCounterparty(movLines: string[]): ParsedTxLine['counterparty'] {
-  const rest = movLines.slice(1).map((l) => l.trim()).filter(Boolean);
+  const rest = movLines
+    .slice(1)
+    .map((l) => l.trim())
+    .filter(Boolean);
   let cuil: string | undefined;
   let cbu: string | undefined;
   let name: string | undefined;
@@ -82,31 +85,40 @@ function classify(
 
   if (/CTAS PROPIAS|CUENTA PROPIA/.test(u)) return { isTransfer: true };
   if (/FIMA/.test(u)) return { isTransfer: true, transferAccountName: 'Galicia Inversiones' };
-  if (/^PAGO TARJETA AMEX/.test(u)) return { isTransfer: true, transferAccountName: 'Galicia Amex' };
-  if (/^PAGO TARJETA VISA/.test(u)) return { isTransfer: true, transferAccountName: 'Galicia Visa' };
-  if (/^PAGO TARJETA MASTER/.test(u)) return { isTransfer: true, transferAccountName: 'Galicia Master' };
+  if (/^PAGO TARJETA AMEX/.test(u))
+    return { isTransfer: true, transferAccountName: 'Galicia Amex' };
+  if (/^PAGO TARJETA VISA/.test(u))
+    return { isTransfer: true, transferAccountName: 'Galicia Visa' };
+  if (/^PAGO TARJETA MASTER/.test(u))
+    return { isTransfer: true, transferAccountName: 'Galicia Master' };
   if (household) return { isTransfer: true };
 
   if (/^REINTEGRO PROMO/.test(u)) return { isTransfer: false, suggestedCategory: 'Otros ingresos' };
   if (/^INTERES/.test(u)) return { isTransfer: false, suggestedCategory: 'Intereses' };
-  if (/^IVA\b|^COMISION/.test(u)) return { isTransfer: false, suggestedCategory: 'Gastos bancarios' };
+  if (/^IVA\b|^COMISION/.test(u))
+    return { isTransfer: false, suggestedCategory: 'Gastos bancarios' };
   return { isTransfer: false };
 }
 
 function parseGaliciaBancoXlsx(rows: string[][], ctx: { currency: 'ARS' | 'USD' }): ParserOutput {
   const dataRows = rows.filter((r) => /^\d{2}\/\d{2}\/\d{4}$/.test((r[0] || '').trim()));
-  const hasHeader = rows.some((r) =>
-    r.some((c) => /movimiento/i.test(c)) && r.some((c) => /d[ée]bito/i.test(c)),
+  const hasHeader = rows.some(
+    (r) => r.some((c) => /movimiento/i.test(c)) && r.some((c) => /d[ée]bito/i.test(c)),
   );
   if (!hasHeader || dataRows.length === 0) {
-    throw new CsvFormatError('no parece un export de Galicia banco (sin encabezado Movimiento/Débito)');
+    throw new CsvFormatError(
+      'no parece un export de Galicia banco (sin encabezado Movimiento/Débito)',
+    );
   }
 
   const lines: ParsedTxLine[] = [];
   for (const r of dataRows) {
     const [dd, mm, yyyy] = (r[0] ?? '').trim().split('/');
     const date = `${yyyy}-${mm}-${dd}`;
-    const movLines = (r[1] || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    const movLines = (r[1] || '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
     const concept = movLines[0] || '';
     if (!concept) continue;
 

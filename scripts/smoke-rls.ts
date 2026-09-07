@@ -72,7 +72,9 @@ async function main() {
     if (!memb) throw new Error('nico household membership not found');
 
     const nicoHouseholdId = memb.household_id;
-    console.warn(`[smoke-rls] nico=${nico.id.slice(0, 8)}… household=${nicoHouseholdId.slice(0, 8)}…`);
+    console.warn(
+      `[smoke-rls] nico=${nico.id.slice(0, 8)}… household=${nicoHouseholdId.slice(0, 8)}…`,
+    );
 
     const [fake] = await sql<{ id: string }[]>`
       insert into households (name) values ('__smoke_other__') returning id
@@ -89,11 +91,15 @@ async function main() {
 
     // --- INSERT propia ---
     try {
-      const inserted = await asAuthenticated(sql, nico.id, (tx) => tx<{ id: string }[]>`
+      const inserted = await asAuthenticated(
+        sql,
+        nico.id,
+        (tx) => tx<{ id: string }[]>`
         insert into accounts (household_id, name, type, currency_default, owner_tag)
         values (${nicoHouseholdId}, '__smoke_acc__', 'cash', 'ARS', 'Nico')
         returning id
-      `);
+      `,
+      );
       const acc = inserted[0];
       if (!acc) throw new Error('insert returned no row');
       record('INSERT account propia', true, `id=${acc.id.slice(0, 8)}…`);
@@ -104,29 +110,45 @@ async function main() {
     // --- INSERT ajena (debe fallar) ---
     await expectRlsViolation(
       'INSERT account ajena (debe fallar)',
-      asAuthenticated(sql, nico.id, (tx) => tx`
+      asAuthenticated(
+        sql,
+        nico.id,
+        (tx) => tx`
         insert into accounts (household_id, name, type, currency_default, owner_tag)
         values (${fakeHouseholdId}, '__smoke_acc_ajena__', 'cash', 'ARS', 'Nico')
-      `),
+      `,
+      ),
     );
 
     // --- SELECT solo accounts propias ---
     try {
-      const visible = await asAuthenticated(sql, nico.id, (tx) => tx<{ household_id: string; name: string }[]>`
+      const visible = await asAuthenticated(
+        sql,
+        nico.id,
+        (tx) => tx<{ household_id: string; name: string }[]>`
         select household_id, name from accounts where name like '__smoke%'
-      `);
+      `,
+      );
       const seesOwn = visible.some((r) => r.household_id === nicoHouseholdId);
       const seesAlien = visible.some((r) => r.household_id === fakeHouseholdId);
-      record('SELECT accounts: ve propia, no ajena', seesOwn && !seesAlien, `${visible.length} fila(s)`);
+      record(
+        'SELECT accounts: ve propia, no ajena',
+        seesOwn && !seesAlien,
+        `${visible.length} fila(s)`,
+      );
     } catch (err) {
       record('SELECT accounts: ve propia, no ajena', false, (err as Error).message);
     }
 
     // --- SELECT households solo propia ---
     try {
-      const hs = await asAuthenticated(sql, nico.id, (tx) => tx<{ id: string; name: string }[]>`
+      const hs = await asAuthenticated(
+        sql,
+        nico.id,
+        (tx) => tx<{ id: string; name: string }[]>`
         select id, name from households
-      `);
+      `,
+      );
       const onlyOwn = hs.length === 1 && hs[0]?.id === nicoHouseholdId;
       record('SELECT households: solo propia', onlyOwn, `${hs.length} fila(s)`);
     } catch (err) {
@@ -144,10 +166,14 @@ async function main() {
     // --- institutions INSERT denegado para authenticated ---
     await expectRlsViolation(
       'INSERT institutions: denegado',
-      asAuthenticated(sql, nico.id, (tx) => tx`
+      asAuthenticated(
+        sql,
+        nico.id,
+        (tx) => tx`
         insert into institutions (name, country, default_currency)
         values ('__smoke_inst__', 'AR', 'ARS')
-      `),
+      `,
+      ),
     );
 
     // --- fx_rates: SELECT abierto, INSERT denegado ---
@@ -159,12 +185,15 @@ async function main() {
     }
     await expectRlsViolation(
       'INSERT fx_rates: denegado',
-      asAuthenticated(sql, nico.id, (tx) => tx`
+      asAuthenticated(
+        sql,
+        nico.id,
+        (tx) => tx`
         insert into fx_rates (date, currency_pair, source, mid)
         values ('2099-01-01', 'USD/ARS', 'smoke', 1)
-      `),
+      `,
+      ),
     );
-
   } finally {
     // Cleanup idempotente. Vive en `finally` para que un crash interno no
     // deje phantom households en la DB (ya nos pasó una vez con el seed

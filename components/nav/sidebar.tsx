@@ -35,8 +35,7 @@ function parseStored(raw: string): Set<string> | null {
   if (!raw) return null;
   try {
     const arr = JSON.parse(raw);
-    if (Array.isArray(arr))
-      return new Set(arr.filter((s): s is string => typeof s === 'string'));
+    if (Array.isArray(arr)) return new Set(arr.filter((s): s is string => typeof s === 'string'));
   } catch {
     /* ignore */
   }
@@ -83,18 +82,14 @@ export function Sidebar({ userDisplayName, onNavigate, badges }: Props) {
   }
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
+    <aside className="border-border bg-sidebar text-sidebar-foreground flex h-full w-60 shrink-0 flex-col border-r">
       {/* Brand header */}
       <div className="px-5 pt-7 pb-5">
-        <Link
-          href="/dashboard"
-          onClick={onNavigate}
-          className="inline-block transition-colors"
-        >
-          <div className="font-display text-[28px] font-light leading-none tracking-tight text-foreground">
+        <Link href="/dashboard" onClick={onNavigate} className="inline-block transition-colors">
+          <div className="font-display text-foreground text-[28px] leading-none font-light tracking-tight">
             G<span className="text-primary">·</span>D
           </div>
-          <div className="mt-1.5 font-sans text-[9px] font-semibold uppercase tracking-[0.32em] text-muted-foreground">
+          <div className="text-muted-foreground mt-1.5 font-sans text-[9px] font-semibold tracking-[0.32em] uppercase">
             Privatbanken
           </div>
         </Link>
@@ -115,9 +110,9 @@ export function Sidebar({ userDisplayName, onNavigate, badges }: Props) {
       </nav>
 
       {/* Footer: user + theme + signout */}
-      <div className="border-t border-border/60 px-4 py-4">
+      <div className="border-border/60 border-t px-4 py-4">
         <div
-          className="truncate font-display text-[15px] italic text-foreground"
+          className="font-display text-foreground truncate text-[15px] italic"
           title={userDisplayName ?? ''}
         >
           {userDisplayName ?? '—'}
@@ -127,7 +122,7 @@ export function Sidebar({ userDisplayName, onNavigate, badges }: Props) {
             {(['ARS', 'USD'] as const).map((c) => (
               <span
                 key={c}
-                className="rounded-full border border-primary/40 px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary"
+                className="border-primary/40 text-primary rounded-full border px-2 py-[3px] font-sans text-[9px] font-semibold tracking-[0.18em] uppercase"
               >
                 {c}
               </span>
@@ -138,7 +133,7 @@ export function Sidebar({ userDisplayName, onNavigate, badges }: Props) {
             <form action="/auth/sign-out" method="post">
               <button
                 type="submit"
-                className="inline-flex h-8 items-center rounded-md border border-border px-2.5 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
+                className="border-border text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground inline-flex h-8 items-center rounded-md border px-2.5 font-sans text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors"
                 title="Cerrar sesión"
               >
                 Salir
@@ -174,16 +169,13 @@ function SectionBlock({
         onClick={onToggle}
         aria-expanded={isOpen}
         className={cn(
-          'flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] transition-colors',
+          'flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-semibold tracking-[0.28em] uppercase transition-colors',
           hasActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
         )}
       >
         <span>{section.title}</span>
         <ChevronDown
-          className={cn(
-            'size-3 transition-transform',
-            isOpen ? 'rotate-0' : '-rotate-90',
-          )}
+          className={cn('size-3 transition-transform', isOpen ? 'rotate-0' : '-rotate-90')}
         />
       </button>
       {isOpen && (
@@ -223,17 +215,17 @@ function NavLink({
       aria-current={active ? 'page' : undefined}
       className={cn(
         // Serif italic-friendly nav items — feels editorial, not OS-chrome.
-        'group flex items-center rounded-md border-l-2 py-1.5 pl-2.5 pr-2 font-display text-[15px] font-normal leading-snug transition-colors',
+        'group font-display flex items-center rounded-md border-l-2 py-1.5 pr-2 pl-2.5 text-[15px] leading-snug font-normal transition-colors',
         active
           ? 'border-primary bg-primary/10 text-primary'
-          : 'border-transparent text-foreground/85 hover:border-border hover:bg-accent hover:text-foreground',
+          : 'text-foreground/85 hover:border-border hover:bg-accent hover:text-foreground border-transparent',
       )}
     >
       <span className="flex-1">{link.label}</span>
       {badge != null && badge > 0 && (
         <span
           aria-label={`${badge} pendientes`}
-          className="ml-2 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[color:var(--attn)] px-1.5 py-[1px] font-sans text-[10px] font-semibold tabular-nums leading-none text-[color:var(--background)]"
+          className="ml-2 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[color:var(--attn)] px-1.5 py-[1px] font-sans text-[10px] leading-none font-semibold text-[color:var(--background)] tabular-nums"
         >
           {badge > 99 ? '99+' : badge}
         </span>

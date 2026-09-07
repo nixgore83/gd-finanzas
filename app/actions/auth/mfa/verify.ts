@@ -28,7 +28,9 @@ export async function verifyMfaCode(formData: FormData): Promise<VerifyMfaResult
   const { factorId, code } = parsed.data;
   const supabase = await createClient();
 
-  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+    factorId,
+  });
   if (challengeError || !challenge) {
     console.error('[mfa] challenge failed', { code: challengeError?.code });
     return { ok: false, error: 'unknown' };

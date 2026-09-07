@@ -151,20 +151,24 @@ async function main() {
 
       // Find category
       const cat = cats.find(
-        (c) => c.name === rec.categoryName && c.kind === rec.kind &&
+        (c) =>
+          c.name === rec.categoryName &&
+          c.kind === rec.kind &&
           (rec.categoryParent === null || c.parentName === rec.categoryParent),
       );
       if (!cat) {
-        console.error(`[seed-recurrences] ❌ categoría no encontrada: "${rec.categoryName}" (${rec.kind}, parent="${rec.categoryParent}")`);
+        console.error(
+          `[seed-recurrences] ❌ categoría no encontrada: "${rec.categoryName}" (${rec.kind}, parent="${rec.categoryParent}")`,
+        );
         continue;
       }
 
       // Find account
-      const acct = accts.find(
-        (a) => a.name === rec.accountName && a.ownerTag === rec.accountOwner,
-      );
+      const acct = accts.find((a) => a.name === rec.accountName && a.ownerTag === rec.accountOwner);
       if (!acct) {
-        console.error(`[seed-recurrences] ❌ cuenta no encontrada: "${rec.accountName}" (owner="${rec.accountOwner}")`);
+        console.error(
+          `[seed-recurrences] ❌ cuenta no encontrada: "${rec.accountName}" (owner="${rec.accountOwner}")`,
+        );
         continue;
       }
 
@@ -205,10 +209,15 @@ async function main() {
 
         // Generate 12 months of forecasts from today
         for (let i = 0; i < 12; i++) {
-          const recRow = await sql<{
-            dayOfMonth: number; amount: string; currency: string;
-            startDate: string; endDate: string | null;
-          }[]>`
+          const recRow = await sql<
+            {
+              dayOfMonth: number;
+              amount: string;
+              currency: string;
+              startDate: string;
+              endDate: string | null;
+            }[]
+          >`
             select day_of_month as "dayOfMonth", amount::text, currency,
                    start_date::text as "startDate", end_date::text as "endDate"
             from public.recurrences where id = ${r.id}

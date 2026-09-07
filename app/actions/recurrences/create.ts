@@ -51,7 +51,9 @@ export async function createRecurrence(formData: FormData): Promise<CreateRecurr
   const [category] = await db
     .select({ id: categories.id, kind: categories.kind, archived: categories.archived })
     .from(categories)
-    .where(and(eq(categories.id, input.categoryId), eq(categories.householdId, session.householdId)))
+    .where(
+      and(eq(categories.id, input.categoryId), eq(categories.householdId, session.householdId)),
+    )
     .limit(1);
   if (!category || category.archived) {
     return { ok: false, error: 'invalid_refs', fields: { categoryId: 'Categoría inválida' } };

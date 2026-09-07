@@ -5,10 +5,7 @@ import type { BackupFile } from './drive';
  * Asume que `files` viene ordenado por `createdTime desc` (más reciente
  * primero). Función pura.
  */
-export function pruneOldBackups(
-  files: readonly BackupFile[],
-  keep: number,
-): BackupFile[] {
+export function pruneOldBackups(files: readonly BackupFile[], keep: number): BackupFile[] {
   if (keep < 0) throw new Error('keep must be >= 0');
   if (files.length <= keep) return [];
   return files.slice(keep);

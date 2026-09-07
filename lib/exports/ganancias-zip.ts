@@ -10,10 +10,7 @@ import type { GananciasData } from './ganancias-data';
 export async function buildGananciasZip(data: GananciasData): Promise<Uint8Array> {
   const zip = new JSZip();
 
-  zip.file(
-    '01_ingresos.csv',
-    buildIngresosCsv(data.txns, data.accountsById, data.categoriesById),
-  );
+  zip.file('01_ingresos.csv', buildIngresosCsv(data.txns, data.accountsById, data.categoriesById));
   zip.file('02_consumos_tc.csv', buildConsumosTcCsv(data.txns, data.accountsById));
   zip.file('03_servicio_domestico.csv', buildServicioDomesticoCsv(data.txns));
   zip.file(

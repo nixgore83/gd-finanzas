@@ -177,7 +177,9 @@ describe('routeFile', () => {
     // Si las reglas sólo conocieran la carpeta ORIGINAL, reorganizar dejaría
     // todo sin ruteo y el import no encontraría nada — la reorganización
     // rompería justo lo que viene a ordenar.
-    expect(routeFile('TC\\Visa Galicia Pau\\RESUMEN_VISA23_7_2026pdf.pdf')?.targets[0]).toMatchObject({
+    expect(
+      routeFile('TC\\Visa Galicia Pau\\RESUMEN_VISA23_7_2026pdf.pdf')?.targets[0],
+    ).toMatchObject({
       institutionName: 'Galicia',
       ownerTag: 'Pau',
       cardBrand: 'visa',
@@ -187,14 +189,18 @@ describe('routeFile', () => {
       ownerTag: 'Pau',
     });
     expect(
-      routeFile('Cuentas\\Galicia Nico\\RESUMEN_EXTRACTOS CONSOLIDADOS - CAJA DE AHORRO 02-07-2026.pdf')
-        ?.targets[0],
+      routeFile(
+        'Cuentas\\Galicia Nico\\RESUMEN_EXTRACTOS CONSOLIDADOS - CAJA DE AHORRO 02-07-2026.pdf',
+      )?.targets[0],
     ).toMatchObject({ institutionName: 'Galicia', ownerTag: 'Nico' });
     expect(
-      routeFile('Cuentas\\Galicia Pau\\RESUMEN_EXTRACTOS CONSOLIDADOS - Caja de ahorro-2026-05-22.pdf')
-        ?.targets[0],
+      routeFile(
+        'Cuentas\\Galicia Pau\\RESUMEN_EXTRACTOS CONSOLIDADOS - Caja de ahorro-2026-05-22.pdf',
+      )?.targets[0],
     ).toMatchObject({ institutionName: 'Galicia', ownerTag: 'Pau' });
-    expect(routeFile(`Cuentas\\BIND Pau\\${CUIL}_Cuentas bantotal_20260630.pdf`)?.targets).toHaveLength(2);
+    expect(
+      routeFile(`Cuentas\\BIND Pau\\${CUIL}_Cuentas bantotal_20260630.pdf`)?.targets,
+    ).toHaveLength(2);
   });
 
   it('reorganizar es idempotente: un archivo ya en su carpeta no se vuelve a mover', () => {
@@ -232,7 +238,10 @@ describe('routeFile', () => {
     for (const id of ['nico-visa-icbc', 'pau-visa-bind', 'nico-icbc-ca-usd-0413']) {
       const rule = ROUTE_RULES.find((r) => r.id === id);
       expect(rule, id).toBeDefined();
-      expect(rule!.targets.every((t) => !t.currencyByContent), id).toBe(true);
+      expect(
+        rule!.targets.every((t) => !t.currencyByContent),
+        id,
+      ).toBe(true);
     }
   });
 
@@ -246,7 +255,10 @@ describe('routeFile', () => {
 describe('preferredCopy', () => {
   it('prefiere el nombre sin sufijo de copia', () => {
     expect(
-      preferredCopy(['TC/Visa Pau/RESUMEN_VISA25_6_2026pdf (2).pdf', 'TC/Visa Pau/RESUMEN_VISA25_6_2026pdf.pdf']),
+      preferredCopy([
+        'TC/Visa Pau/RESUMEN_VISA25_6_2026pdf (2).pdf',
+        'TC/Visa Pau/RESUMEN_VISA25_6_2026pdf.pdf',
+      ]),
     ).toBe('TC/Visa Pau/RESUMEN_VISA25_6_2026pdf.pdf');
   });
 
@@ -309,10 +321,7 @@ describe('buildPlan — dedup local', () => {
   });
 
   it('marca SIN_RUTEO y SIN_FECHA en vez de adivinar', () => {
-    const entries = plan([
-      'Otra\\cosa.pdf',
-      'TC\\Visa BNA\\8610_1040211953.pdf',
-    ]);
+    const entries = plan(['Otra\\cosa.pdf', 'TC\\Visa BNA\\8610_1040211953.pdf']);
     expect(entries.find((e) => e.relPath === 'Otra\\cosa.pdf')?.status).toBe('SIN_RUTEO');
     expect(entries.find((e) => e.relPath.includes('8610'))?.status).toBe('SIN_FECHA');
   });
@@ -367,9 +376,7 @@ describe('statementKey', () => {
       currency: 'ARS' as const,
     };
     const date = { precision: 'month' as const, value: '2026-06' };
-    expect(statementKey(base, date)).not.toBe(
-      statementKey({ ...base, accountHint: '0413' }, date),
-    );
+    expect(statementKey(base, date)).not.toBe(statementKey({ ...base, accountHint: '0413' }, date));
     expect(statementKey(base, date)).not.toBe(statementKey({ ...base, currency: 'USD' }, date));
     expect(statementKey(base, date)).toBe(statementKey({ ...base }, date));
   });

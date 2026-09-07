@@ -44,7 +44,7 @@ export default async function NewRecurrencePage() {
     return (
       <div className="mx-auto max-w-xl space-y-4 rounded-md border border-dashed p-8 text-center">
         <h2 className="text-lg font-medium">Necesitás una cuenta primero</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Cargá al menos una cuenta antes de armar recurrencias.
         </p>
         <Button asChild>
@@ -58,7 +58,7 @@ export default async function NewRecurrencePage() {
     return (
       <div className="mx-auto max-w-xl space-y-4 rounded-md border border-dashed p-8 text-center">
         <h2 className="text-lg font-medium">No hay categorías cargadas</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Corré <code>npm run db:seed:categories</code> primero.
         </p>
       </div>

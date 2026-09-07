@@ -27,7 +27,20 @@ function formatUsd(amount: string | number, withDecimals = false): string {
 
 function shortDate(iso: string): string {
   const parts = iso.split('-');
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   const mi = Number.parseInt(parts[1]!, 10) - 1;
   return `${parts[2]} ${months[mi]} ${parts[0]}`;
 }
@@ -59,9 +72,7 @@ export default async function PatrimonioPage() {
     .limit(1);
 
   const targetTotal = goals
-    ? new Decimal(goals.numeroRetiroUsd)
-        .plus(goals.numeroEducacionUsd)
-        .plus(goals.bufferUsd)
+    ? new Decimal(goals.numeroRetiroUsd).plus(goals.numeroEducacionUsd).plus(goals.bufferUsd)
     : new Decimal(FINANCIAL_GOALS_DEFAULTS.numeroRetiroUsd)
         .plus(FINANCIAL_GOALS_DEFAULTS.numeroEducacionUsd)
         .plus(FINANCIAL_GOALS_DEFAULTS.bufferUsd);
@@ -72,9 +83,8 @@ export default async function PatrimonioPage() {
 
   // Variation vs previous snapshot
   const prevSnapshot = snapshots.length >= 2 ? snapshots[1] : null;
-  const variation = latest && prevSnapshot
-    ? new Decimal(latest.totalUsd).minus(prevSnapshot.totalUsd)
-    : null;
+  const variation =
+    latest && prevSnapshot ? new Decimal(latest.totalUsd).minus(prevSnapshot.totalUsd) : null;
 
   // Chart data
   const chartData = snapshots
@@ -88,7 +98,7 @@ export default async function PatrimonioPage() {
       <header className="flex flex-wrap items-end justify-between gap-6 pt-2">
         <div className="min-w-0">
           <Label>Patrimonio neto</Label>
-          <Display size="xl" className="mt-3 block tabular-nums text-primary">
+          <Display size="xl" className="text-primary mt-3 block tabular-nums">
             {currentNw ? formatUsd(currentNw.toNumber()) : '—'}
           </Display>
           {latest && (
@@ -100,7 +110,9 @@ export default async function PatrimonioPage() {
                   <Num
                     className={cn(
                       'text-sm font-semibold',
-                      variation.isPositive() ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
+                      variation.isPositive()
+                        ? 'text-[color:var(--good)]'
+                        : 'text-[color:var(--bad)]',
                     )}
                   >
                     {variation.isPositive() ? '+' : ''}
@@ -115,7 +127,7 @@ export default async function PatrimonioPage() {
 
         <Link
           href="/patrimonio/nuevo"
-          className="inline-flex items-center gap-2 bg-primary px-5 py-2.5 font-display text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          className="bg-primary font-display text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors"
         >
           + Nuevo snapshot
         </Link>
@@ -124,17 +136,13 @@ export default async function PatrimonioPage() {
       <Hair thick />
 
       {/* ============ KPI STRIP ============ */}
-      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <section className="bg-border grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Patrimonio actual"
           value={currentNw ? formatUsd(currentNw.toNumber()) : '—'}
           variant="primary"
         />
-        <KpiCard
-          label="Target total"
-          value={formatUsd(targetTotal.toNumber())}
-          variant="attn"
-        />
+        <KpiCard label="Target total" value={formatUsd(targetTotal.toNumber())} variant="attn" />
         <KpiCard
           label="Progreso"
           value={progressPct !== null ? `${progressPct.toFixed(1)}%` : '—'}
@@ -150,13 +158,13 @@ export default async function PatrimonioPage() {
       {/* ============ PROGRESS BAR ============ */}
       {progressPct !== null && (
         <section className="relative">
-          <div className="h-2 w-full bg-muted/60">
+          <div className="bg-muted/60 h-2 w-full">
             <div
-              className="h-full bg-primary transition-all"
+              className="bg-primary h-full transition-all"
               style={{ width: `${Math.min(100, progressPct)}%` }}
             />
           </div>
-          <div className="mt-2 flex items-center justify-between font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="text-muted-foreground mt-2 flex items-center justify-between font-sans text-[10px] tracking-[0.18em] uppercase">
             <span>USD 0</span>
             <span>{formatUsd(targetTotal.toNumber())}</span>
           </div>
@@ -194,12 +202,12 @@ export default async function PatrimonioPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-border border-b">
                   {['Fecha', 'Net worth', 'Variación', ''].map((h, i) => (
                     <th
                       key={h || `empty-${i}`}
                       className={cn(
-                        'py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground',
+                        'text-muted-foreground py-2 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase',
                         i >= 1 && i <= 2 ? 'text-right' : 'text-left',
                       )}
                     >
@@ -211,41 +219,41 @@ export default async function PatrimonioPage() {
               <tbody>
                 {snapshots.map((s, i) => {
                   const prev = snapshots[i + 1];
-                  const delta = prev
-                    ? new Decimal(s.totalUsd).minus(prev.totalUsd)
-                    : null;
+                  const delta = prev ? new Decimal(s.totalUsd).minus(prev.totalUsd) : null;
                   return (
                     <tr
                       key={s.id}
-                      className="border-b border-border/40 transition-colors hover:bg-primary/[0.04]"
+                      className="border-border/40 hover:bg-primary/[0.04] border-b transition-colors"
                     >
                       <td className="py-3">
-                        <Num className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                        <Num className="text-muted-foreground text-[11px] tracking-[0.1em] uppercase">
                           {shortDate(s.date)}
                         </Num>
                       </td>
                       <td className="py-3 text-right">
-                        <Num className="text-sm text-foreground">{formatUsd(s.totalUsd)}</Num>
+                        <Num className="text-foreground text-sm">{formatUsd(s.totalUsd)}</Num>
                       </td>
                       <td className="py-3 text-right">
                         {delta && !delta.isZero() ? (
                           <Num
                             className={cn(
                               'text-sm font-semibold',
-                              delta.isPositive() ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
+                              delta.isPositive()
+                                ? 'text-[color:var(--good)]'
+                                : 'text-[color:var(--bad)]',
                             )}
                           >
                             {delta.isPositive() ? '+' : ''}
                             {formatUsd(delta.toNumber())}
                           </Num>
                         ) : (
-                          <Num className="text-sm text-muted-foreground">—</Num>
+                          <Num className="text-muted-foreground text-sm">—</Num>
                         )}
                       </td>
                       <td className="py-3 text-right">
                         <Link
                           href={`/patrimonio/${s.id}`}
-                          className="link font-display text-sm italic text-muted-foreground"
+                          className="link font-display text-muted-foreground text-sm italic"
                         >
                           Ver detalle →
                         </Link>

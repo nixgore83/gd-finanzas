@@ -123,13 +123,12 @@ export async function routeAttachment(
   // antes se matcheaba contra `name`, que ya no embebe la marca — con fallback
   // al rótulo.
   const target = match.accountNamePattern
-    ? accounts.find(
+    ? (accounts.find(
         (a) =>
           a.type === match.type &&
           a.currencyDefault === match.currency &&
           match.accountNamePattern!.test(`${a.cardBrand ?? ''} ${a.name}`),
-      ) ??
-      accounts.find((a) => a.type === match.type && a.currencyDefault === match.currency)
+      ) ?? accounts.find((a) => a.type === match.type && a.currencyDefault === match.currency))
     : accounts.find((a) => a.type === match.type && a.currencyDefault === match.currency);
   if (!target) return null;
 

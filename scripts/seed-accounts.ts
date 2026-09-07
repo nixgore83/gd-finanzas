@@ -18,32 +18,98 @@ type Acct = {
 
 const ACCOUNTS: Acct[] = [
   // Nico — Galicia
-  { name: 'Galicia Amex', type: 'credit_card', currency: 'ARS', institution: 'Galicia', owner: 'Nico' },
-  { name: 'Galicia Visa', type: 'credit_card', currency: 'ARS', institution: 'Galicia', owner: 'Nico' },
-  { name: 'Galicia Master', type: 'credit_card', currency: 'ARS', institution: 'Galicia', owner: 'Nico' },
+  {
+    name: 'Galicia Amex',
+    type: 'credit_card',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Nico',
+  },
+  {
+    name: 'Galicia Visa',
+    type: 'credit_card',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Nico',
+  },
+  {
+    name: 'Galicia Master',
+    type: 'credit_card',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Nico',
+  },
   // Nico — ICBC
   { name: 'ICBC Visa', type: 'credit_card', currency: 'ARS', institution: 'ICBC', owner: 'Nico' },
   { name: 'ICBC Master', type: 'credit_card', currency: 'ARS', institution: 'ICBC', owner: 'Nico' },
-  { name: 'ICBC Caja Ahorro', type: 'bank_savings', currency: 'ARS', institution: 'ICBC', owner: 'Nico' },
+  {
+    name: 'ICBC Caja Ahorro',
+    type: 'bank_savings',
+    currency: 'ARS',
+    institution: 'ICBC',
+    owner: 'Nico',
+  },
   { name: 'ICBC Inversiones', type: 'broker', currency: 'ARS', institution: 'ICBC', owner: 'Nico' },
   // Nico — BNA
   { name: 'BNA Visa', type: 'credit_card', currency: 'ARS', institution: 'BNA', owner: 'Nico' },
   // Nico — HSBC US
-  { name: 'HSBC US TC', type: 'credit_card', currency: 'USD', institution: 'HSBC US', owner: 'Nico' },
-  { name: 'HSBC US Cuenta', type: 'bank_checking', currency: 'USD', institution: 'HSBC US', owner: 'Nico' },
+  {
+    name: 'HSBC US TC',
+    type: 'credit_card',
+    currency: 'USD',
+    institution: 'HSBC US',
+    owner: 'Nico',
+  },
+  {
+    name: 'HSBC US Cuenta',
+    type: 'bank_checking',
+    currency: 'USD',
+    institution: 'HSBC US',
+    owner: 'Nico',
+  },
   // Nico — Brokers
   { name: 'Balanz', type: 'broker', currency: 'ARS', institution: 'Balanz', owner: 'Nico' },
   { name: 'Cocos', type: 'broker', currency: 'ARS', institution: 'Cocos', owner: 'Nico' },
   // Nico — E-wallet
-  { name: 'Mercado Pago', type: 'ewallet', currency: 'ARS', institution: 'Mercado Pago', owner: 'Nico' },
+  {
+    name: 'Mercado Pago',
+    type: 'ewallet',
+    currency: 'ARS',
+    institution: 'Mercado Pago',
+    owner: 'Nico',
+  },
   // Hogar — Cash
   { name: 'Cash USD', type: 'cash', currency: 'USD', institution: null, owner: 'Hogar' },
   { name: 'Cash ARS', type: 'cash', currency: 'ARS', institution: null, owner: 'Hogar' },
   // Pau — Galicia
-  { name: 'Galicia Caja Ahorro', type: 'bank_savings', currency: 'ARS', institution: 'Galicia', owner: 'Pau' },
-  { name: 'Galicia Visa', type: 'credit_card', currency: 'ARS', institution: 'Galicia', owner: 'Pau' },
-  { name: 'Galicia Master', type: 'credit_card', currency: 'ARS', institution: 'Galicia', owner: 'Pau' },
-  { name: 'Galicia Inversiones', type: 'broker', currency: 'ARS', institution: 'Galicia', owner: 'Pau' },
+  {
+    name: 'Galicia Caja Ahorro',
+    type: 'bank_savings',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Pau',
+  },
+  {
+    name: 'Galicia Visa',
+    type: 'credit_card',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Pau',
+  },
+  {
+    name: 'Galicia Master',
+    type: 'credit_card',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Pau',
+  },
+  {
+    name: 'Galicia Inversiones',
+    type: 'broker',
+    currency: 'ARS',
+    institution: 'Galicia',
+    owner: 'Pau',
+  },
 ];
 
 async function main() {

@@ -73,17 +73,10 @@ export function GmailLabelConfig({ accounts }: { accounts: AccountRow[] }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleLoadLabels}
-          disabled={loadingLabels}
-        >
+        <Button type="button" variant="outline" onClick={handleLoadLabels} disabled={loadingLabels}>
           {loadingLabels ? 'Cargando...' : labels ? 'Recargar labels' : 'Cargar labels de Gmail'}
         </Button>
-        {labels && (
-          <Body>{labels.length} labels disponibles</Body>
-        )}
+        {labels && <Body>{labels.length} labels disponibles</Body>}
       </div>
 
       <Hair />
@@ -92,10 +85,10 @@ export function GmailLabelConfig({ accounts }: { accounts: AccountRow[] }) {
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-border/40 pb-3"
+            className="border-border/40 grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b pb-3"
           >
             <div>
-              <span className="font-display text-sm text-foreground">
+              <span className="font-display text-foreground text-sm">
                 {formatAccount(
                   {
                     institutionName: acc.institutionName,
@@ -108,7 +101,7 @@ export function GmailLabelConfig({ accounts }: { accounts: AccountRow[] }) {
                   { withInstitution: false, withOwner: false, withCurrency: false },
                 )}
               </span>
-              <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
+              <span className="text-muted-foreground ml-2 font-sans text-[9px] tracking-wide uppercase">
                 {acc.institutionName ? `${acc.institutionName} · ` : ''}
                 {acc.ownerTag} · {acc.currencyDefault}
               </span>
@@ -138,7 +131,7 @@ export function GmailLabelConfig({ accounts }: { accounts: AccountRow[] }) {
                 </SelectContent>
               </Select>
             ) : (
-              <span className="font-mono text-xs text-muted-foreground">
+              <span className="text-muted-foreground font-mono text-xs">
                 {acc.gmailLabelId ?? '—'}
               </span>
             )}

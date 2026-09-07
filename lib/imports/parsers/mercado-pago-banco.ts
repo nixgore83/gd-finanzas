@@ -120,7 +120,10 @@ function classify(type: string): Classification {
   return { isTransfer: false };
 }
 
-function extractSummary(rows: string[][], ctx: { currency: 'ARS' | 'USD' }): ImportSummary | undefined {
+function extractSummary(
+  rows: string[][],
+  ctx: { currency: 'ARS' | 'USD' },
+): ImportSummary | undefined {
   const hIdx = rows.findIndex(
     (r) => r.some((c) => /CREDITS/i.test(c)) && r.some((c) => /DEBITS/i.test(c)),
   );

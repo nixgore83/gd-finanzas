@@ -31,10 +31,7 @@ type RunInput<T> = {
   modelId: string;
   systemPrompt: string;
   userPrompt: string;
-  file:
-    | { kind: 'pdf'; base64: string }
-    | { kind: 'text'; text: string }
-    | null;
+  file: { kind: 'pdf'; base64: string } | { kind: 'text'; text: string } | null;
   outputSchema: z.ZodSchema<T>;
   maxTokens?: number;
 };
@@ -195,7 +192,12 @@ export async function runParser<T>(input: RunInput<T>): Promise<LlmRunResult<T>>
           lines[0] && typeof lines[0] === 'object'
             ? Object.keys(lines[0] as Record<string, unknown>)
             : Object.keys(root ?? {});
-        console.warn('[llm] schema mismatch — output keys:', sampleKeys, 'lineCount:', lines.length);
+        console.warn(
+          '[llm] schema mismatch — output keys:',
+          sampleKeys,
+          'lineCount:',
+          lines.length,
+        );
       } catch {
         /* swallow logging errors */
       }

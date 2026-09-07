@@ -10,7 +10,11 @@ import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 
 export type UpdateSnapshotResult =
   | { ok: true }
-  | { ok: false; error: 'invalid_input' | 'session' | 'not_found' | 'duplicate_date' | 'unknown'; fields?: Record<string, string> };
+  | {
+      ok: false;
+      error: 'invalid_input' | 'session' | 'not_found' | 'duplicate_date' | 'unknown';
+      fields?: Record<string, string>;
+    };
 
 export async function updateSnapshot(
   snapshotId: string,
@@ -64,9 +68,7 @@ export async function updateSnapshot(
       .where(eq(netWorthSnapshots.id, snapshotId));
 
     // Replace balances: delete all, re-insert
-    await db
-      .delete(accountBalances)
-      .where(eq(accountBalances.snapshotId, snapshotId));
+    await db.delete(accountBalances).where(eq(accountBalances.snapshotId, snapshotId));
 
     if (balances.length > 0) {
       await db.insert(accountBalances).values(
@@ -95,7 +97,14 @@ export async function updateSnapshot(
             accountId: h.accountId,
             ticker: h.ticker,
             name: h.name,
-            assetType: h.assetType as 'stock' | 'etf' | 'bond' | 'cedear' | 'fci' | 'crypto' | 'other',
+            assetType: h.assetType as
+              | 'stock'
+              | 'etf'
+              | 'bond'
+              | 'cedear'
+              | 'fci'
+              | 'crypto'
+              | 'other',
             quantity: h.quantity,
             pricePerUnit: h.pricePerUnit,
             currency: h.currency as 'ARS' | 'USD',

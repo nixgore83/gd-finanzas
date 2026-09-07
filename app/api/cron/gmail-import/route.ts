@@ -62,7 +62,11 @@ export async function GET(request: Request) {
 
   // Check if Gmail OAuth is configured
   const google = getGoogleEnv();
-  if (!google.GOOGLE_OAUTH_CLIENT_ID || !google.GOOGLE_OAUTH_CLIENT_SECRET || !google.GOOGLE_OAUTH_REFRESH_TOKEN) {
+  if (
+    !google.GOOGLE_OAUTH_CLIENT_ID ||
+    !google.GOOGLE_OAUTH_CLIENT_SECRET ||
+    !google.GOOGLE_OAUTH_REFRESH_TOKEN
+  ) {
     return NextResponse.json({ ok: true, skipped: 'gmail_not_configured' });
   }
 
@@ -159,7 +163,12 @@ export async function GET(request: Request) {
             if (acc.institutionId) {
               for (const att of attachments) {
                 const result = await createAndParse(
-                  att.filename, att.data, acc, householdId, userId, stats,
+                  att.filename,
+                  att.data,
+                  acc,
+                  householdId,
+                  userId,
+                  stats,
                 );
                 if (result) anyHandled = true;
               }
@@ -204,7 +213,12 @@ export async function GET(request: Request) {
 
                 const acc = accountGroup.find((a) => a.id === routeResult.account.id)!;
                 const result = await createAndParse(
-                  att.filename, routeResult.bytes, acc, householdId, userId, stats,
+                  att.filename,
+                  routeResult.bytes,
+                  acc,
+                  householdId,
+                  userId,
+                  stats,
                 );
                 if (result) anyHandled = true;
               } else {
@@ -220,7 +234,12 @@ export async function GET(request: Request) {
                   continue;
                 }
                 const result = await createAndParse(
-                  att.filename, att.data, acc, householdId, userId, stats,
+                  att.filename,
+                  att.data,
+                  acc,
+                  householdId,
+                  userId,
+                  stats,
                 );
                 if (result) anyHandled = true;
               }

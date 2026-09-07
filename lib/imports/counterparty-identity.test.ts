@@ -35,23 +35,18 @@ describe('sameCounterpartyIdentity', () => {
   });
 
   it('ids fuertes distintos NO matchean aunque otro campo falte', () => {
-    expect(
-      sameCounterpartyIdentity({ cuil: '20-1-1' }, { cuil: '27-2-2' }),
-    ).toBe(false);
+    expect(sameCounterpartyIdentity({ cuil: '20-1-1' }, { cuil: '27-2-2' })).toBe(false);
   });
 
   it('fallback por nombre normalizado cuando no hay ids fuertes en común', () => {
-    expect(
-      sameCounterpartyIdentity({ name: '  ROUGIER  NAHIR ' }, { name: 'rougier nahir' }),
-    ).toBe(true);
+    expect(sameCounterpartyIdentity({ name: '  ROUGIER  NAHIR ' }, { name: 'rougier nahir' })).toBe(
+      true,
+    );
   });
 
   it('un id fuerte coincidente gana aunque los nombres difieran', () => {
     expect(
-      sameCounterpartyIdentity(
-        { alias: 'mi.alias', name: 'A' },
-        { alias: 'mi.alias', name: 'B' },
-      ),
+      sameCounterpartyIdentity({ alias: 'mi.alias', name: 'A' }, { alias: 'mi.alias', name: 'B' }),
     ).toBe(true);
   });
 
@@ -66,9 +61,7 @@ describe('sameCounterpartyIdentity', () => {
     // El bulk "Contraparte" de la review crea counterparty {label} en líneas
     // sin contraparte parseada; ese objeto no debe participar del matching.
     expect(counterpartyHasIdentity({ label: 'Niñera' })).toBe(false);
-    expect(
-      sameCounterpartyIdentity({ label: 'Niñera' }, { label: 'Niñera' }),
-    ).toBe(false);
+    expect(sameCounterpartyIdentity({ label: 'Niñera' }, { label: 'Niñera' })).toBe(false);
   });
 });
 
@@ -123,7 +116,10 @@ describe('counterpartyIsStatementAccount', () => {
 
   it('reconoce que el ordenante es la cuenta del propio extracto', () => {
     expect(
-      counterpartyIsStatementAccount({ name: 'GORE NICOLAS MARIO', cuil: '20305551067' }, statement),
+      counterpartyIsStatementAccount(
+        { name: 'GORE NICOLAS MARIO', cuil: '20305551067' },
+        statement,
+      ),
     ).toBe(true);
   });
 

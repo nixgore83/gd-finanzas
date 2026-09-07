@@ -43,7 +43,9 @@ export async function learnAccountNumber(input: {
   const [acc] = await db
     .select({ id: accounts.id })
     .from(accounts)
-    .where(and(eq(accounts.id, parsed.data.accountId), eq(accounts.householdId, session.householdId)))
+    .where(
+      and(eq(accounts.id, parsed.data.accountId), eq(accounts.householdId, session.householdId)),
+    )
     .limit(1);
   if (!acc) return { ok: false, error: 'not_found' };
 

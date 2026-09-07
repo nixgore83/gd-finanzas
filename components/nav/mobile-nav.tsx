@@ -29,7 +29,7 @@ export function MobileNav({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Abrir menú"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-accent md:hidden"
+        className="border-border text-foreground hover:bg-accent inline-flex h-9 w-9 items-center justify-center rounded-md border transition-colors md:hidden"
       >
         <Menu className="size-4" />
       </button>
@@ -38,7 +38,7 @@ export function MobileNav({
       <div
         aria-hidden={!open}
         onClick={() => setOpen(false)}
-        className={`fixed inset-0 z-40 bg-background/70 backdrop-blur-sm transition-opacity md:hidden ${
+        className={`bg-background/70 fixed inset-0 z-40 backdrop-blur-sm transition-opacity md:hidden ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       />
@@ -59,7 +59,7 @@ export function MobileNav({
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Cerrar menú"
-            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground absolute top-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-md border"
           >
             <X className="size-4" />
           </button>

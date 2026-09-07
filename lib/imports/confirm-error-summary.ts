@@ -46,10 +46,7 @@ const MAX_REASONS_SHOWN = 3;
  * `confirmed` es cuántas se confirmaron en ESTA corrida; el confirm es
  * resumible, así que un reintento sólo procesa las que quedaron sin transacción.
  */
-export function buildConfirmErrorMessage(
-  confirmed: number,
-  errors: readonly LineError[],
-): string {
+export function buildConfirmErrorMessage(confirmed: number, errors: readonly LineError[]): string {
   const base =
     confirmed > 0
       ? `${confirmed} confirmadas, ${errors.length} pendientes con error`

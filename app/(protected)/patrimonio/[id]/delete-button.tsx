@@ -27,7 +27,7 @@ export function DeleteSnapshotButton({ snapshotId }: { snapshotId: string }) {
       type="button"
       onClick={handleDelete}
       disabled={isPending}
-      className="border border-[color:var(--bad)]/30 px-5 py-2.5 font-display text-sm text-[color:var(--bad)] transition-colors hover:bg-[color:var(--bad)]/10 disabled:opacity-50"
+      className="font-display border border-[color:var(--bad)]/30 px-5 py-2.5 text-sm text-[color:var(--bad)] transition-colors hover:bg-[color:var(--bad)]/10 disabled:opacity-50"
     >
       {isPending ? 'Eliminando...' : 'Eliminar'}
     </button>

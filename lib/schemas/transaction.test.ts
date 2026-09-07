@@ -109,15 +109,9 @@ describe('transactionInputSchema', () => {
     });
 
     it('rechaza negativo, cero, no-numérico, Infinity', () => {
-      expect(() =>
-        transactionInputSchema.parse({ ...validBase, fxRateOverride: '-1' }),
-      ).toThrow();
-      expect(() =>
-        transactionInputSchema.parse({ ...validBase, fxRateOverride: '0' }),
-      ).toThrow();
-      expect(() =>
-        transactionInputSchema.parse({ ...validBase, fxRateOverride: 'abc' }),
-      ).toThrow();
+      expect(() => transactionInputSchema.parse({ ...validBase, fxRateOverride: '-1' })).toThrow();
+      expect(() => transactionInputSchema.parse({ ...validBase, fxRateOverride: '0' })).toThrow();
+      expect(() => transactionInputSchema.parse({ ...validBase, fxRateOverride: 'abc' })).toThrow();
       expect(() =>
         transactionInputSchema.parse({ ...validBase, fxRateOverride: 'Infinity' }),
       ).toThrow();

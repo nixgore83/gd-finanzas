@@ -49,9 +49,9 @@ export default async function CategoriasPage() {
         </Display>
         <Body className="mt-2 max-w-2xl">
           Las marcadas como{' '}
-          <span className="not-italic font-medium text-[color:var(--attn)]">inversión</span>{' '}
-          suman al ahorro en el Reporte D, no al gasto.{' '}
-          <span className="not-italic text-foreground">
+          <span className="font-medium text-[color:var(--attn)] not-italic">inversión</span> suman
+          al ahorro en el Reporte D, no al gasto.{' '}
+          <span className="text-foreground not-italic">
             {investCount} de {leafCount}
           </span>{' '}
           marcadas.
@@ -61,7 +61,7 @@ export default async function CategoriasPage() {
       <Hair thick />
 
       {groups.length === 0 ? (
-        <div className="border border-dashed border-border p-10 text-center">
+        <div className="border-border border border-dashed p-10 text-center">
           <Body>Sin categorías de gasto cargadas.</Body>
         </div>
       ) : (
@@ -72,15 +72,12 @@ export default async function CategoriasPage() {
             const isGroupInvestment = isLeaf(parent) && parent.isInvestment;
             return (
               <section key={parent.id}>
-                <div className="flex flex-wrap items-baseline gap-3 border-b border-border pb-2">
-                  <span
-                    className="inline-block h-4 w-[3px] bg-[color:var(--bad)]"
-                    aria-hidden
-                  />
+                <div className="border-border flex flex-wrap items-baseline gap-3 border-b pb-2">
+                  <span className="inline-block h-4 w-[3px] bg-[color:var(--bad)]" aria-hidden />
                   <Display size="sm">{parent.name}</Display>
                   {isGroupInvestment && (
                     <span
-                      className="inline-block rounded-full px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.18em]"
+                      className="inline-block rounded-full px-2 py-0.5 font-sans text-[9px] font-semibold tracking-[0.18em] uppercase"
                       style={{
                         background: 'color-mix(in oklab, var(--attn) 18%, transparent)',
                         color: 'var(--attn)',
@@ -95,12 +92,10 @@ export default async function CategoriasPage() {
                 </div>
 
                 {/* Parent row first if it's also a leaf (no children) */}
-                {isLeaf(parent) && (
-                  <CategoryRow category={parent} isLeaf isParentNode />
-                )}
+                {isLeaf(parent) && <CategoryRow category={parent} isLeaf isParentNode />}
 
                 {group.rows.length === 0 && !isLeaf(parent) && (
-                  <p className="px-2 py-4 font-display text-sm italic text-muted-foreground">
+                  <p className="font-display text-muted-foreground px-2 py-4 text-sm italic">
                     Sin sub-categorías.
                   </p>
                 )}
@@ -128,14 +123,14 @@ function CategoryRow({
 }) {
   return (
     <div
-      className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border/40 py-3 transition-colors hover:bg-primary/[0.03]"
+      className="border-border/40 hover:bg-primary/[0.03] grid grid-cols-[1fr_auto] items-center gap-4 border-b py-3 transition-colors"
       style={{ paddingLeft: isParentNode ? 0 : 20 }}
     >
       <div className="flex items-center gap-3">
-        <span className="font-display text-base text-foreground">{category.name}</span>
+        <span className="font-display text-foreground text-base">{category.name}</span>
         {category.isInvestment && (
           <span
-            className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em]"
+            className="font-sans text-[9px] font-semibold tracking-[0.18em] uppercase"
             style={{ color: 'var(--attn)' }}
           >
             · inversión

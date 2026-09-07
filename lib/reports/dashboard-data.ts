@@ -210,4 +210,3 @@ export async function loadDashboardData(
     recentTransactions: recentRows,
   };
 }
-

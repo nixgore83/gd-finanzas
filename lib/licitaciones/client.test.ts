@@ -93,10 +93,7 @@ describe('procesarLicitaciones', () => {
   });
 
   it('http_error status no mapeado sin JSON → incluye el código', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response('nope', { status: 418 })),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 418 })));
     const r = await procesarLicitaciones(onePdf);
     expect(r.ok).toBe(false);
     if (!r.ok) {

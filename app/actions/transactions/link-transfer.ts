@@ -86,10 +86,7 @@ export async function linkAsTransfer(input: {
   const pairId = randomUUID();
   try {
     await db.transaction(async (tx) => {
-      for (const [row, dir] of [
-        [a, dirA] as const,
-        [b, dirB] as const,
-      ]) {
+      for (const [row, dir] of [[a, dirA] as const, [b, dirB] as const]) {
         await tx
           .update(transactions)
           .set({

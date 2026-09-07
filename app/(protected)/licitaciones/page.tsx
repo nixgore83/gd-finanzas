@@ -51,7 +51,7 @@ export default async function LicitacionesListPage() {
       <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Calendario de Licitaciones</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Subí los PDFs de la semana y descargá el Excel del calendario.
           </p>
         </div>
@@ -62,7 +62,7 @@ export default async function LicitacionesListPage() {
 
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed p-12 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Sin tandas todavía. Subí los PDFs de la semana para empezar.
           </p>
           <Button asChild className="mt-4">

@@ -13,7 +13,7 @@
   /* Fonts — declaradas por next/font en app/layout.tsx via CSS variables. */
   --font-sans: var(--font-sans), -apple-system, system-ui, sans-serif;
   --font-display: var(--font-display), Georgia, serif;
-  --font-mono: var(--font-mono), ui-monospace, "JetBrains Mono", monospace;
+  --font-mono: var(--font-mono), ui-monospace, 'JetBrains Mono', monospace;
 
   /* shadcn token bridges */
   --color-background: var(--background);
@@ -52,20 +52,20 @@
  * con sage como primario para mantener coherencia con dark.
  */
 :root {
-  --background: hsl(40 47% 91%);              /* #f3ecdc cream paper */
-  --foreground: hsl(143 19% 13%);             /* #1b2820 deep forest ink */
+  --background: hsl(40 47% 91%); /* #f3ecdc cream paper */
+  --foreground: hsl(143 19% 13%); /* #1b2820 deep forest ink */
 
-  --card: hsl(40 50% 95%);                    /* paper a touch lighter */
+  --card: hsl(40 50% 95%); /* paper a touch lighter */
   --card-foreground: hsl(143 19% 13%);
 
   --popover: hsl(40 50% 95%);
   --popover-foreground: hsl(143 19% 13%);
 
   /* Primary = sage (darker than dark-mode variant to hit AA on cream) */
-  --primary: hsl(143 22% 38%);                /* #4d7659 */
+  --primary: hsl(143 22% 38%); /* #4d7659 */
   --primary-foreground: hsl(40 50% 95%);
 
-  --secondary: hsl(45 33% 86%);               /* warm taupe */
+  --secondary: hsl(45 33% 86%); /* warm taupe */
   --secondary-foreground: hsl(143 19% 13%);
 
   --muted: hsl(45 33% 86%);
@@ -74,19 +74,19 @@
   --accent: hsl(45 33% 86%);
   --accent-foreground: hsl(143 19% 13%);
 
-  --destructive: hsl(8 50% 45%);              /* ember on cream */
+  --destructive: hsl(8 50% 45%); /* ember on cream */
   --destructive-foreground: hsl(40 50% 95%);
 
   --border: hsl(45 18% 78%);
   --input: hsl(45 18% 78%);
   --ring: hsl(143 22% 38%);
 
-  --sidebar: hsl(45 41% 88%);                 /* slightly darker than bg */
+  --sidebar: hsl(45 41% 88%); /* slightly darker than bg */
   --sidebar-foreground: hsl(143 19% 13%);
 
-  --good: hsl(143 22% 38%);                   /* sage */
-  --bad: hsl(8 50% 45%);                      /* ember */
-  --attn: hsl(35 60% 42%);                    /* gold antiguo */
+  --good: hsl(143 22% 38%); /* sage */
+  --bad: hsl(8 50% 45%); /* ember */
+  --attn: hsl(35 60% 42%); /* gold antiguo */
 }
 
 /*
@@ -94,40 +94,40 @@
  * Esta es la dirección B3 elegida.
  */
 .dark {
-  --background: hsl(150 22% 6%);              /* #0d1411 */
-  --foreground: hsl(45 35% 87%);              /* #e8e3d4 cream */
+  --background: hsl(150 22% 6%); /* #0d1411 */
+  --foreground: hsl(45 35% 87%); /* #e8e3d4 cream */
 
-  --card: hsl(150 21% 9%);                    /* #121b17 */
+  --card: hsl(150 21% 9%); /* #121b17 */
   --card-foreground: hsl(45 35% 87%);
 
   --popover: hsl(150 21% 9%);
   --popover-foreground: hsl(45 35% 87%);
 
-  --primary: hsl(133 22% 64%);                /* #8fb89a sage */
+  --primary: hsl(133 22% 64%); /* #8fb89a sage */
   --primary-foreground: hsl(150 22% 6%);
 
-  --secondary: hsl(150 21% 12%);              /* #19241f */
+  --secondary: hsl(150 21% 12%); /* #19241f */
   --secondary-foreground: hsl(45 35% 87%);
 
   --muted: hsl(150 21% 12%);
-  --muted-foreground: hsl(60 4% 43%);         /* #727269 */
+  --muted-foreground: hsl(60 4% 43%); /* #727269 */
 
   --accent: hsl(150 21% 14%);
   --accent-foreground: hsl(45 35% 87%);
 
-  --destructive: hsl(20 65% 57%);             /* #d97a4a ember */
+  --destructive: hsl(20 65% 57%); /* #d97a4a ember */
   --destructive-foreground: hsl(150 22% 6%);
 
-  --border: hsl(150 18% 22%);                 /* hair, solid version */
+  --border: hsl(150 18% 22%); /* hair, solid version */
   --input: hsl(150 18% 22%);
   --ring: hsl(133 22% 64%);
 
-  --sidebar: hsl(150 22% 5%);                 /* slightly deeper than bg */
+  --sidebar: hsl(150 22% 5%); /* slightly deeper than bg */
   --sidebar-foreground: hsl(45 35% 87%);
 
-  --good: hsl(135 32% 76%);                   /* #aed3b6 sage hover/positive */
-  --bad: hsl(20 65% 57%);                     /* ember */
-  --attn: hsl(40 55% 65%);                    /* gold luminoso */
+  --good: hsl(135 32% 76%); /* #aed3b6 sage hover/positive */
+  --bad: hsl(20 65% 57%); /* ember */
+  --attn: hsl(40 55% 65%); /* gold luminoso */
 }
 
 body {
@@ -142,7 +142,9 @@ body {
 
 /* Pequeño touch: tablas de números siempre tabular. Se aplica cuando
    un elemento (o cualquier ancestro) usa la utility .tabular-nums. */
-.tabular-nums { font-variant-numeric: tabular-nums; }
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
 
 /* Vault Sage usa underline siempre presente para links inline en serif,
    sin que la utility de Tailwind tape el offset. */
@@ -151,7 +153,9 @@ a.link {
   text-decoration-color: color-mix(in oklab, var(--primary) 60%, transparent);
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
-  transition: color 0.12s, text-decoration-color 0.12s;
+  transition:
+    color 0.12s,
+    text-decoration-color 0.12s;
 }
 a.link:hover {
   color: var(--primary);

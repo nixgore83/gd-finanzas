@@ -6,7 +6,11 @@ import { transactions, transactionTags } from '@/db/schema';
 import { parseTransactionFormData } from '@/lib/schemas/transaction';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { buildTransactionFields, validateTagIds } from './_build';
-import { getAutoMatchEnabled, tryAutoMatch, type AutoMatchResult } from '@/lib/forecasts/auto-match';
+import {
+  getAutoMatchEnabled,
+  tryAutoMatch,
+  type AutoMatchResult,
+} from '@/lib/forecasts/auto-match';
 
 export type CreateTransactionResult =
   | { ok: true; id: string; autoMatch?: AutoMatchResult }

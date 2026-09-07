@@ -122,7 +122,7 @@ export function LicitacionesUploadForm() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5 rounded-md border bg-card p-4">
+      <div className="bg-card space-y-1.5 rounded-md border p-4">
         <Label htmlFor="files">
           PDFs de avisos (suscripción, colocación, complementarios) — hasta{' '}
           {MAX_LICITACIONES_PDF_COUNT}
@@ -144,7 +144,7 @@ export function LicitacionesUploadForm() {
       </div>
 
       {files.length > 0 && (
-        <div className="space-y-2 rounded-md border bg-card p-4">
+        <div className="bg-card space-y-2 rounded-md border p-4">
           <p className="text-sm font-medium">
             {files.length} {files.length === 1 ? 'archivo' : 'archivos'}
           </p>
@@ -155,7 +155,7 @@ export function LicitacionesUploadForm() {
                 <button
                   type="button"
                   onClick={() => removeEntry(entry.id)}
-                  className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive shrink-0 text-xs"
                   disabled={isPending}
                 >
                   Quitar
@@ -166,7 +166,7 @@ export function LicitacionesUploadForm() {
         </div>
       )}
 
-      <div className="space-y-1.5 rounded-md border bg-card p-4">
+      <div className="bg-card space-y-1.5 rounded-md border p-4">
         <Label htmlFor="lunes">Lunes objetivo (opcional)</Label>
         <Input
           id="lunes"
@@ -176,12 +176,12 @@ export function LicitacionesUploadForm() {
           disabled={isPending}
           onChange={(e) => setLunes(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Vacío = próximo lunes. Forzá la fecha si estás armando una semana distinta.
         </p>
       </div>
 
-      {progress && <p className="text-sm text-muted-foreground">{progress}</p>}
+      {progress && <p className="text-muted-foreground text-sm">{progress}</p>}
 
       <div className="flex justify-end">
         <Button type="button" onClick={submit} disabled={isPending || files.length === 0}>

@@ -7,7 +7,13 @@ const parse = (rows: string[][], currency: 'ARS' | 'USD' = 'ARS') =>
 
 // Filas tal como las entrega readXlsxRows (string[][]). Datos sintéticos: los TRANSACTION_TYPE son
 // reales (genéricos), pero los nombres de terceros y los montos son inventados.
-const HEADER = ['RELEASE_DATE', 'TRANSACTION_TYPE', 'REFERENCE_ID', 'TRANSACTION_NET_AMOUNT', 'PARTIAL_BALANCE'];
+const HEADER = [
+  'RELEASE_DATE',
+  'TRANSACTION_TYPE',
+  'REFERENCE_ID',
+  'TRANSACTION_NET_AMOUNT',
+  'PARTIAL_BALANCE',
+];
 function sheet(dataRows: string[][]): string[][] {
   return [
     ['INITIAL_BALANCE', 'CREDITS', 'DEBITS', 'FINAL_BALANCE'],
@@ -23,7 +29,9 @@ const byDesc = (lines: ParsedTxLine[], needle: string) =>
 
 describe('mercadoPagoBancoParser.parseXlsx', () => {
   it('fecha DD-MM-YYYY → YYYY-MM-DD y monto es-AR', () => {
-    const { lines } = parse(sheet([['02-06-2026', 'Rendimientos', '1744608605023', '1.234,56', '25.012,40']]));
+    const { lines } = parse(
+      sheet([['02-06-2026', 'Rendimientos', '1744608605023', '1.234,56', '25.012,40']]),
+    );
     expect(lines).toHaveLength(1);
     expect(lines[0]!.date).toBe('2026-06-02');
     expect(lines[0]!.amountOriginal).toBe('1234.56');
@@ -52,7 +60,13 @@ describe('mercadoPagoBancoParser.parseXlsx', () => {
     const { lines } = parse(
       sheet([
         ['22-06-2026', 'Transferencia enviada Nicolas Mario Gore', '1', '-1.000,00', '5.908,96'],
-        ['29-06-2026', 'Transferencia recibida PAULA CECILIA DALMASSO', '2', '5.844,86', '5.849,81'],
+        [
+          '29-06-2026',
+          'Transferencia recibida PAULA CECILIA DALMASSO',
+          '2',
+          '5.844,86',
+          '5.849,81',
+        ],
       ]),
     );
     const enviada = byDesc(lines, 'Nicolas Mario Gore');
@@ -67,7 +81,9 @@ describe('mercadoPagoBancoParser.parseXlsx', () => {
 
   it('Transferencia a un tercero → NO transfer (gasto/ingreso real) + counterparty', () => {
     const { lines } = parse(
-      sheet([['05-06-2026', 'Transferencia enviada Juan Alberto Tercero', '1', '-5.000,00', '20.048,32']]),
+      sheet([
+        ['05-06-2026', 'Transferencia enviada Juan Alberto Tercero', '1', '-5.000,00', '20.048,32'],
+      ]),
     );
     expect(lines[0]!.isTransfer).toBe(false);
     expect(lines[0]!.kind).toBe('expense');
@@ -75,7 +91,9 @@ describe('mercadoPagoBancoParser.parseXlsx', () => {
   });
 
   it('Ingreso de dinero → transfer entrante a revisar', () => {
-    const { lines } = parse(sheet([['09-06-2026', 'Ingreso de dinero', '1', '2.360.951,00', '2.366.030,05']]));
+    const { lines } = parse(
+      sheet([['09-06-2026', 'Ingreso de dinero', '1', '2.360.951,00', '2.366.030,05']]),
+    );
     expect(lines[0]!.isTransfer).toBe(true);
     expect(lines[0]!.kind).toBe('income');
     expect(lines[0]!.counterparty).toBeUndefined();
@@ -83,20 +101,26 @@ describe('mercadoPagoBancoParser.parseXlsx', () => {
 
   it('Pago automático Tarjeta de crédito → transfer a la cuenta TC de MP', () => {
     const { lines } = parse(
-      sheet([['11-06-2026', 'Pago automático Tarjeta de crédito', '1', '-2.360.950,73', '6.873,08']]),
+      sheet([
+        ['11-06-2026', 'Pago automático Tarjeta de crédito', '1', '-2.360.950,73', '6.873,08'],
+      ]),
     );
     expect(lines[0]!.isTransfer).toBe(true);
     expect(lines[0]!.transferAccountName).toBe('Mercado Pago Master');
   });
 
   it('Inversión → transfer saliente a revisar (sin cuenta de inversiones modelada)', () => {
-    const { lines } = parse(sheet([['25-06-2026', 'Inversión Empresas Argentinas', '1', '-10.321,47', '0,00']]));
+    const { lines } = parse(
+      sheet([['25-06-2026', 'Inversión Empresas Argentinas', '1', '-10.321,47', '0,00']]),
+    );
     expect(lines[0]!.isTransfer).toBe(true);
     expect(lines[0]!.kind).toBe('expense');
   });
 
   it('Pago de servicio ARCA → expense, categoría Impuestos', () => {
-    const { lines } = parse(sheet([['09-06-2026', 'Pago de servicio ARCA', '1', '-931.269,47', '1.434.760,58']]));
+    const { lines } = parse(
+      sheet([['09-06-2026', 'Pago de servicio ARCA', '1', '-931.269,47', '1.434.760,58']]),
+    );
     expect(lines[0]!.isTransfer).toBe(false);
     expect(lines[0]!.suggestedCategory).toBe('Impuestos');
   });
@@ -134,8 +158,11 @@ describe('mercadoPagoBancoParser.parseXlsx', () => {
   });
 
   it('input que no es estado de cuenta MP → CsvFormatError', () => {
-    expect(() => parse([['Fecha', 'Movimiento', 'Débito', 'Crédito'], ['01/06/2026', 'algo', '', '']])).toThrow(
-      /Mercado Pago/,
-    );
+    expect(() =>
+      parse([
+        ['Fecha', 'Movimiento', 'Débito', 'Crédito'],
+        ['01/06/2026', 'algo', '', ''],
+      ]),
+    ).toThrow(/Mercado Pago/);
   });
 });

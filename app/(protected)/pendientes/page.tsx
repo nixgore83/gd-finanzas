@@ -9,7 +9,18 @@ import { cn } from '@/lib/utils';
 export const metadata = { title: 'Pendientes · gd-finanzas' };
 
 const MONTHS_SHORT = [
-  'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
 ];
 
 function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
@@ -85,18 +96,18 @@ export default async function PendientesPage() {
               title="Importaciones para revisar"
               hint={`${data.importsToReview.length} esperando confirmación`}
             >
-              <ul className="divide-y divide-border/60">
+              <ul className="divide-border/60 divide-y">
                 {data.importsToReview.map((imp) => (
                   <li key={imp.id}>
                     <Link
                       href={`/imports/${imp.id}`}
-                      className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 transition-colors hover:bg-primary/[0.04]"
+                      className="hover:bg-primary/[0.04] grid grid-cols-[1fr_auto] items-center gap-3 py-3 transition-colors"
                     >
                       <div className="min-w-0">
-                        <div className="truncate font-display text-base text-foreground">
+                        <div className="font-display text-foreground truncate text-base">
                           {imp.fileName ?? 'Importación sin nombre'}
                         </div>
-                        <div className="mt-0.5 font-sans text-xs text-muted-foreground">
+                        <div className="text-muted-foreground mt-0.5 font-sans text-xs">
                           {IMPORT_TYPE_LABELS[imp.type]}
                           {imp.institutionName ? ` · ${imp.institutionName}` : ''}
                           {imp.accountName ? ` · ${imp.accountName}` : ''}
@@ -119,15 +130,15 @@ export default async function PendientesPage() {
               title="Importaciones con error"
               hint={`${data.importsErrored.length} fallaron`}
             >
-              <ul className="divide-y divide-border/60">
+              <ul className="divide-border/60 divide-y">
                 {data.importsErrored.map((imp) => (
                   <li key={imp.id}>
                     <Link
                       href={`/imports/${imp.id}`}
-                      className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 transition-colors hover:bg-primary/[0.04]"
+                      className="hover:bg-primary/[0.04] grid grid-cols-[1fr_auto] items-center gap-3 py-3 transition-colors"
                     >
                       <div className="min-w-0">
-                        <div className="truncate font-display text-base text-foreground">
+                        <div className="font-display text-foreground truncate text-base">
                           {imp.fileName ?? 'Importación sin nombre'}
                         </div>
                         <div className="mt-0.5 truncate font-sans text-xs text-[color:var(--bad)]">
@@ -148,18 +159,18 @@ export default async function PendientesPage() {
               title="Resúmenes mensuales faltantes"
               hint="cuentas con import mensual esperado"
             >
-              <ul className="divide-y divide-border/60">
+              <ul className="divide-border/60 divide-y">
                 {data.importGaps.map((gap) => (
                   <li
                     key={gap.accountId}
                     className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
                     <div className="min-w-0">
-                      <div className="font-display text-base text-foreground">
+                      <div className="font-display text-foreground text-base">
                         {gap.accountName}
                       </div>
                       {gap.institutionName && (
-                        <div className="mt-0.5 font-sans text-xs text-muted-foreground">
+                        <div className="text-muted-foreground mt-0.5 font-sans text-xs">
                           {gap.institutionName}
                         </div>
                       )}
@@ -168,14 +179,14 @@ export default async function PendientesPage() {
                       {gap.missingMonths.map((m) => (
                         <span
                           key={m}
-                          className="rounded-sm bg-[color:var(--attn)]/15 px-2 py-[3px] font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--attn)]"
+                          className="rounded-sm bg-[color:var(--attn)]/15 px-2 py-[3px] font-sans text-[10px] font-semibold tracking-[0.12em] text-[color:var(--attn)] uppercase"
                         >
                           {monthChip(m)}
                         </span>
                       ))}
                       <Link
                         href="/imports/new"
-                        className="link font-display text-sm italic text-muted-foreground"
+                        className="link font-display text-muted-foreground text-sm italic"
                       >
                         Importar →
                       </Link>
@@ -192,17 +203,14 @@ export default async function PendientesPage() {
               title="Previsiones vencidas"
               hint={`${data.overdueForecasts.length} sin confirmar`}
             >
-              <ul className="divide-y divide-border/60">
+              <ul className="divide-border/60 divide-y">
                 {data.overdueForecasts.map((f) => (
-                  <li
-                    key={f.id}
-                    className="grid grid-cols-[56px_1fr_auto] items-center gap-3 py-3"
-                  >
-                    <Num className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                  <li key={f.id} className="grid grid-cols-[56px_1fr_auto] items-center gap-3 py-3">
+                    <Num className="text-muted-foreground text-[11px] tracking-[0.1em] uppercase">
                       {shortDate(f.expectedDate)}
                     </Num>
                     <div className="min-w-0">
-                      <div className="truncate font-display text-base text-foreground">
+                      <div className="font-display text-foreground truncate text-base">
                         {f.recurrenceName}
                       </div>
                       <StatusChip
@@ -211,7 +219,7 @@ export default async function PendientesPage() {
                         className="mt-1"
                       />
                     </div>
-                    <Num className="text-sm text-foreground">
+                    <Num className="text-foreground text-sm">
                       {formatAmount(f.expectedAmount, f.currency)}
                     </Num>
                   </li>
@@ -219,7 +227,7 @@ export default async function PendientesPage() {
               </ul>
               <Link
                 href="/forecasts"
-                className="link mt-4 inline-block font-display text-sm italic text-muted-foreground"
+                className="link font-display text-muted-foreground mt-4 inline-block text-sm italic"
               >
                 Gestionar previsiones →
               </Link>
@@ -232,29 +240,29 @@ export default async function PendientesPage() {
               title="Transferencias sin parear"
               hint={`${data.unmatchedTransfers.length} pendientes`}
             >
-              <ul className="divide-y divide-border/60">
+              <ul className="divide-border/60 divide-y">
                 {data.unmatchedTransfers.map((t) => (
                   <li
                     key={t.id}
                     className="grid grid-cols-[56px_1fr_auto_auto] items-center gap-3 py-3"
                   >
-                    <Num className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                    <Num className="text-muted-foreground text-[11px] tracking-[0.1em] uppercase">
                       {shortDate(t.date)}
                     </Num>
                     <div className="min-w-0">
-                      <div className="truncate font-display text-base text-foreground">
+                      <div className="font-display text-foreground truncate text-base">
                         {t.description}
                       </div>
-                      <div className="mt-0.5 truncate font-sans text-xs text-muted-foreground">
+                      <div className="text-muted-foreground mt-0.5 truncate font-sans text-xs">
                         {t.accountName}
                       </div>
                     </div>
-                    <Num className="text-sm text-foreground">
+                    <Num className="text-foreground text-sm">
                       {formatAmount(t.amountOriginal, t.currencyOriginal)}
                     </Num>
                     <Link
                       href={`/transactions/${t.id}`}
-                      className="link font-display text-sm italic text-muted-foreground ml-2"
+                      className="link font-display text-muted-foreground ml-2 text-sm italic"
                     >
                       Parear →
                     </Link>
@@ -273,7 +281,7 @@ export default async function PendientesPage() {
                 </Body>
                 <Link
                   href="/budget"
-                  className="link font-display text-sm italic text-muted-foreground"
+                  className="link font-display text-muted-foreground text-sm italic"
                 >
                   Definir presupuesto →
                 </Link>
@@ -319,7 +327,7 @@ function StatusChip({
   return (
     <span
       className={cn(
-        'inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]',
+        'inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold tracking-[0.14em] uppercase',
         tone === 'attn' && 'bg-[color:var(--attn)]/15 text-[color:var(--attn)]',
         tone === 'bad' && 'bg-[color:var(--bad)]/15 text-[color:var(--bad)]',
         tone === 'good' && 'bg-[color:var(--good)]/15 text-[color:var(--good)]',

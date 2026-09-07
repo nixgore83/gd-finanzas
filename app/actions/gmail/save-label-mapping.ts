@@ -37,10 +37,7 @@ export async function saveLabelMapping(input: {
       .update(accounts)
       .set({ gmailLabelId: parsed.data.gmailLabelId })
       .where(
-        and(
-          eq(accounts.id, parsed.data.accountId),
-          eq(accounts.householdId, session.householdId),
-        ),
+        and(eq(accounts.id, parsed.data.accountId), eq(accounts.householdId, session.householdId)),
       )
       .returning({ id: accounts.id });
 

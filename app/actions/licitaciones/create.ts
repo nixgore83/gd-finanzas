@@ -86,7 +86,9 @@ export async function createLicitacionUploadSlots(input: {
   try {
     const slots: UploadSlot[] = [];
     for (let i = 0; i < pdfCount; i++) {
-      const { path, token } = await createSignedUpload(buildInputPath(session.householdId, jobId, i));
+      const { path, token } = await createSignedUpload(
+        buildInputPath(session.householdId, jobId, i),
+      );
       slots.push({ index: i, path, token });
     }
     revalidatePath('/licitaciones');
@@ -122,7 +124,9 @@ export async function startLicitacionJob(jobId: string): Promise<StartLicitacion
   const [job] = await db
     .select({ status: licitacionesJobs.status, pdfCount: licitacionesJobs.pdfCount })
     .from(licitacionesJobs)
-    .where(and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)))
+    .where(
+      and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)),
+    )
     .limit(1);
 
   if (!job) return { ok: false, error: 'not_found' };
@@ -137,7 +141,9 @@ export async function startLicitacionJob(jobId: string): Promise<StartLicitacion
   await db
     .update(licitacionesJobs)
     .set({ inputFilePaths: paths })
-    .where(and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)));
+    .where(
+      and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)),
+    );
 
   try {
     await processLicitacionesJob(jobId);
@@ -163,7 +169,9 @@ export async function cancelLicitacionJob(jobId: string): Promise<{ ok: boolean 
   const [job] = await db
     .select({ status: licitacionesJobs.status })
     .from(licitacionesJobs)
-    .where(and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)))
+    .where(
+      and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)),
+    )
     .limit(1);
   if (!job || job.status !== 'uploaded') return { ok: false };
 
@@ -174,7 +182,9 @@ export async function cancelLicitacionJob(jobId: string): Promise<{ ok: boolean 
   }
   await db
     .delete(licitacionesJobs)
-    .where(and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)));
+    .where(
+      and(eq(licitacionesJobs.id, jobId), eq(licitacionesJobs.householdId, session.householdId)),
+    );
 
   revalidatePath('/licitaciones');
   return { ok: true };

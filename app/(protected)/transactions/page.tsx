@@ -18,7 +18,14 @@ import {
 } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
-import { accounts, categories, institutions, tags, transactionTags, transactions } from '@/db/schema';
+import {
+  accounts,
+  categories,
+  institutions,
+  tags,
+  transactionTags,
+  transactions,
+} from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { counterpartyFromMeta } from '@/lib/imports/parsers/types';
@@ -118,11 +125,7 @@ function buildExportHref(filters: Filters): string {
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export default async function TransactionsPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function TransactionsPage({ searchParams }: { searchParams: SearchParams }) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -287,7 +290,11 @@ export default async function TransactionsPage({
   const activeChips: Array<{ label: string; value: string }> = [];
   if (filters.kind) {
     const kindLabel =
-      filters.kind === 'income' ? 'Ingreso' : filters.kind === 'expense' ? 'Gasto' : 'Transferencia';
+      filters.kind === 'income'
+        ? 'Ingreso'
+        : filters.kind === 'expense'
+          ? 'Gasto'
+          : 'Transferencia';
     activeChips.push({ label: 'Tipo', value: kindLabel });
   }
   if (filters.accountId) {
@@ -331,13 +338,13 @@ export default async function TransactionsPage({
           </Display>
           {total > 0 ? (
             <Body className="mt-1">
-              {total} {total === 1 ? 'movimiento' : 'movimientos'} en total ·{' '}
-              {daysCount} {daysCount === 1 ? 'día' : 'días'} en la página · neto{' '}
+              {total} {total === 1 ? 'movimiento' : 'movimientos'} en total · {daysCount}{' '}
+              {daysCount === 1 ? 'día' : 'días'} en la página · neto{' '}
               <Num
                 className={
                   netUsd >= 0
-                    ? 'not-italic text-[color:var(--good)]'
-                    : 'not-italic text-[color:var(--bad)]'
+                    ? 'text-[color:var(--good)] not-italic'
+                    : 'text-[color:var(--bad)] not-italic'
                 }
               >
                 {netUsd >= 0 ? '+' : ''}
@@ -368,7 +375,7 @@ export default async function TransactionsPage({
       <Hair thick />
 
       {accountCount.length === 0 ? (
-        <div className="border border-dashed border-border p-10 text-center">
+        <div className="border-border border border-dashed p-10 text-center">
           <Body className="mx-auto max-w-md">
             Necesitás al menos una cuenta para empezar a cargar movimientos. Andá a{' '}
             <Link href="/accounts/new" className="link not-italic">
@@ -381,14 +388,14 @@ export default async function TransactionsPage({
         <>
           {/* Active filter chips */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 border-l-2 border-primary bg-primary/[0.06] px-4 py-2.5">
+            <div className="border-primary bg-primary/[0.06] flex flex-wrap items-center gap-2 border-l-2 px-4 py-2.5">
               <Label className="text-foreground">Filtros activos</Label>
               {activeChips.map((c, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-baseline gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 font-sans text-[11px] font-medium text-primary"
+                  className="bg-primary/15 text-primary inline-flex items-baseline gap-1 rounded-full px-2.5 py-0.5 font-sans text-[11px] font-medium"
                 >
-                  <span className="text-[9px] uppercase tracking-[0.14em] opacity-70">
+                  <span className="text-[9px] tracking-[0.14em] uppercase opacity-70">
                     {c.label}
                   </span>
                   <span>{c.value}</span>
@@ -396,7 +403,7 @@ export default async function TransactionsPage({
               ))}
               <Link
                 href="/transactions"
-                className="link ml-auto font-display text-sm italic text-muted-foreground"
+                className="link font-display text-muted-foreground ml-auto text-sm italic"
               >
                 Limpiar
               </Link>
@@ -404,18 +411,19 @@ export default async function TransactionsPage({
           )}
 
           {/* Filters details */}
-          <details
-            className="group border border-border bg-card/40"
-            open={hasActiveFilters}
-          >
-            <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-3 hover:bg-accent/50">
+          <details className="group border-border bg-card/40 border" open={hasActiveFilters}>
+            <summary className="hover:bg-accent/50 flex cursor-pointer items-center justify-between px-4 py-3 select-none">
               <Label className="text-foreground">Filtrar y buscar</Label>
-              <span className="font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-transform group-open:rotate-180">
+              <span className="text-muted-foreground font-sans text-[10px] tracking-[0.18em] uppercase transition-transform group-open:rotate-180">
                 ▼
               </span>
             </summary>
 
-            <form method="get" action="/transactions" className="border-t border-border p-5 pt-4 space-y-4">
+            <form
+              method="get"
+              action="/transactions"
+              className="border-border space-y-4 border-t p-5 pt-4"
+            >
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5 md:col-span-2">
                   <FormLabel htmlFor="q">Búsqueda</FormLabel>
@@ -433,7 +441,7 @@ export default async function TransactionsPage({
                     id="kind"
                     name="kind"
                     defaultValue={filters.kind ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todos</option>
                     <option value="income">Ingreso</option>
@@ -447,7 +455,7 @@ export default async function TransactionsPage({
                     id="accountId"
                     name="accountId"
                     defaultValue={filters.accountId ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todas</option>
                     {accountOptions.map((a) => (
@@ -463,7 +471,7 @@ export default async function TransactionsPage({
                     id="categoryId"
                     name="categoryId"
                     defaultValue={filters.categoryId ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todas</option>
                     <option value="unclassified">Sin clasificar</option>
@@ -480,7 +488,7 @@ export default async function TransactionsPage({
                     id="tagId"
                     name="tagId"
                     defaultValue={filters.tagId ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todas</option>
                     {tagOptions.map((t) => (
@@ -499,7 +507,7 @@ export default async function TransactionsPage({
                   <Input id="to" name="to" type="date" defaultValue={filters.to ?? ''} />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+              <div className="border-border/60 flex justify-end gap-2 border-t pt-4">
                 <Button variant="ghost" asChild>
                   <Link href="/transactions">Limpiar</Link>
                 </Button>
@@ -509,7 +517,7 @@ export default async function TransactionsPage({
           </details>
 
           {rows.length === 0 ? (
-            <div className="border border-dashed border-border p-10 text-center">
+            <div className="border-border border border-dashed p-10 text-center">
               <Body className="mx-auto max-w-md">
                 {total === 0
                   ? 'Sin movimientos que coincidan con esos filtros.'
@@ -541,12 +549,18 @@ export default async function TransactionsPage({
                   categoryName: row.categoryName,
                   tags: tagsByTx.get(row.id) ?? [],
                 }));
-                return <TransactionsTable rows={tableRows} categories={categoryOptions} criteria={filters.sort} />;
+                return (
+                  <TransactionsTable
+                    rows={tableRows}
+                    categories={categoryOptions}
+                    criteria={filters.sort}
+                  />
+                );
               })()}
 
               {/* Pagination */}
-              <div className="flex items-center justify-between border-t border-border pt-4">
-                <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="border-border flex items-center justify-between border-t pt-4">
+                <Num className="text-muted-foreground text-xs tracking-[0.14em] uppercase">
                   Mostrando {showStart}–{showEnd} de {total}
                 </Num>
                 {totalPages > 1 && (
@@ -558,7 +572,7 @@ export default async function TransactionsPage({
                         <span>← Anterior</span>
                       )}
                     </Button>
-                    <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                    <Num className="text-muted-foreground text-xs tracking-[0.14em] uppercase">
                       Pág. {page} de {totalPages}
                     </Num>
                     <Button

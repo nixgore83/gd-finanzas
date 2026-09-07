@@ -16,14 +16,42 @@ const HEADER: string[][] = [
 ];
 const ROWS: string[][] = [
   ...HEADER,
-  ['09/06/2026', 'TRANSF. CTAS PROPIAS\nCU  20305551067\n0150926101000109094301\nBSTN\nVARIOS', '-99.235,24', '0,00', '0', ''],
-  ['09/06/2026', 'RESCATE FIMA\nFIMA PREMIUM CLASE A\nNro Operacion: 218482593', '0,00', '98.475,24', '', ''],
+  [
+    '09/06/2026',
+    'TRANSF. CTAS PROPIAS\nCU  20305551067\n0150926101000109094301\nBSTN\nVARIOS',
+    '-99.235,24',
+    '0,00',
+    '0',
+    '',
+  ],
+  [
+    '09/06/2026',
+    'RESCATE FIMA\nFIMA PREMIUM CLASE A\nNro Operacion: 218482593',
+    '0,00',
+    '98.475,24',
+    '',
+    '',
+  ],
   ['05/06/2026', 'PAGO TARJETA VISA\nOPERACION 5083308976', '-1.050.405,88', '0,00', '', ''],
   ['08/06/2026', 'REINTEGRO PROMOCION GALICIA\nGastronomía', '0,00', '3.560,00', '', ''],
   ['18/05/2026', 'IVA', '-1.530,74', '0,00', '', ''],
   ['22/05/2026', 'INTERES CAPITALIZADO', '0,00', '0,06', '', ''],
-  ['15/04/2026', 'TRANSFERENCIA A TERCEROS\nGENZONE JORGE PEDRO\n20075905336\nVARIOS', '-26.000,00', '0,00', '', ''],
-  ['14/04/2026', 'TRANSFERENCIA A TERCEROS\nCU 27288643110\n0340100808710150284008', '-18.000,00', '0,00', '', ''],
+  [
+    '15/04/2026',
+    'TRANSFERENCIA A TERCEROS\nGENZONE JORGE PEDRO\n20075905336\nVARIOS',
+    '-26.000,00',
+    '0,00',
+    '',
+    '',
+  ],
+  [
+    '14/04/2026',
+    'TRANSFERENCIA A TERCEROS\nCU 27288643110\n0340100808710150284008',
+    '-18.000,00',
+    '0,00',
+    '',
+    '',
+  ],
   ['13/04/2026', 'SALDO INFORMATIVO', '0,00', '0,00', '', ''], // ambos 0 → se saltea
 ];
 
@@ -98,6 +126,11 @@ describe('galiciaBancoParser.parseXlsx', () => {
   });
 
   it('lanza CsvFormatError si no es el layout de Galicia', () => {
-    expect(() => parse([['fecha', 'concepto'], ['x', 'y']])).toThrow(CsvFormatError);
+    expect(() =>
+      parse([
+        ['fecha', 'concepto'],
+        ['x', 'y'],
+      ]),
+    ).toThrow(CsvFormatError);
   });
 });

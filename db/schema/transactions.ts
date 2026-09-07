@@ -33,9 +33,7 @@ export const transactions = pgTable(
       .references(() => accounts.id, { onDelete: 'restrict' }),
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'restrict' }),
     kind: transactionKindEnum('kind').notNull(),
-    transactionSubtype: transactionSubtypeEnum('transaction_subtype')
-      .notNull()
-      .default('standard'),
+    transactionSubtype: transactionSubtypeEnum('transaction_subtype').notNull().default('standard'),
     amountOriginal: numeric('amount_original', { precision: 18, scale: 2 }).notNull(),
     currencyOriginal: currencyEnum('currency_original').notNull(),
     amountUsd: numeric('amount_usd', { precision: 18, scale: 2 }).notNull(),

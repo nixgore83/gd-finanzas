@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -105,9 +99,7 @@ export function RecurrenceForm({
   const initialKind: RecurrenceKind = initial?.kind ?? 'expense';
   const [kind, setKind] = useState<RecurrenceKind>(initialKind);
 
-  const [accountId, setAccountId] = useState<string>(
-    initial?.accountId ?? firstAccount?.id ?? '',
-  );
+  const [accountId, setAccountId] = useState<string>(initial?.accountId ?? firstAccount?.id ?? '');
 
   const filteredCategories = useMemo(
     () => categories.filter((c) => c.kind === kind),
@@ -195,7 +187,7 @@ export function RecurrenceForm({
               placeholder="Sueldo Nico, expensas, etc."
               aria-invalid={errors.name ? true : undefined}
             />
-            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+            {errors.name && <p className="text-destructive text-sm">{errors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -213,7 +205,7 @@ export function RecurrenceForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.kind && <p className="text-sm text-destructive">{errors.kind}</p>}
+              {errors.kind && <p className="text-destructive text-sm">{errors.kind}</p>}
             </div>
 
             <div className="space-y-2">
@@ -223,10 +215,7 @@ export function RecurrenceForm({
                 onValueChange={(v) => setFrequency(v as RecurrenceFrequency)}
                 disabled={isPending}
               >
-                <SelectTrigger
-                  id="frequency"
-                  aria-invalid={errors.frequency ? true : undefined}
-                >
+                <SelectTrigger id="frequency" aria-invalid={errors.frequency ? true : undefined}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,7 +226,7 @@ export function RecurrenceForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.frequency && <p className="text-sm text-destructive">{errors.frequency}</p>}
+              {errors.frequency && <p className="text-destructive text-sm">{errors.frequency}</p>}
             </div>
           </div>
 
@@ -255,7 +244,7 @@ export function RecurrenceForm({
                 ))}
               </SelectContent>
             </Select>
-            {errors.accountId && <p className="text-sm text-destructive">{errors.accountId}</p>}
+            {errors.accountId && <p className="text-destructive text-sm">{errors.accountId}</p>}
           </div>
 
           <div className="space-y-2">
@@ -275,7 +264,7 @@ export function RecurrenceForm({
                 ))}
               </SelectContent>
             </Select>
-            {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId}</p>}
+            {errors.categoryId && <p className="text-destructive text-sm">{errors.categoryId}</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -293,7 +282,7 @@ export function RecurrenceForm({
                 placeholder="0.00"
                 aria-invalid={errors.amount ? true : undefined}
               />
-              {errors.amount && <p className="text-sm text-destructive">{errors.amount}</p>}
+              {errors.amount && <p className="text-destructive text-sm">{errors.amount}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="currency">Moneda</Label>
@@ -302,10 +291,7 @@ export function RecurrenceForm({
                 onValueChange={(v) => setCurrency(v as 'ARS' | 'USD')}
                 disabled={isPending}
               >
-                <SelectTrigger
-                  id="currency"
-                  aria-invalid={errors.currency ? true : undefined}
-                >
+                <SelectTrigger id="currency" aria-invalid={errors.currency ? true : undefined}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -316,7 +302,7 @@ export function RecurrenceForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.currency && <p className="text-sm text-destructive">{errors.currency}</p>}
+              {errors.currency && <p className="text-destructive text-sm">{errors.currency}</p>}
             </div>
           </div>
 
@@ -334,9 +320,7 @@ export function RecurrenceForm({
                 disabled={isPending}
                 aria-invalid={errors.dayOfMonth ? true : undefined}
               />
-              {errors.dayOfMonth && (
-                <p className="text-sm text-destructive">{errors.dayOfMonth}</p>
-              )}
+              {errors.dayOfMonth && <p className="text-destructive text-sm">{errors.dayOfMonth}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="startDate">Inicio</Label>
@@ -349,9 +333,7 @@ export function RecurrenceForm({
                 disabled={isPending}
                 aria-invalid={errors.startDate ? true : undefined}
               />
-              {errors.startDate && (
-                <p className="text-sm text-destructive">{errors.startDate}</p>
-              )}
+              {errors.startDate && <p className="text-destructive text-sm">{errors.startDate}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="endDate">Fin (opcional)</Label>
@@ -363,7 +345,7 @@ export function RecurrenceForm({
                 disabled={isPending}
                 aria-invalid={errors.endDate ? true : undefined}
               />
-              {errors.endDate && <p className="text-sm text-destructive">{errors.endDate}</p>}
+              {errors.endDate && <p className="text-destructive text-sm">{errors.endDate}</p>}
             </div>
           </div>
 

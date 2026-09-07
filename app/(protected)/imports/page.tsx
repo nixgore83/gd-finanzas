@@ -1,6 +1,19 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, type AnyColumn, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  or,
+  type AnyColumn,
+  type SQL,
+} from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db/client';
 import { accounts, imports, institutions } from '@/db/schema';
@@ -302,14 +315,15 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                 <span className="text-foreground">{tabCounts.all}</span> archivos
                 {tabCounts.review > 0 && (
                   <>
-                    {' '}·{' '}
-                    <span className="text-[color:var(--attn)]">{tabCounts.review}</span> para revisar
+                    {' '}
+                    · <span className="text-[color:var(--attn)]">{tabCounts.review}</span> para
+                    revisar
                   </>
                 )}
                 {tabCounts.error > 0 && (
                   <>
-                    {' '}·{' '}
-                    <span className="text-[color:var(--bad)]">{tabCounts.error}</span> con error
+                    {' '}
+                    · <span className="text-[color:var(--bad)]">{tabCounts.error}</span> con error
                   </>
                 )}
               </>
@@ -328,13 +342,18 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
 
       {gaps.length > 0 && (
         <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Resúmenes faltantes</p>
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            Resúmenes faltantes
+          </p>
           <div className="space-y-1.5">
             {gaps.map((gap) => (
               <div key={gap.accountId} className="text-sm text-amber-800 dark:text-amber-300">
                 <span className="font-medium">{gap.accountName}</span>
                 {gap.institutionName && (
-                  <span className="text-amber-700 dark:text-amber-400"> · {gap.institutionName}</span>
+                  <span className="text-amber-700 dark:text-amber-400">
+                    {' '}
+                    · {gap.institutionName}
+                  </span>
                 )}
                 <span className="ml-1 inline-flex flex-wrap items-center gap-1 align-middle">
                   — falta{gap.missingMonths.length > 1 ? 'n' : ''}{' '}
@@ -363,11 +382,11 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
       )}
 
       {tabCounts.all === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Display size="sm">Sin imports todavía</Display>
           <Body className="mx-auto mt-3 max-w-md">
-            Subí un PDF o CSV de resumen de banco / TC / broker. El parser LLM lo procesa, vos revisás
-            y confirmás las transacciones.
+            Subí un PDF o CSV de resumen de banco / TC / broker. El parser LLM lo procesa, vos
+            revisás y confirmás las transacciones.
           </Body>
           <Button asChild className="mt-6" size="lg">
             <Link href="/imports/new">+ Subir el primero</Link>
@@ -376,7 +395,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
       ) : (
         <>
           {/* ===== Tabs por estado ===== */}
-          <div className="flex flex-wrap gap-1 border-b border-border">
+          <div className="border-border flex flex-wrap gap-1 border-b">
             {IMPORT_VIEWS.map((v) => {
               const activeTab = filters.view === v;
               return (
@@ -384,14 +403,14 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                   key={v}
                   href={viewHref(filters, v)}
                   className={cn(
-                    '-mb-px border-b-2 px-3 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors',
+                    '-mb-px border-b-2 px-3 py-2 font-sans text-[11px] font-semibold tracking-[0.16em] uppercase transition-colors',
                     activeTab
                       ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                      : 'text-muted-foreground hover:text-foreground border-transparent',
                   )}
                 >
                   {IMPORT_VIEW_LABELS[v]}
-                  <span className="ml-1.5 text-muted-foreground/70">{tabCounts[v]}</span>
+                  <span className="text-muted-foreground/70 ml-1.5">{tabCounts[v]}</span>
                 </Link>
               );
             })}
@@ -399,32 +418,52 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
 
           {/* ===== Chips activos ===== */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 border-l-2 border-primary bg-primary/[0.06] px-4 py-2.5">
+            <div className="border-primary bg-primary/[0.06] flex flex-wrap items-center gap-2 border-l-2 px-4 py-2.5">
               <Label className="text-foreground">Filtros activos</Label>
               {activeChips.map((c, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-baseline gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 font-sans text-[11px] font-medium text-primary"
+                  className="bg-primary/15 text-primary inline-flex items-baseline gap-1 rounded-full px-2.5 py-0.5 font-sans text-[11px] font-medium"
                 >
-                  <span className="text-[9px] uppercase tracking-[0.14em] opacity-70">{c.label}</span>
+                  <span className="text-[9px] tracking-[0.14em] uppercase opacity-70">
+                    {c.label}
+                  </span>
                   <span>{c.value}</span>
                 </span>
               ))}
-              <Link href={viewHref({ ...filters, type: undefined, institutionId: undefined, accountId: undefined, from: undefined, to: undefined, q: undefined }, filters.view)} className="link ml-auto font-display text-sm italic text-muted-foreground">
+              <Link
+                href={viewHref(
+                  {
+                    ...filters,
+                    type: undefined,
+                    institutionId: undefined,
+                    accountId: undefined,
+                    from: undefined,
+                    to: undefined,
+                    q: undefined,
+                  },
+                  filters.view,
+                )}
+                className="link font-display text-muted-foreground ml-auto text-sm italic"
+              >
                 Limpiar
               </Link>
             </div>
           )}
 
           {/* ===== Form de filtros ===== */}
-          <details className="group border border-border bg-card/40" open={hasActiveFilters}>
-            <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-3 hover:bg-accent/50">
+          <details className="group border-border bg-card/40 border" open={hasActiveFilters}>
+            <summary className="hover:bg-accent/50 flex cursor-pointer items-center justify-between px-4 py-3 select-none">
               <Label className="text-foreground">Filtrar y buscar</Label>
-              <span className="font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-transform group-open:rotate-180">
+              <span className="text-muted-foreground font-sans text-[10px] tracking-[0.18em] uppercase transition-transform group-open:rotate-180">
                 ▼
               </span>
             </summary>
-            <form method="get" action="/imports" className="space-y-4 border-t border-border p-5 pt-4">
+            <form
+              method="get"
+              action="/imports"
+              className="border-border space-y-4 border-t p-5 pt-4"
+            >
               <input type="hidden" name="view" value={filters.view} />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5 md:col-span-2">
@@ -443,7 +482,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                     id="type"
                     name="type"
                     defaultValue={filters.type ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todos</option>
                     {IMPORT_TYPES.map((t) => (
@@ -459,7 +498,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                     id="institutionId"
                     name="institutionId"
                     defaultValue={filters.institutionId ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todas</option>
                     {institutionOptions.map((i) => (
@@ -475,7 +514,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                     id="accountId"
                     name="accountId"
                     defaultValue={filters.accountId ?? ''}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                   >
                     <option value="">Todas</option>
                     {accountOptions.map((a) => (
@@ -494,9 +533,22 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                   <Input id="to" name="to" type="date" defaultValue={filters.to ?? ''} />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+              <div className="border-border/60 flex justify-end gap-2 border-t pt-4">
                 <Button variant="ghost" asChild>
-                  <Link href={viewHref({ ...filters, type: undefined, institutionId: undefined, accountId: undefined, from: undefined, to: undefined, q: undefined }, filters.view)}>
+                  <Link
+                    href={viewHref(
+                      {
+                        ...filters,
+                        type: undefined,
+                        institutionId: undefined,
+                        accountId: undefined,
+                        from: undefined,
+                        to: undefined,
+                        q: undefined,
+                      },
+                      filters.view,
+                    )}
+                  >
                     Limpiar
                   </Link>
                 </Button>
@@ -506,7 +558,7 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
           </details>
 
           {rows.length === 0 ? (
-            <div className="border border-dashed border-border p-10 text-center">
+            <div className="border-border border border-dashed p-10 text-center">
               <Body className="mx-auto max-w-md">
                 {total === 0
                   ? 'Sin imports que coincidan con esos filtros.'
@@ -517,8 +569,8 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
             <>
               <ImportsTable rows={tableRows} criteria={filters.sort} />
 
-              <div className="flex items-center justify-between border-t border-border pt-4">
-                <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="border-border flex items-center justify-between border-t pt-4">
+                <Num className="text-muted-foreground text-xs tracking-[0.14em] uppercase">
                   Mostrando {showStart}–{showEnd} de {total}
                 </Num>
                 {totalPages > 1 && (
@@ -530,10 +582,15 @@ export default async function ImportsListPage({ searchParams }: { searchParams: 
                         <span>← Anterior</span>
                       )}
                     </Button>
-                    <Num className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                    <Num className="text-muted-foreground text-xs tracking-[0.14em] uppercase">
                       Pág. {page} de {totalPages}
                     </Num>
-                    <Button variant="outline" size="sm" asChild={page < totalPages} disabled={page >= totalPages}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild={page < totalPages}
+                      disabled={page >= totalPages}
+                    >
                       {page < totalPages ? (
                         <Link href={buildHref(filters, page + 1)}>Siguiente →</Link>
                       ) : (

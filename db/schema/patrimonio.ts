@@ -40,9 +40,7 @@ export const accountBalances = pgTable(
     fxRateUsed: numeric('fx_rate_used', { precision: 18, scale: 6 }),
     fxRateSource: text('fx_rate_source'),
   },
-  (table) => [
-    unique('account_balances_snapshot_account_uq').on(table.snapshotId, table.accountId),
-  ],
+  (table) => [unique('account_balances_snapshot_account_uq').on(table.snapshotId, table.accountId)],
 );
 
 export const holdings = pgTable(

@@ -71,8 +71,12 @@ export async function findLineForecastCandidates(input: {
     }
 
     const txDateMs = Date.parse(`${parsed.data.date}T00:00:00Z`);
-    const lower = new Date(txDateMs - MATCH_DATE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
-    const upper = new Date(txDateMs + MATCH_DATE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
+    const lower = new Date(txDateMs - MATCH_DATE_WINDOW_DAYS * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const upper = new Date(txDateMs + MATCH_DATE_WINDOW_DAYS * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
 
     const rows = await db
       .select({

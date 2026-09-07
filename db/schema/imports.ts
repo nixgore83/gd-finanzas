@@ -1,13 +1,4 @@
-import {
-  pgTable,
-  uuid,
-  text,
-  timestamp,
-  date,
-  integer,
-  jsonb,
-  index,
-} from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, date, integer, jsonb, index } from 'drizzle-orm/pg-core';
 import { households } from './households';
 import { institutions } from './institutions';
 import { accounts } from './accounts';

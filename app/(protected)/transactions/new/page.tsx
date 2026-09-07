@@ -51,7 +51,7 @@ export default async function NewTransactionPage() {
     return (
       <EmptyState
         title="Necesitás una cuenta primero"
-        body='Cargá al menos una cuenta antes de registrar transacciones.'
+        body="Cargá al menos una cuenta antes de registrar transacciones."
         cta={{ href: '/accounts/new', label: 'Crear cuenta' }}
       />
     );
@@ -61,7 +61,7 @@ export default async function NewTransactionPage() {
     return (
       <EmptyState
         title="No hay categorías cargadas"
-        body='Corré `npm run db:seed:categories-placeholder` para crear las placeholder, o esperá a la sesión de taxonomía.'
+        body="Corré `npm run db:seed:categories-placeholder` para crear las placeholder, o esperá a la sesión de taxonomía."
         cta={{ href: '/transactions', label: 'Volver' }}
       />
     );
@@ -94,7 +94,7 @@ function EmptyState({
   return (
     <div className="mx-auto max-w-xl space-y-4 rounded-md border border-dashed p-8 text-center">
       <h2 className="text-lg font-medium">{title}</h2>
-      <p className="text-sm text-muted-foreground">{body}</p>
+      <p className="text-muted-foreground text-sm">{body}</p>
       <Button asChild>
         <Link href={cta.href}>{cta.label}</Link>
       </Button>

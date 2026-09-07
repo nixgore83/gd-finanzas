@@ -19,9 +19,7 @@ const inputSchema = z.object({
   forecastId: z.string().uuid(),
 });
 
-export async function linkTransactionForecast(
-  formData: FormData,
-): Promise<LinkForecastResult> {
+export async function linkTransactionForecast(formData: FormData): Promise<LinkForecastResult> {
   const parsed = inputSchema.safeParse({
     transactionId: formData.get('transactionId'),
     forecastId: formData.get('forecastId'),

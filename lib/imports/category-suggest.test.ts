@@ -12,9 +12,7 @@ describe('normalizeDescription', () => {
   });
 
   it('strips amount in parentheses', () => {
-    expect(normalizeDescription('DEV.IMP. RG 5617 30% (147398,64)')).toBe(
-      'DEV.IMP. RG 5617 30%',
-    );
+    expect(normalizeDescription('DEV.IMP. RG 5617 30% (147398,64)')).toBe('DEV.IMP. RG 5617 30%');
   });
 
   it('strips both cuota and amount', () => {

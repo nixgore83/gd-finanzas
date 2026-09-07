@@ -19,7 +19,7 @@ export function buildIngresosCsv(
       mes: monthOf(t.date),
       año: yearOf(t.date),
       cuenta: accountsById.get(t.accountId)?.name ?? '',
-      categoria: t.categoryId ? categoriesById.get(t.categoryId)?.name ?? '' : '',
+      categoria: t.categoryId ? (categoriesById.get(t.categoryId)?.name ?? '') : '',
       descripcion: t.description,
       monto_original: t.amountOriginal,
       moneda: t.currencyOriginal,

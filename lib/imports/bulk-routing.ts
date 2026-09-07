@@ -84,18 +84,35 @@ export type RouteRule = {
 };
 
 const MESES: Record<string, string> = {
-  ene: '01', enero: '01', jan: '01',
-  feb: '02', febrero: '02',
-  mar: '03', marzo: '03',
-  abr: '04', abril: '04', apr: '04',
-  may: '05', mayo: '05',
-  jun: '06', junio: '06',
-  jul: '07', julio: '07',
-  ago: '08', agosto: '08', aug: '08',
-  sep: '09', septiembre: '09', set: '09',
-  oct: '10', octubre: '10',
-  nov: '11', noviembre: '11',
-  dic: '12', diciembre: '12', dec: '12',
+  ene: '01',
+  enero: '01',
+  jan: '01',
+  feb: '02',
+  febrero: '02',
+  mar: '03',
+  marzo: '03',
+  abr: '04',
+  abril: '04',
+  apr: '04',
+  may: '05',
+  mayo: '05',
+  jun: '06',
+  junio: '06',
+  jul: '07',
+  julio: '07',
+  ago: '08',
+  agosto: '08',
+  aug: '08',
+  sep: '09',
+  septiembre: '09',
+  set: '09',
+  oct: '10',
+  octubre: '10',
+  nov: '11',
+  noviembre: '11',
+  dic: '12',
+  diciembre: '12',
+  dec: '12',
 };
 
 function pad2(n: string | number): string {
@@ -232,11 +249,8 @@ const anyOf =
  * archivos sin ruteo y el import no los encontraba — la reorganización rompía
  * justamente lo que venía a ordenar.
  */
-const inFolderOrCanonical = (
-  sourceFolder: string,
-  filePattern: RegExp,
-  canonicalFolder: string,
-) => anyOf(inFolder(sourceFolder, filePattern), startsWith(`${canonicalFolder}/`));
+const inFolderOrCanonical = (sourceFolder: string, filePattern: RegExp, canonicalFolder: string) =>
+  anyOf(inFolder(sourceFolder, filePattern), startsWith(`${canonicalFolder}/`));
 
 /**
  * Reglas en orden: la PRIMERA que matchea gana. Las carpetas mixtas
@@ -304,7 +318,11 @@ export const ROUTE_RULES: RouteRule[] = [
     // vuelve a chequear el titular antes de subir.
     id: 'nico-galicia-ca-consolidado',
     folder: 'Cuentas/Galicia Nico',
-    match: inFolderOrCanonical('pau/', /^resumen_extractos consolidados - caja de ahorro \d{2}-\d{2}-\d{4}/i, 'cuentas/galicia nico'),
+    match: inFolderOrCanonical(
+      'pau/',
+      /^resumen_extractos consolidados - caja de ahorro \d{2}-\d{2}-\d{4}/i,
+      'cuentas/galicia nico',
+    ),
     targets: [
       {
         institutionName: GALICIA,
@@ -320,7 +338,11 @@ export const ROUTE_RULES: RouteRule[] = [
     // "Caja de ahorro-YYYY-MM-DD" → titular PAULA DALMASSO (verificado).
     id: 'pau-galicia-ca',
     folder: 'Cuentas/Galicia Pau',
-    match: inFolderOrCanonical('pau/', /^resumen_extractos consolidados - caja de ahorro-\d{4}-\d{2}-\d{2}/i, 'cuentas/galicia pau'),
+    match: inFolderOrCanonical(
+      'pau/',
+      /^resumen_extractos consolidados - caja de ahorro-\d{4}-\d{2}-\d{2}/i,
+      'cuentas/galicia pau',
+    ),
     targets: [
       {
         institutionName: GALICIA,
@@ -575,7 +597,13 @@ export function buildPlan(files: readonly PlannedFile[]): PlanEntry[] {
   const out: PlanEntry[] = [];
   for (const f of files) {
     if (!f.rule) {
-      out.push({ relPath: f.relPath, ruleId: null, target: null, date: f.date, status: 'SIN_RUTEO' });
+      out.push({
+        relPath: f.relPath,
+        ruleId: null,
+        target: null,
+        date: f.date,
+        status: 'SIN_RUTEO',
+      });
       continue;
     }
     if (!f.date) {

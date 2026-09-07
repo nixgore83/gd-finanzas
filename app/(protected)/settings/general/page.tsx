@@ -33,13 +33,13 @@ export default async function GeneralSettingsPage() {
       <Display>General</Display>
 
       <section className="space-y-4">
-        <h2 className="font-display text-lg text-foreground">Previsiones</h2>
-        <div className="rounded-lg border border-border p-4">
+        <h2 className="font-display text-foreground text-lg">Previsiones</h2>
+        <div className="border-border rounded-lg border p-4">
           <AutoMatchToggle defaultValue={autoMatch} />
-          <Body className="mt-2 text-muted-foreground">
+          <Body className="text-muted-foreground mt-2">
             Cuando está activo, las transacciones nuevas (manuales e importadas) se linkean
-            automáticamente con previsiones pendientes si coinciden en cuenta, tipo, monto (±10%)
-            y fecha (±5 días). Solo matchea cuando hay un único candidato claro.
+            automáticamente con previsiones pendientes si coinciden en cuenta, tipo, monto (±10%) y
+            fecha (±5 días). Solo matchea cuando hay un único candidato claro.
           </Body>
         </div>
       </section>

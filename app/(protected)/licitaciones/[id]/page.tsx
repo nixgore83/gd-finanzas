@@ -64,12 +64,12 @@ export default async function LicitacionDetailPage({
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tanda de licitaciones</h1>
-        <Link href="/licitaciones" className="text-sm text-muted-foreground hover:underline">
+        <Link href="/licitaciones" className="text-muted-foreground text-sm hover:underline">
           ← Licitaciones
         </Link>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 rounded-md border bg-card p-4 text-sm md:grid-cols-3">
+      <dl className="bg-card grid grid-cols-2 gap-3 rounded-md border p-4 text-sm md:grid-cols-3">
         <div>
           <dt className="text-muted-foreground">Estado</dt>
           <dd className="font-medium">{STATUS_LABELS[job.status] ?? job.status}</dd>

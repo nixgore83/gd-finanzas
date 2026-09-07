@@ -56,8 +56,6 @@ describe('parseClaimWhere', () => {
 
   it('usa created_at como fallback cuando no hay parsing_started_at', () => {
     const { sql } = compile('imp-1', 'hh-1');
-    expect(sql).toMatch(
-      /coalesce\("imports"\."parsing_started_at", "imports"\."created_at"\)/,
-    );
+    expect(sql).toMatch(/coalesce\("imports"\."parsing_started_at", "imports"\."created_at"\)/);
   });
 });

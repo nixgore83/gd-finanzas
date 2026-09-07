@@ -288,7 +288,12 @@ export async function parseImportInternal(
           : 'Parseo falló';
     console.error('[imports] parse failed', {
       importId,
-      code: err instanceof LlmError ? err.code : err instanceof CsvFormatError ? 'csv_format' : 'unknown',
+      code:
+        err instanceof LlmError
+          ? err.code
+          : err instanceof CsvFormatError
+            ? 'csv_format'
+            : 'unknown',
     });
     await db
       .update(imports)
@@ -464,7 +469,8 @@ export async function parseImportInternal(
       // Marcadores que la review UI lee de `notes` (`[DUPLICADA]`, `[FECHA SOSPECHOSA]`).
       const flags: string[] = [];
       if (isDuplicate) flags.push('[DUPLICADA] Ya existe como transacción en esta cuenta');
-      if (dateCollapse.collapsed) flags.push(`${DATE_COLLAPSE_LINE_MARKER} verificá la fecha contra el PDF`);
+      if (dateCollapse.collapsed)
+        flags.push(`${DATE_COLLAPSE_LINE_MARKER} verificá la fecha contra el PDF`);
       // `notes` tiene max 500 en parsedTxLineSchema (lo revalida update-line al editar).
       const notes =
         flags.length > 0
@@ -500,11 +506,12 @@ export async function parseImportInternal(
   const dupCount = lineRows.filter((l) => l.status === 'rejected').length;
   const pendingCount = lineRows.filter((l) => l.status === 'pending').length;
 
-  const summary = (
-    result.data as {
-      summary?: { totalExpense?: string; totalIncome?: string; currency?: string };
-    }
-  ).summary ?? null;
+  const summary =
+    (
+      result.data as {
+        summary?: { totalExpense?: string; totalIncome?: string; currency?: string };
+      }
+    ).summary ?? null;
 
   // Encabezado del extracto: nº de cuenta propia (→ auto-sugerir la cuenta destino)
   // y titular (→ mostrarlo en el detalle, para cotejar contra la cuenta elegida).

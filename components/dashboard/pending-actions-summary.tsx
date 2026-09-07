@@ -20,7 +20,10 @@ function buildItems(data: PendingActions): SummaryItem[] {
   }
   if (data.importGaps.length > 0) {
     const months = data.importGaps.reduce((acc, g) => acc + g.missingMonths.length, 0);
-    items.push({ label: `${months} resumen${months > 1 ? 'es' : ''} faltante${months > 1 ? 's' : ''}`, tone: 'attn' });
+    items.push({
+      label: `${months} resumen${months > 1 ? 'es' : ''} faltante${months > 1 ? 's' : ''}`,
+      tone: 'attn',
+    });
   }
   if (data.overdueForecasts.length > 0) {
     items.push({
@@ -45,7 +48,7 @@ export function PendingActionsSummary({ data }: { data: PendingActions }) {
     return (
       <Link
         href="/pendientes"
-        className="flex items-center gap-2 font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--good)] transition-opacity hover:opacity-80"
+        className="flex items-center gap-2 font-sans text-[11px] font-semibold tracking-[0.16em] text-[color:var(--good)] uppercase transition-opacity hover:opacity-80"
       >
         <span aria-hidden>✓</span> Sin acciones pendientes
       </Link>
@@ -59,13 +62,17 @@ export function PendingActionsSummary({ data }: { data: PendingActions }) {
       href="/pendientes"
       className="group flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-[color:var(--attn)]/30 bg-[color:var(--attn)]/[0.06] px-4 py-3 transition-colors hover:border-[color:var(--attn)]/50"
     >
-      <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-[color:var(--attn)]">
+      <span className="font-sans text-[10px] font-semibold tracking-[0.2em] text-[color:var(--attn)] uppercase">
         Acciones pendientes
       </span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {items.map((it, i) => (
           <span key={i} className="flex items-center gap-3">
-            {i > 0 && <span className="text-muted-foreground/40" aria-hidden>·</span>}
+            {i > 0 && (
+              <span className="text-muted-foreground/40" aria-hidden>
+                ·
+              </span>
+            )}
             <span
               className={cn(
                 'font-display text-base',
@@ -77,7 +84,7 @@ export function PendingActionsSummary({ data }: { data: PendingActions }) {
           </span>
         ))}
       </span>
-      <span className="ml-auto font-display text-sm italic text-muted-foreground group-hover:text-foreground">
+      <span className="font-display text-muted-foreground group-hover:text-foreground ml-auto text-sm italic">
         Ver todas →
       </span>
     </Link>

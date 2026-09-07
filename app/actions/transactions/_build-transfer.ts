@@ -226,7 +226,11 @@ export async function buildTransferFields(
   const toAcc = accs.find((a) => a.id === input.accountToId);
 
   if (!fromAcc || fromAcc.archived) {
-    return { ok: false, error: 'invalid_refs', fields: { accountFromId: 'Cuenta origen inválida' } };
+    return {
+      ok: false,
+      error: 'invalid_refs',
+      fields: { accountFromId: 'Cuenta origen inválida' },
+    };
   }
   if (!toAcc || toAcc.archived) {
     return { ok: false, error: 'invalid_refs', fields: { accountToId: 'Cuenta destino inválida' } };
@@ -340,7 +344,11 @@ export async function buildSingleTransferLeg(
   const db = getDb();
 
   const [acc] = await db
-    .select({ id: accounts.id, currencyDefault: accounts.currencyDefault, archived: accounts.archived })
+    .select({
+      id: accounts.id,
+      currencyDefault: accounts.currencyDefault,
+      archived: accounts.archived,
+    })
     .from(accounts)
     .where(and(eq(accounts.householdId, householdId), eq(accounts.id, input.accountId)))
     .limit(1);

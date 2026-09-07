@@ -7,13 +7,7 @@ import { verifyMfaCode } from '@/app/actions/auth/mfa/verify';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Props = { factorId: string };
 
@@ -40,7 +34,9 @@ export function ChallengeForm({ factorId }: Props) {
     <Card>
       <CardHeader>
         <CardTitle>Verificar 2FA</CardTitle>
-        <CardDescription>Ingresá el código de 6 dígitos de tu app de autenticación.</CardDescription>
+        <CardDescription>
+          Ingresá el código de 6 dígitos de tu app de autenticación.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={handleSubmit} className="space-y-4">

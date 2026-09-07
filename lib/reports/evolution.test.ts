@@ -42,16 +42,12 @@ describe('buildEvolutionSeries', () => {
   });
 
   it('label formato MMM YY', () => {
-    const [p] = buildEvolutionSeries([
-      { year: 2026, month: 1, income: '0', expense: '0' },
-    ]);
+    const [p] = buildEvolutionSeries([{ year: 2026, month: 1, income: '0', expense: '0' }]);
     expect(p?.label).toBe('Ene 26');
   });
 
   it('net puede ser negativo', () => {
-    const [p] = buildEvolutionSeries([
-      { year: 2026, month: 5, income: '1000', expense: '3000' },
-    ]);
+    const [p] = buildEvolutionSeries([{ year: 2026, month: 5, income: '1000', expense: '3000' }]);
     expect(p?.net).toBe(-2000);
   });
 

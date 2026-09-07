@@ -36,18 +36,10 @@ type DisplaySize = keyof typeof DISPLAY_SIZES;
  * Weight 600 (semibold) por default — más presencia que el Cormorant 300
  * que usábamos antes; los hero overrides pueden bajar a 500 si necesitan respirar.
  */
-export function Display({
-  size = 'md',
-  className,
-  ...props
-}: SpanProps & { size?: DisplaySize }) {
+export function Display({ size = 'md', className, ...props }: SpanProps & { size?: DisplaySize }) {
   return (
     <span
-      className={cn(
-        'font-display font-semibold text-foreground',
-        DISPLAY_SIZES[size],
-        className,
-      )}
+      className={cn('font-display text-foreground font-semibold', DISPLAY_SIZES[size], className)}
       {...props}
     />
   );
@@ -61,7 +53,7 @@ export function Label({ className, ...props }: DivProps) {
   return (
     <div
       className={cn(
-        'font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground',
+        'text-muted-foreground font-sans text-[10px] font-semibold tracking-[0.22em] uppercase',
         className,
       )}
       {...props}
@@ -75,30 +67,19 @@ export function Label({ className, ...props }: DivProps) {
  * / "text-muted-foreground" / "text-primary" según el contexto.
  */
 export function Num({ className, ...props }: SpanProps) {
-  return (
-    <span
-      className={cn('font-mono tabular-nums', className)}
-      {...props}
-    />
-  );
+  return <span className={cn('font-mono tabular-nums', className)} {...props} />;
 }
 
 /**
  * Separador horizontal de 1px (border-color). Sirve tanto bajo secciones
  * como dentro de cards. `thick` para hits visuales fuertes (sección nueva).
  */
-export function Hair({
-  thick = false,
-  className,
-}: {
-  thick?: boolean;
-  className?: string;
-}) {
+export function Hair({ thick = false, className }: { thick?: boolean; className?: string }) {
   return (
     <div
       role="separator"
       aria-orientation="horizontal"
-      className={cn('w-full bg-border', thick ? 'h-[2px]' : 'h-px', className)}
+      className={cn('bg-border w-full', thick ? 'h-[2px]' : 'h-px', className)}
     />
   );
 }
@@ -112,7 +93,7 @@ export function Body({ className, ...props }: DivProps) {
   return (
     <div
       className={cn(
-        'font-sans text-sm font-normal leading-relaxed text-muted-foreground',
+        'text-muted-foreground font-sans text-sm leading-relaxed font-normal',
         className,
       )}
       {...props}

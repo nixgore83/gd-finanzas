@@ -1,11 +1,7 @@
 import { and, eq, gte, isNotNull, lte, sql, sum } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { transactions } from '@/db/schema';
-import {
-  rollingMonths,
-  type EvolutionBucket,
-  type EvolutionCurrency,
-} from './evolution';
+import { rollingMonths, type EvolutionBucket, type EvolutionCurrency } from './evolution';
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);

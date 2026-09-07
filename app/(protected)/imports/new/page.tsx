@@ -17,11 +17,7 @@ export const maxDuration = 300;
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export default async function NewImportPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function NewImportPage({ searchParams }: { searchParams: SearchParams }) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -66,9 +62,9 @@ export default async function NewImportPage({
     <div className="mx-auto max-w-xl space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">Nuevo import</h1>
-        <p className="text-sm text-muted-foreground">
-          Subí un resumen PDF (o CSV en cuentas HSBC US). Tras subirlo, vas a poder
-          parsearlo con LLM y revisar las transacciones antes de confirmar.
+        <p className="text-muted-foreground text-sm">
+          Subí un resumen PDF (o CSV en cuentas HSBC US). Tras subirlo, vas a poder parsearlo con
+          LLM y revisar las transacciones antes de confirmar.
         </p>
       </div>
       <ImportUploadForm

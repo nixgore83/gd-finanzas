@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -73,12 +67,8 @@ export function AccountForm({
   // emite name/value como input nativo). El resto va via FormData del DOM.
   const [type, setType] = useState<string>(initial?.type ?? 'bank_savings');
   const [cardBrand, setCardBrand] = useState<string>(initial?.cardBrand ?? NONE_VALUE);
-  const [currencyDefault, setCurrencyDefault] = useState<string>(
-    initial?.currencyDefault ?? 'ARS',
-  );
-  const [institutionId, setInstitutionId] = useState<string>(
-    initial?.institutionId ?? NONE_VALUE,
-  );
+  const [currencyDefault, setCurrencyDefault] = useState<string>(initial?.currencyDefault ?? 'ARS');
+  const [institutionId, setInstitutionId] = useState<string>(initial?.institutionId ?? NONE_VALUE);
   const [ownerTag, setOwnerTag] = useState<string>(initial?.ownerTag ?? 'Hogar');
 
   // Contraseña de PDF: write-only. Si ya hay una guardada, el input arranca
@@ -92,10 +82,7 @@ export function AccountForm({
     // Inyectar los valores controlados de los Selects en el FormData.
     formData.set('type', type);
     // La marca solo aplica a TC; en otros tipos se manda vacío (→ null).
-    formData.set(
-      'cardBrand',
-      type === 'credit_card' && cardBrand !== NONE_VALUE ? cardBrand : '',
-    );
+    formData.set('cardBrand', type === 'credit_card' && cardBrand !== NONE_VALUE ? cardBrand : '');
     formData.set('currencyDefault', currencyDefault);
     formData.set('institutionId', institutionId === NONE_VALUE ? '' : institutionId);
     formData.set('ownerTag', ownerTag);
@@ -146,12 +133,11 @@ export function AccountForm({
               placeholder="Solo si hace falta distinguirla — ej. Argentina"
               aria-invalid={errors.name ? true : undefined}
             />
-            <p className="text-xs text-muted-foreground">
-              El nombre se arma solo con institución, tipo, marca, titular y moneda. Usá el
-              rótulo únicamente para una distinción extra (ej. Balanz “Argentina” vs
-              “Internacional”).
+            <p className="text-muted-foreground text-xs">
+              El nombre se arma solo con institución, tipo, marca, titular y moneda. Usá el rótulo
+              únicamente para una distinción extra (ej. Balanz “Argentina” vs “Internacional”).
             </p>
-            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+            {errors.name && <p className="text-destructive text-sm">{errors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -169,7 +155,7 @@ export function AccountForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.type && <p className="text-sm text-destructive">{errors.type}</p>}
+              {errors.type && <p className="text-destructive text-sm">{errors.type}</p>}
             </div>
 
             <div className="space-y-2">
@@ -194,7 +180,7 @@ export function AccountForm({
                 </SelectContent>
               </Select>
               {errors.currencyDefault && (
-                <p className="text-sm text-destructive">{errors.currencyDefault}</p>
+                <p className="text-destructive text-sm">{errors.currencyDefault}</p>
               )}
             </div>
           </div>
@@ -203,10 +189,7 @@ export function AccountForm({
             <div className="space-y-2">
               <Label htmlFor="cardBrand">Marca</Label>
               <Select value={cardBrand} onValueChange={setCardBrand} disabled={isPending}>
-                <SelectTrigger
-                  id="cardBrand"
-                  aria-invalid={errors.cardBrand ? true : undefined}
-                >
+                <SelectTrigger id="cardBrand" aria-invalid={errors.cardBrand ? true : undefined}>
                   <SelectValue placeholder="Elegí la marca" />
                 </SelectTrigger>
                 <SelectContent>
@@ -218,19 +201,13 @@ export function AccountForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.cardBrand && (
-                <p className="text-sm text-destructive">{errors.cardBrand}</p>
-              )}
+              {errors.cardBrand && <p className="text-destructive text-sm">{errors.cardBrand}</p>}
             </div>
           )}
 
           <div className="space-y-2">
             <Label htmlFor="institutionId">Institución</Label>
-            <Select
-              value={institutionId}
-              onValueChange={setInstitutionId}
-              disabled={isPending}
-            >
+            <Select value={institutionId} onValueChange={setInstitutionId} disabled={isPending}>
               <SelectTrigger
                 id="institutionId"
                 aria-invalid={errors.institutionId ? true : undefined}
@@ -247,7 +224,7 @@ export function AccountForm({
               </SelectContent>
             </Select>
             {errors.institutionId && (
-              <p className="text-sm text-destructive">{errors.institutionId}</p>
+              <p className="text-destructive text-sm">{errors.institutionId}</p>
             )}
           </div>
 
@@ -265,7 +242,7 @@ export function AccountForm({
                 ))}
               </SelectContent>
             </Select>
-            {errors.ownerTag && <p className="text-sm text-destructive">{errors.ownerTag}</p>}
+            {errors.ownerTag && <p className="text-destructive text-sm">{errors.ownerTag}</p>}
           </div>
 
           <div className="flex items-center gap-2">
@@ -275,7 +252,7 @@ export function AccountForm({
               name="expectsMonthlyImport"
               defaultChecked={initial?.expectsMonthlyImport ?? false}
               disabled={isPending}
-              className="size-4 rounded border-input"
+              className="border-input size-4 rounded"
             />
             <Label htmlFor="expectsMonthlyImport" className="cursor-pointer text-sm font-normal">
               Espera import mensual (alertar si falta un mes)
@@ -289,7 +266,7 @@ export function AccountForm({
 
             {hasPdfPassword && pdfPasswordAction === 'keep' && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground text-sm">
                   Hay una contraseña guardada (no se muestra).
                 </span>
                 <Button
@@ -315,7 +292,7 @@ export function AccountForm({
 
             {hasPdfPassword && pdfPasswordAction === 'clear' && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-destructive">
+                <span className="text-destructive text-sm">
                   Se va a borrar al guardar los cambios.
                 </span>
                 <Button
@@ -360,9 +337,9 @@ export function AccountForm({
               </>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              Si el banco protege los resúmenes con contraseña, ingresala acá. Se guarda
-              cifrada y no se vuelve a mostrar: dejar el campo vacío no la borra.
+            <p className="text-muted-foreground text-xs">
+              Si el banco protege los resúmenes con contraseña, ingresala acá. Se guarda cifrada y
+              no se vuelve a mostrar: dejar el campo vacío no la borra.
             </p>
           </div>
 

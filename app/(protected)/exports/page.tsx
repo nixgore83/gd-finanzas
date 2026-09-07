@@ -33,7 +33,7 @@ export default async function ExportsPage() {
       <Hair thick />
 
       {/* Main card */}
-      <section className="border border-border bg-card/40 p-8">
+      <section className="border-border bg-card/40 border p-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.4fr_280px]">
           <div>
             <Label>Pack contable · Ganancias</Label>
@@ -46,9 +46,9 @@ export default async function ExportsPage() {
               <span className="text-foreground">consumos TC</span>,{' '}
               <span className="text-foreground">servicio doméstico</span>,{' '}
               <span className="text-foreground">gastos deducibles</span> y{' '}
-              <span className="text-foreground">otros ingresos</span>, más un README con
-              disclaimer y procedencia. UTF-8 con BOM (compatible Excel). No se persiste —
-              se genera al momento.
+              <span className="text-foreground">otros ingresos</span>, más un README con disclaimer
+              y procedencia. UTF-8 con BOM (compatible Excel). No se persiste — se genera al
+              momento.
             </Body>
 
             {/* File list */}
@@ -63,10 +63,10 @@ export default async function ExportsPage() {
               ].map(([f, hint]) => (
                 <div
                   key={f}
-                  className="flex items-baseline justify-between gap-3 border-b border-border/40 py-2"
+                  className="border-border/40 flex items-baseline justify-between gap-3 border-b py-2"
                 >
-                  <Num className="text-xs text-foreground">{f}</Num>
-                  <span className="font-display text-xs text-muted-foreground">{hint}</span>
+                  <Num className="text-foreground text-xs">{f}</Num>
+                  <span className="font-display text-muted-foreground text-xs">{hint}</span>
                 </div>
               ))}
             </div>
@@ -75,8 +75,8 @@ export default async function ExportsPage() {
           <div>
             <ExportsClient years={years} defaultYear={currentYear} />
             <Body className="mt-4 text-xs">
-              Se genera ahora — no se guarda en el server. Pesa entre 80&nbsp;KB y 400&nbsp;KB
-              según el año.
+              Se genera ahora — no se guarda en el server. Pesa entre 80&nbsp;KB y 400&nbsp;KB según
+              el año.
             </Body>
           </div>
         </div>

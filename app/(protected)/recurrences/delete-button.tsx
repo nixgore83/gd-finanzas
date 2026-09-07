@@ -13,17 +13,17 @@ type Props = {
   size?: 'sm' | 'default';
 };
 
-export function DeleteRecurrenceButton({
-  id,
-  name,
-  variant = 'ghost',
-  size = 'sm',
-}: Props) {
+export function DeleteRecurrenceButton({ id, name, variant = 'ghost', size = 'sm' }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
-    if (!confirm(`¿Borrar "${name}"? Las previsiones futuras se borran. Las transacciones que estaban matched quedan sin link.`)) return;
+    if (
+      !confirm(
+        `¿Borrar "${name}"? Las previsiones futuras se borran. Las transacciones que estaban matched quedan sin link.`,
+      )
+    )
+      return;
     const fd = new FormData();
     fd.set('id', id);
     startTransition(async () => {

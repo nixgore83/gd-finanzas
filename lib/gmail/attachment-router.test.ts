@@ -130,9 +130,7 @@ describe('routeAttachment', () => {
     // Este es el bug de fondo: el router usaba pdf-decrypt directo, que rechaza
     // AES-128 V=4/R=4, y seguía con los bytes cifrados → texto ilegible → descarte.
     const pdf = makePdf('CAJA DE AHORRO EN DOLARES', 'encrypt=aes-128,user-password=secret');
-    const accounts = GROUP.map((a) =>
-      a.id === 'caja-ars' ? { ...a, pdfPassword: 'secret' } : a,
-    );
+    const accounts = GROUP.map((a) => (a.id === 'caja-ars' ? { ...a, pdfPassword: 'secret' } : a));
     const res = await routeAttachment(pdf, 'extracto.pdf', accounts);
     expect(res?.account.id).toBe('caja-usd');
   });
@@ -145,7 +143,8 @@ describe('routeAttachment', () => {
   it('devuelve null si no hay sufijo conocido ni contenido reconocible', async () => {
     expect(await routeAttachment(makePdf('OTRA COSA'), 'cualquiera.pdf', GROUP)).toBeNull();
     // Sufijo que no corresponde a ninguna cuenta del grupo, contenido ilegible.
-    expect(await routeAttachment(new Uint8Array([9, 9]), 'EXT.DE.MOVIMIENTOS-1111.PDF', GROUP))
-      .toBeNull();
+    expect(
+      await routeAttachment(new Uint8Array([9, 9]), 'EXT.DE.MOVIMIENTOS-1111.PDF', GROUP),
+    ).toBeNull();
   });
 });

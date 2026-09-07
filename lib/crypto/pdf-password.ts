@@ -32,7 +32,7 @@ export class PdfPasswordKeyMissingError extends Error {
   constructor() {
     super(
       'PDF_PASSWORD_ENC_KEY no está configurada: no se pueden cifrar ni descifrar las contraseñas de PDF. ' +
-        'Generá una con `node -e "console.log(require(\'node:crypto\').randomBytes(32).toString(\'base64\'))"` ' +
+        "Generá una con `node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64'))\"` " +
         'y seteala en las env vars de Vercel.',
     );
     this.name = 'PdfPasswordKeyMissingError';

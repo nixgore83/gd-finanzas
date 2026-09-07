@@ -1,12 +1,6 @@
 import { loadHouseholdSnapshot } from './snapshot';
 import { buildBackupZip } from './build-zip';
-import {
-  deleteFile,
-  getBackupFolderId,
-  listBackups,
-  uploadBackup,
-  type BackupFile,
-} from './drive';
+import { deleteFile, getBackupFolderId, listBackups, uploadBackup, type BackupFile } from './drive';
 import { pruneOldBackups, BACKUP_RETENTION } from './prune';
 
 export type BackupRunResult = {

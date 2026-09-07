@@ -1,7 +1,14 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql, sum } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import { getDb } from '@/lib/db/client';
-import { budgets, financialGoals, forecasts, netWorthSnapshots, recurrences, transactions } from '@/db/schema';
+import {
+  budgets,
+  financialGoals,
+  forecasts,
+  netWorthSnapshots,
+  recurrences,
+  transactions,
+} from '@/db/schema';
 import { loadCategoryTree, type CategoryNode } from '@/lib/categories/tree';
 import { getFxRate } from '@/lib/fx/get-fx-rate';
 import type { ResolvedFxRate } from '@/lib/fx/resolve';
@@ -115,7 +122,10 @@ export async function loadYearEconomyData(
   try {
     todayFx = await getFxRate({ date: today });
   } catch (err) {
-    console.warn('[year-economy-data] No se pudo obtener la cotización de hoy para forecasts futuros:', err);
+    console.warn(
+      '[year-economy-data] No se pudo obtener la cotización de hoy para forecasts futuros:',
+      err,
+    );
   }
 
   const fxCache = new Map<string, Decimal>();
@@ -128,7 +138,9 @@ export async function loadYearEconomyData(
     } else {
       if (r.expectedDate > today) {
         if (!todayFx) {
-          throw new Error(`Cotización de tipo de cambio no disponible para proyecciones futuras (fecha: ${r.expectedDate})`);
+          throw new Error(
+            `Cotización de tipo de cambio no disponible para proyecciones futuras (fecha: ${r.expectedDate})`,
+          );
         }
         usd = new Decimal(r.expectedAmount).div(todayFx.rate);
       } else {

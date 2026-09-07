@@ -10,7 +10,13 @@ const CATS = new Map([
 
 const line = (
   id: string,
-  data: { date?: string; description?: string; amount?: string; status?: string; catId?: string | null },
+  data: {
+    date?: string;
+    description?: string;
+    amount?: string;
+    status?: string;
+    catId?: string | null;
+  },
 ): ReviewSortableLine & { id: string } => ({
   id,
   status: data.status ?? 'pending',
@@ -56,10 +62,7 @@ describe('makeReviewComparator', () => {
   });
 
   it('empates preservan orden de entrada (sort estable)', () => {
-    const rows = [
-      line('x', { date: '2026-01-01' }),
-      line('y', { date: '2026-01-01' }),
-    ];
+    const rows = [line('x', { date: '2026-01-01' }), line('y', { date: '2026-01-01' })];
     expect(sortIds(rows, [{ field: 'date', dir: 'asc' }])).toEqual(['x', 'y']);
   });
 

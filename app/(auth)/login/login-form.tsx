@@ -6,13 +6,7 @@ import { sendMagicLink } from '@/app/actions/auth/send-magic-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function LoginForm() {
   const [isPending, startTransition] = useTransition();
@@ -37,8 +31,7 @@ export function LoginForm() {
         <CardHeader>
           <CardTitle>Revisá tu mail</CardTitle>
           <CardDescription>
-            Si tu email está autorizado, te enviamos un link para entrar. Puede tardar unos
-            minutos.
+            Si tu email está autorizado, te enviamos un link para entrar. Puede tardar unos minutos.
           </CardDescription>
         </CardHeader>
         <CardContent>

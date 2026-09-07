@@ -22,8 +22,7 @@ export type UploadInput = {
 
 export async function uploadImportFile(input: UploadInput): Promise<void> {
   const client = adminClient();
-  const body =
-    input.bytes instanceof Uint8Array ? input.bytes : new Uint8Array(input.bytes);
+  const body = input.bytes instanceof Uint8Array ? input.bytes : new Uint8Array(input.bytes);
   const { error } = await client.storage.from(BUCKET_NAME).upload(input.path, body, {
     contentType: input.contentType,
     upsert: false,
@@ -46,9 +45,7 @@ export async function downloadImportFile(path: string): Promise<Uint8Array> {
  */
 export async function generateSignedUrl(path: string, expiresIn = 3600): Promise<string | null> {
   const client = adminClient();
-  const { data, error } = await client.storage
-    .from(BUCKET_NAME)
-    .createSignedUrl(path, expiresIn);
+  const { data, error } = await client.storage.from(BUCKET_NAME).createSignedUrl(path, expiresIn);
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }

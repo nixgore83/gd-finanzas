@@ -7,7 +7,11 @@ import { toast } from 'sonner';
 import { createSnapshot } from '@/app/actions/patrimonio/create-snapshot';
 import { updateSnapshot } from '@/app/actions/patrimonio/update-snapshot';
 import { fetchPrices } from '@/app/actions/patrimonio/fetch-prices';
-import type { SnapshotDetail, SnapshotBalance, SnapshotHolding } from '@/lib/patrimonio/load-snapshot-detail';
+import type {
+  SnapshotDetail,
+  SnapshotBalance,
+  SnapshotHolding,
+} from '@/lib/patrimonio/load-snapshot-detail';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/account';
 import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
 import { Hair, Label, Display, Body, Num } from '@/components/ui/typography';
@@ -24,7 +28,10 @@ interface AccountInfo {
 }
 
 /** Nombre legible de una cuenta de patrimonio. */
-function accountLabel(a: AccountInfo, opts?: { withInstitution?: boolean; withOwner?: boolean; withCurrency?: boolean }): string {
+function accountLabel(
+  a: AccountInfo,
+  opts?: { withInstitution?: boolean; withOwner?: boolean; withCurrency?: boolean },
+): string {
   return formatAccount(
     {
       institutionName: a.institutionName,
@@ -95,13 +102,17 @@ function totalNetWorth(balances: BalanceRow[], holdings: HoldingRow[]): Decimal 
   for (const b of balances) {
     try {
       total = total.plus(computeUsd(b.balance, b.currency, b.fxRateUsed));
-    } catch { /* skip invalid */ }
+    } catch {
+      /* skip invalid */
+    }
   }
   for (const h of holdings) {
     try {
       const tv = new Decimal(h.quantity || 0).times(h.pricePerUnit || 0);
       total = total.plus(computeUsd(tv.toFixed(2), h.currency, h.fxRateUsed));
-    } catch { /* skip invalid */ }
+    } catch {
+      /* skip invalid */
+    }
   }
   return total;
 }
@@ -139,9 +150,7 @@ export function SnapshotForm({
   const [balances, setBalances] = useState<BalanceRow[]>(() => {
     return accounts.map((acc) => {
       const prev = sourceDetail?.balances.find((b: SnapshotBalance) => b.accountId === acc.id);
-      const fxRate = acc.currencyDefault === 'ARS'
-        ? (prev?.fxRateUsed ?? defaultFxRate ?? '')
-        : '';
+      const fxRate = acc.currencyDefault === 'ARS' ? (prev?.fxRateUsed ?? defaultFxRate ?? '') : '';
       return {
         accountId: acc.id,
         balance: prev?.balance ?? '',
@@ -204,9 +213,7 @@ export function SnapshotForm({
   }, []);
 
   const updateHolding = useCallback((key: string, field: keyof HoldingRow, value: string) => {
-    setHoldings((prev) =>
-      prev.map((h) => (h.key === key ? { ...h, [field]: value } : h)),
-    );
+    setHoldings((prev) => prev.map((h) => (h.key === key ? { ...h, [field]: value } : h)));
   }, []);
 
   const handleFetchPrices = async () => {
@@ -305,14 +312,14 @@ export function SnapshotForm({
     <div className="space-y-8">
       {/* Date */}
       <div className="max-w-xs">
-        <label className="block font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <label className="text-muted-foreground block font-sans text-xs font-semibold tracking-widest uppercase">
           Fecha del snapshot
         </label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mt-2 w-full border border-border bg-card px-3 py-2 font-mono text-sm text-foreground"
+          className="border-border bg-card text-foreground mt-2 w-full border px-3 py-2 font-mono text-sm"
         />
       </div>
 
@@ -336,13 +343,13 @@ export function SnapshotForm({
                   return (
                     <div
                       key={acc.id}
-                      className="grid grid-cols-[1fr_120px_100px_80px] items-center gap-3 border-b border-border/30 pb-2"
+                      className="border-border/30 grid grid-cols-[1fr_120px_100px_80px] items-center gap-3 border-b pb-2"
                     >
                       <div>
-                        <span className="font-display text-sm text-foreground">
+                        <span className="font-display text-foreground text-sm">
                           {accountLabel(acc, { withOwner: false, withCurrency: false })}
                         </span>
-                        <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
+                        <span className="text-muted-foreground ml-2 font-sans text-[9px] tracking-wide uppercase">
                           {acc.ownerTag} · {acc.currencyDefault}
                         </span>
                       </div>
@@ -352,7 +359,7 @@ export function SnapshotForm({
                         value={row.balance}
                         onChange={(e) => updateBalance(acc.id, 'balance', e.target.value)}
                         placeholder={type === 'credit_card' ? '-0.00' : '0.00'}
-                        className="border border-border bg-card px-2 py-1.5 text-right font-mono text-sm text-foreground"
+                        className="border-border bg-card text-foreground border px-2 py-1.5 text-right font-mono text-sm"
                       />
                       {row.currency === 'ARS' ? (
                         <input
@@ -361,12 +368,12 @@ export function SnapshotForm({
                           value={row.fxRateUsed}
                           onChange={(e) => updateBalance(acc.id, 'fxRateUsed', e.target.value)}
                           placeholder="FX"
-                          className="border border-border bg-card px-2 py-1.5 text-right font-mono text-xs text-muted-foreground"
+                          className="border-border bg-card text-muted-foreground border px-2 py-1.5 text-right font-mono text-xs"
                         />
                       ) : (
                         <div />
                       )}
-                      <Num className="text-right text-xs text-muted-foreground">
+                      <Num className="text-muted-foreground text-right text-xs">
                         {row.balance ? formatUsd(Number.parseFloat(usd)) : '—'}
                       </Num>
                     </div>
@@ -391,7 +398,7 @@ export function SnapshotForm({
                   type="button"
                   onClick={handleFetchPrices}
                   disabled={fetchingPrices}
-                  className="inline-flex items-center gap-1 border border-border px-3 py-1.5 font-display text-xs font-semibold text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-50"
+                  className="border-border font-display text-muted-foreground hover:bg-card hover:text-foreground inline-flex items-center gap-1 border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
                 >
                   {fetchingPrices ? 'Consultando...' : 'Actualizar precios'}
                 </button>
@@ -399,15 +406,15 @@ export function SnapshotForm({
               <button
                 type="button"
                 onClick={addHolding}
-                className="inline-flex items-center gap-1 bg-primary/10 px-3 py-1.5 font-display text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                className="bg-primary/10 font-display text-primary hover:bg-primary/20 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold transition-colors"
               >
                 + Agregar holding
               </button>
             </div>
           </div>
           <Body className="mt-1">
-            Detalle de tenencias en brokers. Usá &quot;Actualizar precios&quot; para traer cotizaciones
-            de Yahoo Finance.
+            Detalle de tenencias en brokers. Usá &quot;Actualizar precios&quot; para traer
+            cotizaciones de Yahoo Finance.
           </Body>
 
           {holdings.length === 0 ? (
@@ -418,22 +425,23 @@ export function SnapshotForm({
                 const tv = (() => {
                   try {
                     return new Decimal(h.quantity || 0).times(h.pricePerUnit || 0);
-                  } catch { return new Decimal(0); }
+                  } catch {
+                    return new Decimal(0);
+                  }
                 })();
                 const tvUsd = computeUsd(tv.toFixed(2), h.currency, h.fxRateUsed);
                 return (
-                  <div
-                    key={h.key}
-                    className="border border-border/60 bg-card/30 p-3"
-                  >
+                  <div key={h.key} className="border-border/60 bg-card/30 border p-3">
                     <div className="grid grid-cols-[100px_1fr_100px_80px_auto] items-center gap-2">
                       {/* Ticker */}
                       <input
                         type="text"
                         value={h.ticker}
-                        onChange={(e) => updateHolding(h.key, 'ticker', e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          updateHolding(h.key, 'ticker', e.target.value.toUpperCase())
+                        }
                         placeholder="AAPL"
-                        className="border border-border bg-card px-2 py-1.5 font-mono text-sm text-foreground uppercase"
+                        className="border-border bg-card text-foreground border px-2 py-1.5 font-mono text-sm uppercase"
                       />
                       {/* Name */}
                       <input
@@ -441,33 +449,37 @@ export function SnapshotForm({
                         value={h.name}
                         onChange={(e) => updateHolding(h.key, 'name', e.target.value)}
                         placeholder="Apple Inc."
-                        className="border border-border bg-card px-2 py-1.5 text-sm text-foreground"
+                        className="border-border bg-card text-foreground border px-2 py-1.5 text-sm"
                       />
                       {/* Type */}
                       <select
                         value={h.assetType}
                         onChange={(e) => updateHolding(h.key, 'assetType', e.target.value)}
-                        className="border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+                        className="border-border bg-card text-foreground border px-2 py-1.5 text-xs"
                       >
                         {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => (
-                          <option key={k} value={k}>{v}</option>
+                          <option key={k} value={k}>
+                            {v}
+                          </option>
                         ))}
                       </select>
                       {/* Broker */}
                       <select
                         value={h.accountId}
                         onChange={(e) => updateHolding(h.key, 'accountId', e.target.value)}
-                        className="border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+                        className="border-border bg-card text-foreground border px-2 py-1.5 text-xs"
                       >
                         {brokerAccounts.map((a) => (
-                          <option key={a.id} value={a.id}>{accountLabel(a)}</option>
+                          <option key={a.id} value={a.id}>
+                            {accountLabel(a)}
+                          </option>
                         ))}
                       </select>
                       {/* Remove */}
                       <button
                         type="button"
                         onClick={() => removeHolding(h.key)}
-                        className="px-2 py-1 text-sm text-muted-foreground hover:text-[color:var(--bad)]"
+                        className="text-muted-foreground px-2 py-1 text-sm hover:text-[color:var(--bad)]"
                       >
                         ✕
                       </button>
@@ -475,35 +487,41 @@ export function SnapshotForm({
                     <div className="mt-2 grid grid-cols-[120px_120px_80px_80px_1fr] items-center gap-2">
                       {/* Quantity */}
                       <div>
-                        <span className="block font-sans text-[9px] uppercase tracking-wide text-muted-foreground">Cantidad</span>
+                        <span className="text-muted-foreground block font-sans text-[9px] tracking-wide uppercase">
+                          Cantidad
+                        </span>
                         <input
                           type="text"
                           inputMode="decimal"
                           value={h.quantity}
                           onChange={(e) => updateHolding(h.key, 'quantity', e.target.value)}
                           placeholder="0"
-                          className="mt-0.5 w-full border border-border bg-card px-2 py-1.5 text-right font-mono text-sm text-foreground"
+                          className="border-border bg-card text-foreground mt-0.5 w-full border px-2 py-1.5 text-right font-mono text-sm"
                         />
                       </div>
                       {/* Price */}
                       <div>
-                        <span className="block font-sans text-[9px] uppercase tracking-wide text-muted-foreground">Precio</span>
+                        <span className="text-muted-foreground block font-sans text-[9px] tracking-wide uppercase">
+                          Precio
+                        </span>
                         <input
                           type="text"
                           inputMode="decimal"
                           value={h.pricePerUnit}
                           onChange={(e) => updateHolding(h.key, 'pricePerUnit', e.target.value)}
                           placeholder="0.00"
-                          className="mt-0.5 w-full border border-border bg-card px-2 py-1.5 text-right font-mono text-sm text-foreground"
+                          className="border-border bg-card text-foreground mt-0.5 w-full border px-2 py-1.5 text-right font-mono text-sm"
                         />
                       </div>
                       {/* Currency */}
                       <div>
-                        <span className="block font-sans text-[9px] uppercase tracking-wide text-muted-foreground">Moneda</span>
+                        <span className="text-muted-foreground block font-sans text-[9px] tracking-wide uppercase">
+                          Moneda
+                        </span>
                         <select
                           value={h.currency}
                           onChange={(e) => updateHolding(h.key, 'currency', e.target.value)}
-                          className="mt-0.5 w-full border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+                          className="border-border bg-card text-foreground mt-0.5 w-full border px-2 py-1.5 text-xs"
                         >
                           <option value="USD">USD</option>
                           <option value="ARS">ARS</option>
@@ -513,21 +531,25 @@ export function SnapshotForm({
                       <div>
                         {h.currency === 'ARS' && (
                           <>
-                            <span className="block font-sans text-[9px] uppercase tracking-wide text-muted-foreground">FX</span>
+                            <span className="text-muted-foreground block font-sans text-[9px] tracking-wide uppercase">
+                              FX
+                            </span>
                             <input
                               type="text"
                               inputMode="decimal"
                               value={h.fxRateUsed}
                               onChange={(e) => updateHolding(h.key, 'fxRateUsed', e.target.value)}
-                              className="mt-0.5 w-full border border-border bg-card px-2 py-1.5 text-right font-mono text-xs text-muted-foreground"
+                              className="border-border bg-card text-muted-foreground mt-0.5 w-full border px-2 py-1.5 text-right font-mono text-xs"
                             />
                           </>
                         )}
                       </div>
                       {/* Total */}
                       <div className="text-right">
-                        <span className="block font-sans text-[9px] uppercase tracking-wide text-muted-foreground">Total USD</span>
-                        <Num className="mt-1 text-sm text-foreground">
+                        <span className="text-muted-foreground block font-sans text-[9px] tracking-wide uppercase">
+                          Total USD
+                        </span>
+                        <Num className="text-foreground mt-1 text-sm">
                           {h.quantity && h.pricePerUnit ? formatUsd(Number.parseFloat(tvUsd)) : '—'}
                         </Num>
                       </div>
@@ -544,7 +566,7 @@ export function SnapshotForm({
 
       {/* ========== NOTES ========== */}
       <div className="max-w-xl">
-        <label className="block font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <label className="text-muted-foreground block font-sans text-xs font-semibold tracking-widest uppercase">
           Notas (opcional)
         </label>
         <textarea
@@ -552,7 +574,7 @@ export function SnapshotForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           maxLength={2000}
-          className="mt-2 w-full border border-border bg-card px-3 py-2 text-sm text-foreground"
+          className="border-border bg-card text-foreground mt-2 w-full border px-3 py-2 text-sm"
           placeholder="Observaciones sobre este snapshot..."
         />
       </div>
@@ -563,7 +585,13 @@ export function SnapshotForm({
       <footer className="flex items-center justify-between">
         <div>
           <Label>Net worth total</Label>
-          <Display size="lg" className={cn('mt-2 block tabular-nums', nw.isNegative() ? 'text-[color:var(--bad)]' : 'text-primary')}>
+          <Display
+            size="lg"
+            className={cn(
+              'mt-2 block tabular-nums',
+              nw.isNegative() ? 'text-[color:var(--bad)]' : 'text-primary',
+            )}
+          >
             {formatUsd(nw.toNumber())}
           </Display>
         </div>
@@ -571,7 +599,7 @@ export function SnapshotForm({
           <button
             type="button"
             onClick={() => router.push('/patrimonio')}
-            className="border border-border px-5 py-2.5 font-display text-sm text-muted-foreground transition-colors hover:bg-card"
+            className="border-border font-display text-muted-foreground hover:bg-card border px-5 py-2.5 text-sm transition-colors"
           >
             Cancelar
           </button>
@@ -579,7 +607,7 @@ export function SnapshotForm({
             type="button"
             onClick={handleSubmit}
             disabled={isPending}
-            className="bg-primary px-6 py-2.5 font-display text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="bg-primary font-display text-primary-foreground hover:bg-primary/90 px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
           >
             {isPending ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar snapshot'}
           </button>

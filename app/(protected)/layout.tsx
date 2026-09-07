@@ -33,15 +33,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
       <main className="flex min-h-dvh items-center justify-center px-4">
         <div className="max-w-md space-y-3 text-center">
           <h1 className="text-xl font-semibold">Tu cuenta aún no está vinculada</h1>
-          <p className="text-sm text-muted-foreground">
-            Tu usuario está creado pero no pertenece a ningún household. Avisale a Nico para
-            correr el seed inicial.
+          <p className="text-muted-foreground text-sm">
+            Tu usuario está creado pero no pertenece a ningún household. Avisale a Nico para correr
+            el seed inicial.
           </p>
           <form action="/auth/sign-out" method="post">
-            <button
-              type="submit"
-              className="text-sm underline underline-offset-4 hover:opacity-80"
-            >
+            <button type="submit" className="text-sm underline underline-offset-4 hover:opacity-80">
               Cerrar sesión
             </button>
           </form>
@@ -70,7 +67,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar: hamburguesa + brand + theme toggle */}
-        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
+        <header className="border-border flex items-center justify-between gap-3 border-b px-4 py-3 md:hidden">
           <div className="flex items-center gap-3">
             <MobileNav userDisplayName={displayName} badges={navBadges} />
             <span className="text-sm font-semibold">gd-finanzas</span>

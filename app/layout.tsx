@@ -47,9 +47,7 @@ export const metadata: Metadata = {
 // localStorage o prefers-color-scheme del OS.
 const themeScript = `(function(){try{var t=localStorage.getItem('gd-theme');var d=(t==='dark')||((t==='system'||!t)&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="es"

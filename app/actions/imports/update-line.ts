@@ -18,7 +18,10 @@ const updateLineSchema = z.object({
 
 export type UpdateImportLineResult =
   | { ok: true }
-  | { ok: false; error: 'session' | 'invalid_input' | 'not_found' | 'category_mismatch' | 'unknown' };
+  | {
+      ok: false;
+      error: 'session' | 'invalid_input' | 'not_found' | 'category_mismatch' | 'unknown';
+    };
 
 export async function updateImportLine(input: {
   lineId: string;
@@ -42,9 +45,7 @@ export async function updateImportLine(input: {
   const [imp] = await db
     .select({ id: imports.id })
     .from(imports)
-    .where(
-      and(eq(imports.id, parsed.data.importId), eq(imports.householdId, session.householdId)),
-    )
+    .where(and(eq(imports.id, parsed.data.importId), eq(imports.householdId, session.householdId)))
     .limit(1);
   if (!imp) return { ok: false, error: 'not_found' };
 
@@ -120,10 +121,7 @@ export async function updateImportLine(input: {
         status: 'edited',
       })
       .where(
-        and(
-          eq(importLines.id, parsed.data.lineId),
-          eq(importLines.importId, parsed.data.importId),
-        ),
+        and(eq(importLines.id, parsed.data.lineId), eq(importLines.importId, parsed.data.importId)),
       )
       .returning({ id: importLines.id });
     if (updated.length === 0) return { ok: false, error: 'not_found' };

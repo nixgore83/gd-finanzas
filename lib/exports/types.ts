@@ -7,14 +7,7 @@
 export type ExportAccount = {
   id: string;
   name: string;
-  type:
-    | 'bank_checking'
-    | 'bank_savings'
-    | 'credit_card'
-    | 'cash'
-    | 'broker'
-    | 'ewallet'
-    | 'other';
+  type: 'bank_checking' | 'bank_savings' | 'credit_card' | 'cash' | 'broker' | 'ewallet' | 'other';
 };
 
 export type ExportCategory = {

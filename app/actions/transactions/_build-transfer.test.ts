@@ -253,22 +253,14 @@ describe('selectOperationRefTransferMatch', () => {
   it('ignora candidatos del mismo sentido', () => {
     // Línea saliente busca una pata que entre; ésta también sale.
     expect(
-      selectOperationRefTransferMatch(
-        [{ ...usdLeg, amountOriginal: '-30.00' }],
-        '7772754',
-        true,
-      ),
+      selectOperationRefTransferMatch([{ ...usdLeg, amountOriginal: '-30.00' }], '7772754', true),
     ).toBeNull();
   });
 
   it('si la referencia aparece en 2+ patas del mismo sentido, es ambiguo → null', () => {
     // Pasa de verdad: una pata duplicada por dos fuentes solapadas del mismo banco.
     expect(
-      selectOperationRefTransferMatch(
-        [usdLeg, { ...usdLeg, id: 'dup' }],
-        '7772754',
-        true,
-      ),
+      selectOperationRefTransferMatch([usdLeg, { ...usdLeg, id: 'dup' }], '7772754', true),
     ).toBeNull();
   });
 

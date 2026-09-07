@@ -26,24 +26,16 @@ describe('financialGoalsInputSchema', () => {
   });
 
   it('rechaza edad fuera de rango', () => {
-    expect(() =>
-      financialGoalsInputSchema.parse({ ...valid, edadTargetIfNico: 17 }),
-    ).toThrow();
-    expect(() =>
-      financialGoalsInputSchema.parse({ ...valid, edadTargetIfNico: 121 }),
-    ).toThrow();
+    expect(() => financialGoalsInputSchema.parse({ ...valid, edadTargetIfNico: 17 })).toThrow();
+    expect(() => financialGoalsInputSchema.parse({ ...valid, edadTargetIfNico: 121 })).toThrow();
   });
 
   it('rechaza edad no entera', () => {
-    expect(() =>
-      financialGoalsInputSchema.parse({ ...valid, edadTargetIfNico: 58.5 }),
-    ).toThrow();
+    expect(() => financialGoalsInputSchema.parse({ ...valid, edadTargetIfNico: 58.5 })).toThrow();
   });
 
   it('rechaza monto negativo', () => {
-    expect(() =>
-      financialGoalsInputSchema.parse({ ...valid, bufferUsd: '-100' }),
-    ).toThrow();
+    expect(() => financialGoalsInputSchema.parse({ ...valid, bufferUsd: '-100' })).toThrow();
   });
 
   it('acepta monto = 0', () => {
@@ -59,8 +51,6 @@ describe('financialGoalsInputSchema', () => {
   });
 
   it('notas > 2000 chars → reject', () => {
-    expect(() =>
-      financialGoalsInputSchema.parse({ ...valid, notas: 'x'.repeat(2001) }),
-    ).toThrow();
+    expect(() => financialGoalsInputSchema.parse({ ...valid, notas: 'x'.repeat(2001) })).toThrow();
   });
 });

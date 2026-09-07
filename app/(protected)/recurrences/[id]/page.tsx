@@ -103,7 +103,7 @@ export default async function EditRecurrencePage({ params }: { params: RoutePara
       {pendingForecasts.length > 0 && (
         <div className="rounded-md border p-4">
           <h2 className="mb-2 text-sm font-medium">Previsiones pendientes (próximas)</h2>
-          <ul className="space-y-1 text-sm text-muted-foreground">
+          <ul className="text-muted-foreground space-y-1 text-sm">
             {pendingForecasts.map((f) => (
               <li key={f.id} className="flex justify-between">
                 <span>{f.expectedDate}</span>
@@ -119,15 +119,20 @@ export default async function EditRecurrencePage({ params }: { params: RoutePara
         </div>
       )}
 
-      <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+      <div className="border-destructive/40 bg-destructive/5 rounded-md border p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">Borrar recurrencia</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Hard delete. Previsiones futuras se borran; transacciones matched pierden el link.
             </p>
           </div>
-          <DeleteRecurrenceButton id={rec.id} name={rec.name} variant="destructive" size="default" />
+          <DeleteRecurrenceButton
+            id={rec.id}
+            name={rec.name}
+            variant="destructive"
+            size="default"
+          />
         </div>
       </div>
     </div>

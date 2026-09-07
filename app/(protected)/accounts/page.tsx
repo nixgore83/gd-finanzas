@@ -55,10 +55,10 @@ function rowTitle(row: AccountRow): string {
 
 /** Bullet color by account type — keeps the page scannable at a glance. */
 function dotVarFor(type: AccountRow['type']): string {
-  if (type === 'credit_card') return 'var(--bad)';      // debt-bearing
-  if (type === 'broker') return 'var(--attn)';          // investment vehicle
+  if (type === 'credit_card') return 'var(--bad)'; // debt-bearing
+  if (type === 'broker') return 'var(--attn)'; // investment vehicle
   if (type === 'cash') return 'var(--muted-foreground)';
-  return 'var(--good)';                                 // bank / wallet / etc
+  return 'var(--good)'; // bank / wallet / etc
 }
 
 export default async function AccountsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -122,15 +122,15 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
               <>Todavía no hay cuentas cargadas. Arrancá creando la primera.</>
             ) : (
               <>
-                <span className="not-italic text-foreground">{activeCount}</span>{' '}
+                <span className="text-foreground not-italic">{activeCount}</span>{' '}
                 {activeCount === 1 ? 'activa' : 'activas'} ·{' '}
-                <span className="not-italic text-foreground">{groups.length}</span>{' '}
+                <span className="text-foreground not-italic">{groups.length}</span>{' '}
                 {groups.length === 1 ? 'institución' : 'instituciones'}
                 {showArchived && archivedCount > 0 && (
                   <>
-                    {' '}·{' '}
-                    <span className="not-italic text-foreground">{archivedCount}</span>{' '}
-                    archivada{archivedCount === 1 ? '' : 's'}
+                    {' '}
+                    · <span className="text-foreground not-italic">{archivedCount}</span> archivada
+                    {archivedCount === 1 ? '' : 's'}
                   </>
                 )}
               </>
@@ -156,12 +156,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
 
       {/* ============ BODY ============ */}
       {rows.length === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Display size="sm">Sin cuentas todavía</Display>
           <Body className="mx-auto mt-3 max-w-md">
-            Las cuentas son el lugar donde &laquo;vive&raquo; el dinero — una caja de ahorro,
-            una tarjeta, una billetera virtual, cash. Después conectás recurrencias y
-            transacciones a ellas.
+            Las cuentas son el lugar donde &laquo;vive&raquo; el dinero — una caja de ahorro, una
+            tarjeta, una billetera virtual, cash. Después conectás recurrencias y transacciones a
+            ellas.
           </Body>
           <Button asChild className="mt-6" size="lg">
             <Link href="/accounts/new">+ Crear la primera</Link>
@@ -196,10 +196,10 @@ function FilterPill({
     <Link
       href={href}
       className={cn(
-        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase transition-colors',
         active
-          ? 'border-b-2 border-primary text-primary'
-          : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+          ? 'border-primary text-primary border-b-2'
+          : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent',
       )}
     >
       {children}
@@ -218,7 +218,7 @@ function BankSection({
 }) {
   return (
     <section>
-      <header className="flex items-baseline justify-between border-b border-border pb-2">
+      <header className="border-border flex items-baseline justify-between border-b pb-2">
         <div className="flex items-baseline gap-3">
           <Display size="sm">{name}</Display>
           <Label>
@@ -232,7 +232,7 @@ function BankSection({
           <li
             key={row.id}
             className={cn(
-              'group grid grid-cols-[16px_minmax(0,1fr)_80px_140px_auto] items-center gap-4 border-b border-border/40 py-4 transition-colors hover:bg-primary/[0.04]',
+              'group border-border/40 hover:bg-primary/[0.04] grid grid-cols-[16px_minmax(0,1fr)_80px_140px_auto] items-center gap-4 border-b py-4 transition-colors',
               row.archived && 'opacity-60',
             )}
           >
@@ -247,27 +247,27 @@ function BankSection({
             <div className="min-w-0">
               <Link
                 href={`/accounts/${row.id}`}
-                className="block font-display text-lg text-foreground hover:text-primary"
+                className="font-display text-foreground hover:text-primary block text-lg"
               >
                 {rowTitle(row)}
                 {row.expectsMonthlyImport && (
-                  <span className="ml-2 inline-block align-middle rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  <span className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 align-middle text-[9px] font-semibold tracking-wide text-amber-800 uppercase dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                     Import mensual
                   </span>
                 )}
               </Link>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
-                <Label className="normal-case tracking-[0.14em] text-muted-foreground">
+                <Label className="text-muted-foreground tracking-[0.14em] normal-case">
                   {ACCOUNT_TYPE_LABELS[row.type]}
                 </Label>
                 {row.ownerTag && (
-                  <Label className="normal-case tracking-[0.14em] text-muted-foreground">
+                  <Label className="text-muted-foreground tracking-[0.14em] normal-case">
                     · {row.ownerTag}
                   </Label>
                 )}
                 {row.archived && (
                   <span
-                    className="rounded-full px-2 py-[1px] font-sans text-[9px] font-semibold uppercase tracking-[0.18em]"
+                    className="rounded-full px-2 py-[1px] font-sans text-[9px] font-semibold tracking-[0.18em] uppercase"
                     style={{
                       background: 'color-mix(in oklab, var(--muted-foreground) 14%, transparent)',
                       color: 'var(--muted-foreground)',
@@ -282,7 +282,7 @@ function BankSection({
             {/* Currency pill */}
             <div>
               <span
-                className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold uppercase tracking-[0.18em]"
+                className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                 style={{
                   borderColor: 'color-mix(in oklab, var(--primary) 40%, transparent)',
                   color: 'var(--primary)',
@@ -293,22 +293,18 @@ function BankSection({
             </div>
 
             {/* Spacer (era institución, ahora redundante) */}
-            <div className="font-display text-sm italic text-muted-foreground">
+            <div className="font-display text-muted-foreground text-sm italic">
               {/* placeholder for future: balance, last activity, etc */}
             </div>
 
             {/* Actions — quiet by default, full on hover/focus */}
-            <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/accounts/${row.id}`}>Editar</Link>
               </Button>
               <form action={toggleArchive}>
                 <input type="hidden" name="id" value={row.id} />
-                <input
-                  type="hidden"
-                  name="archived"
-                  value={row.archived ? 'false' : 'true'}
-                />
+                <input type="hidden" name="archived" value={row.archived ? 'false' : 'true'} />
                 <Button variant="ghost" size="sm" type="submit">
                   {row.archived ? 'Reactivar' : 'Archivar'}
                 </Button>

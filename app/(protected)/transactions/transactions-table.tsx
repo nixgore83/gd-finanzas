@@ -92,10 +92,7 @@ export function TransactionsTable({ rows, categories, criteria }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
 
-  const selectedRows = useMemo(
-    () => rows.filter((r) => selected.has(r.id)),
-    [rows, selected],
-  );
+  const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
   const selectedKinds = useMemo(() => {
     const set = new Set<'income' | 'expense'>();
     for (const r of selectedRows) {
@@ -184,19 +181,19 @@ export function TransactionsTable({ rows, categories, criteria }: Props) {
     <div className="space-y-4">
       {/* ============ BULK ACTION PANEL ============ */}
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-end justify-between gap-4 border-l-2 border-primary bg-primary/[0.06] p-4">
+        <div className="border-primary bg-primary/[0.06] flex flex-wrap items-end justify-between gap-4 border-l-2 p-4">
           <div>
             <Label className="text-primary">Selección activa</Label>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-display text-2xl font-light text-foreground">
+              <span className="font-display text-foreground text-2xl font-light">
                 {selected.size}
               </span>
-              <span className="font-display text-sm italic text-muted-foreground">
+              <span className="font-display text-muted-foreground text-sm italic">
                 {selected.size === 1 ? 'movimiento seleccionado' : 'movimientos seleccionados'}
               </span>
             </div>
             {uniformKind === null && selectedKinds.size > 1 && (
-              <p className="mt-2 font-display text-sm italic text-[color:var(--bad)]">
+              <p className="font-display mt-2 text-sm text-[color:var(--bad)] italic">
                 Tipos mixtos — la recategorización solo aplica a una sola categoría kind.
               </p>
             )}
@@ -226,12 +223,7 @@ export function TransactionsTable({ rows, categories, criteria }: Props) {
             >
               Aplicar
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={doBulkDelete}
-              disabled={isPending}
-            >
+            <Button size="sm" variant="destructive" onClick={doBulkDelete} disabled={isPending}>
               Borrar {selected.size}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
@@ -245,37 +237,58 @@ export function TransactionsTable({ rows, categories, criteria }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-y border-border">
+            <tr className="border-border border-y">
               <th className="w-8 px-3 py-2.5">
                 <input
                   type="checkbox"
                   aria-label="Seleccionar todas"
                   checked={allSelected}
                   onChange={toggleAll}
-                  className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
+                  className="border-input size-4 rounded-sm accent-[color:var(--primary)]"
                 />
               </th>
-              {([['Tipo', 'kind'], ['Cuenta', 'account'], ['Categoría', 'category']] as const).map(([label, field]) => (
+              {(
+                [
+                  ['Tipo', 'kind'],
+                  ['Cuenta', 'account'],
+                  ['Categoría', 'category'],
+                ] as const
+              ).map(([label, field]) => (
                 <th
                   key={field}
-                  className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  className="text-muted-foreground px-3 py-2.5 text-left font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                 >
-                  <SortableHeader label={label} field={field} criteria={criteria} onSort={handleSort} />
+                  <SortableHeader
+                    label={label}
+                    field={field}
+                    criteria={criteria}
+                    onSort={handleSort}
+                  />
                 </th>
               ))}
               {([['Monto', 'amount']] as const).map(([label, field]) => (
                 <th
                   key={field}
-                  className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  className="text-muted-foreground px-3 py-2.5 text-right font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                 >
-                  <SortableHeader label={label} field={field} criteria={criteria} onSort={handleSort} />
+                  <SortableHeader
+                    label={label}
+                    field={field}
+                    criteria={criteria}
+                    onSort={handleSort}
+                  />
                 </th>
               ))}
-              <th className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <th className="text-muted-foreground px-3 py-2.5 text-right font-sans text-[10px] font-semibold tracking-[0.18em] uppercase">
                 USD
               </th>
-              <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                <SortableHeader label="Concepto" field="description" criteria={criteria} onSort={handleSort} />
+              <th className="text-muted-foreground px-3 py-2.5 text-left font-sans text-[10px] font-semibold tracking-[0.18em] uppercase">
+                <SortableHeader
+                  label="Concepto"
+                  field="description"
+                  criteria={criteria}
+                  onSort={handleSort}
+                />
               </th>
               <th className="px-3 py-2.5" />
             </tr>
@@ -326,18 +339,16 @@ function ByDayGroup({
   return (
     <>
       {/* Day separator row */}
-      <tr className="border-t border-border bg-card/30">
+      <tr className="border-border bg-card/30 border-t">
         <td colSpan={8} className="px-3 py-2">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+            <span className="text-primary font-sans text-[10px] font-semibold tracking-[0.22em] uppercase">
               {formatDayHeader(date)}
             </span>
-            <Num className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <Num className="text-muted-foreground text-[10px] tracking-[0.14em] uppercase">
               {rows.length} {rows.length === 1 ? 'mov' : 'movs'} · neto{' '}
               <span
-                className={cn(
-                  dayNet >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
-                )}
+                className={cn(dayNet >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]')}
               >
                 {dayNet >= 0 ? '+' : ''}
                 {formatUsd(dayNet)}
@@ -352,7 +363,7 @@ function ByDayGroup({
         <tr
           key={row.id}
           className={cn(
-            'border-t border-border/40 transition-colors hover:bg-primary/[0.04]',
+            'border-border/40 hover:bg-primary/[0.04] border-t transition-colors',
             selected.has(row.id) && 'bg-primary/[0.08]',
           )}
         >
@@ -362,13 +373,13 @@ function ByDayGroup({
               aria-label={`Seleccionar ${row.description}`}
               checked={selected.has(row.id)}
               onChange={() => onToggle(row.id)}
-              className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
+              className="border-input size-4 rounded-sm accent-[color:var(--primary)]"
             />
           </td>
           <td className="px-3 py-3">
             <span className="flex items-center gap-1">
               <span
-                className="inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]"
+                className="inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold tracking-[0.14em] uppercase"
                 style={{
                   background: `color-mix(in oklab, ${TYPE_VAR[row.kind]} 15%, transparent)`,
                   color: TYPE_VAR[row.kind],
@@ -383,10 +394,10 @@ function ByDayGroup({
               )}
             </span>
           </td>
-          <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
+          <td className="text-muted-foreground px-3 py-3 font-sans text-xs">
             {row.accountName ?? '—'}
           </td>
-          <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
+          <td className="text-muted-foreground px-3 py-3 font-sans text-xs">
             {row.categoryName ?? '—'}
           </td>
           <td className="px-3 py-3 text-right">
@@ -402,13 +413,13 @@ function ByDayGroup({
             </Num>
           </td>
           <td className="px-3 py-3 text-right">
-            <Num className="text-xs text-muted-foreground">
+            <Num className="text-muted-foreground text-xs">
               {formatAmount(row.amountUsd, 'USD')}
             </Num>
           </td>
           <td className="px-3 py-3">
             <div className="flex flex-wrap items-baseline gap-2">
-              <span className="font-display text-base text-foreground">{row.description}</span>
+              <span className="font-display text-foreground text-base">{row.description}</span>
               {row.tags.map((t, i) => (
                 <span
                   key={i}

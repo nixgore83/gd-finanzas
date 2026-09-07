@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  summarizeLineStatuses,
-  importConfirmError,
-  type LineSummary,
-} from './line-summary';
+import { summarizeLineStatuses, importConfirmError, type LineSummary } from './line-summary';
 
 describe('summarizeLineStatuses', () => {
   it('cuenta cada estado', () => {
@@ -59,8 +55,6 @@ describe('importConfirmError', () => {
   });
 
   it('rejected no cuenta como confirmable por sí solo', () => {
-    expect(importConfirmError(s({ accepted: 0, edited: 0, rejected: 10 }))).toBe(
-      'no_accepted',
-    );
+    expect(importConfirmError(s({ accepted: 0, edited: 0, rejected: 10 }))).toBe('no_accepted');
   });
 });

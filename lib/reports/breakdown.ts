@@ -25,12 +25,12 @@ export type BreakdownInput = {
 };
 
 export type BreakdownRow = {
-  id: string;       // category id (parent o leaf según level)
+  id: string; // category id (parent o leaf según level)
   name: string;
   color: string | null;
   amount: string;
-  pct: number;      // 0-100
-  isLeaf: boolean;  // true si proviene de un bucket que es categoría hoja
+  pct: number; // 0-100
+  isLeaf: boolean; // true si proviene de un bucket que es categoría hoja
 };
 
 export function rollupBuckets(

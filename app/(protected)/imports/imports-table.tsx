@@ -116,14 +116,20 @@ export function ImportsTable({ rows, criteria }: Props) {
 
   function doBulkDelete() {
     if (selected.size === 0) return;
-    if (!confirm(`Borrar ${selected.size} import${selected.size > 1 ? 's' : ''}? No se puede deshacer.`)) {
+    if (
+      !confirm(
+        `Borrar ${selected.size} import${selected.size > 1 ? 's' : ''}? No se puede deshacer.`,
+      )
+    ) {
       return;
     }
     startTransition(async () => {
       const res = await bulkDeleteImports({ ids: [...selected] });
       if (res.ok) {
         const skipped = res.skipped > 0 ? ` · ${res.skipped} saltados (confirmados)` : '';
-        toast.success(`${res.deleted} import${res.deleted === 1 ? '' : 's'} borrado${res.deleted === 1 ? '' : 's'}${skipped}`);
+        toast.success(
+          `${res.deleted} import${res.deleted === 1 ? '' : 's'} borrado${res.deleted === 1 ? '' : 's'}${skipped}`,
+        );
         setSelected(new Set());
         router.refresh();
       } else {
@@ -168,10 +174,12 @@ export function ImportsTable({ rows, criteria }: Props) {
   return (
     <div className="space-y-4">
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 border-l-2 border-primary bg-primary/[0.06] p-4">
+        <div className="border-primary bg-primary/[0.06] flex flex-wrap items-center justify-between gap-4 border-l-2 p-4">
           <div className="flex items-baseline gap-2">
-            <span className="font-display text-2xl font-light text-foreground">{selected.size}</span>
-            <span className="font-display text-sm italic text-muted-foreground">
+            <span className="font-display text-foreground text-2xl font-light">
+              {selected.size}
+            </span>
+            <span className="font-display text-muted-foreground text-sm italic">
               {selected.size === 1 ? 'import seleccionado' : 'imports seleccionados'}
             </span>
           </div>
@@ -179,7 +187,12 @@ export function ImportsTable({ rows, criteria }: Props) {
             <Button size="sm" variant="destructive" onClick={doBulkDelete} disabled={isPending}>
               Borrar {selected.size}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} disabled={isPending}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelected(new Set())}
+              disabled={isPending}
+            >
               Limpiar
             </Button>
           </div>
@@ -189,7 +202,7 @@ export function ImportsTable({ rows, criteria }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-y border-border">
+            <tr className="border-border border-y">
               <th className="w-8 px-3 py-2.5">
                 {deletableIds.length > 0 && (
                   <input
@@ -197,22 +210,38 @@ export function ImportsTable({ rows, criteria }: Props) {
                     aria-label="Seleccionar borrables"
                     checked={allDeletableSelected}
                     onChange={toggleAll}
-                    className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
+                    className="border-input size-4 rounded-sm accent-[color:var(--primary)]"
                   />
                 )}
               </th>
-              {([['Fecha', 'created'], ['Cuenta', 'account'], ['Período', 'period'], ['Estado', 'status']] as const).map(
-                ([label, field]) => (
-                  <th
-                    key={field}
-                    className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
-                  >
-                    <SortableHeader label={label} field={field} criteria={criteria} onSort={handleSort} />
-                  </th>
-                ),
-              )}
-              <th className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                <SortableHeader label="Txns" field="txns" criteria={criteria} onSort={handleSort} className="justify-end" />
+              {(
+                [
+                  ['Fecha', 'created'],
+                  ['Cuenta', 'account'],
+                  ['Período', 'period'],
+                  ['Estado', 'status'],
+                ] as const
+              ).map(([label, field]) => (
+                <th
+                  key={field}
+                  className="text-muted-foreground px-3 py-2.5 text-left font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
+                >
+                  <SortableHeader
+                    label={label}
+                    field={field}
+                    criteria={criteria}
+                    onSort={handleSort}
+                  />
+                </th>
+              ))}
+              <th className="text-muted-foreground px-3 py-2.5 text-right font-sans text-[10px] font-semibold tracking-[0.18em] uppercase">
+                <SortableHeader
+                  label="Txns"
+                  field="txns"
+                  criteria={criteria}
+                  onSort={handleSort}
+                  className="justify-end"
+                />
               </th>
               <th className="px-3 py-2.5" />
             </tr>
@@ -225,7 +254,7 @@ export function ImportsTable({ rows, criteria }: Props) {
                 <tr
                   key={r.id}
                   className={cn(
-                    'border-t border-border/40 transition-colors hover:bg-primary/[0.04]',
+                    'border-border/40 hover:bg-primary/[0.04] border-t transition-colors',
                     selected.has(r.id) && 'bg-primary/[0.08]',
                   )}
                 >
@@ -236,32 +265,38 @@ export function ImportsTable({ rows, criteria }: Props) {
                         aria-label={`Seleccionar ${r.fileName ?? r.id}`}
                         checked={selected.has(r.id)}
                         onChange={() => toggleOne(r.id)}
-                        className="size-4 rounded-sm border-input accent-[color:var(--primary)]"
+                        className="border-input size-4 rounded-sm accent-[color:var(--primary)]"
                       />
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    <Num className="block text-sm text-foreground">{formatDateTime(r.createdAt)}</Num>
-                    <Label className="mt-0.5 normal-case tracking-[0.05em]">{relativeAgo(r.createdAt)}</Label>
+                    <Num className="text-foreground block text-sm">
+                      {formatDateTime(r.createdAt)}
+                    </Num>
+                    <Label className="mt-0.5 tracking-[0.05em] normal-case">
+                      {relativeAgo(r.createdAt)}
+                    </Label>
                   </td>
                   <td className="px-3 py-3">
                     <Link
                       href={`/imports/${r.id}`}
-                      className="text-sm font-medium text-foreground transition-colors hover:text-primary"
+                      className="text-foreground hover:text-primary text-sm font-medium transition-colors"
                     >
                       {r.accountName ?? r.institutionName ?? '—'}
                       {r.accountOwner ? ` (${r.accountOwner})` : ''}
                     </Link>
-                    <Label className="mt-0.5 block normal-case tracking-[0.05em]">
+                    <Label className="mt-0.5 block tracking-[0.05em] normal-case">
                       {r.institutionName} · {IMPORT_TYPE_LABELS[r.type]}
                     </Label>
                   </td>
                   <td className="px-3 py-3">
-                    <span className="text-sm text-foreground">{periodLabel(r.periodStart, r.periodEnd)}</span>
+                    <span className="text-foreground text-sm">
+                      {periodLabel(r.periodStart, r.periodEnd)}
+                    </span>
                   </td>
                   <td className="px-3 py-3">
                     <span
-                      className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold uppercase tracking-[0.14em]"
+                      className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold tracking-[0.14em] uppercase"
                       style={{
                         borderColor: `color-mix(in oklab, ${statusVar} 40%, transparent)`,
                         background: `color-mix(in oklab, ${statusVar} 12%, transparent)`,
@@ -272,13 +307,18 @@ export function ImportsTable({ rows, criteria }: Props) {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-right">
-                    <Num className="text-sm text-foreground">{r.transactionCount ?? '—'}</Num>
+                    <Num className="text-foreground text-sm">{r.transactionCount ?? '—'}</Num>
                   </td>
                   <td className="px-3 py-3 text-right">
                     {/* Siempre visibles: con hover-only eran indescubribles (touch/mobile). */}
                     <div className="flex justify-end gap-1.5">
                       {r.status === 'error' && (
-                        <Button variant="outline" size="sm" onClick={() => doRetry(r.id)} disabled={isPending}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => doRetry(r.id)}
+                          disabled={isPending}
+                        >
                           Reintentar
                         </Button>
                       )}

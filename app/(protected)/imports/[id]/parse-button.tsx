@@ -21,11 +21,11 @@ export function ParseButton({
   const [persistPassword, setPersistPassword] = useState(true);
 
   return (
-    <div className="space-y-4 max-w-sm">
+    <div className="max-w-sm space-y-4">
       {isPdf && (
-        <div className="space-y-3 rounded border border-border bg-muted/20 p-3">
+        <div className="border-border bg-muted/20 space-y-3 rounded border p-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="pdf-pass">
+            <label className="text-muted-foreground text-xs font-medium" htmlFor="pdf-pass">
               {hasStoredPassword
                 ? 'Contraseña de desencriptación (vacío para usar la guardada):'
                 : 'Contraseña de desencriptación (requerida para desbloquear el PDF):'}
@@ -37,16 +37,16 @@ export function ParseButton({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isPending}
-              className="flex h-8 w-full rounded border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-8 w-full rounded border px-3 py-1 text-xs shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+          <label className="flex cursor-pointer items-center gap-2 text-xs select-none">
             <input
               type="checkbox"
               checked={persistPassword}
               onChange={(e) => setPersistPassword(e.target.checked)}
               disabled={isPending || !password}
-              className="size-4 rounded border-input"
+              className="border-input size-4 rounded"
             />
             <span>Guardar contraseña para futuras importaciones</span>
           </label>

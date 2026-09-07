@@ -37,7 +37,7 @@ export function TagMultiSelect({ tags, value, onChange, disabled }: Props) {
     return (
       <div className="space-y-2">
         <Label>Etiquetas</Label>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           No hay etiquetas todavía.{' '}
           <Link href="/tags/new" className="underline">
             Crear la primera

@@ -37,7 +37,20 @@ function shortDate(iso: string | null): string {
   const d = parts[2];
   const m = parts[1];
   if (!d || !m) return iso;
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   const mi = Number.parseInt(m, 10) - 1;
   return `${d} ${months[mi] ?? ''}`;
 }
@@ -134,9 +147,9 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                 {active.length === 1 ? 'activa' : 'activas'}
                 {showAll && paused.length > 0 && (
                   <>
-                    {' '}·{' '}
-                    <span className="text-foreground">{paused.length}</span>{' '}
-                    pausada{paused.length === 1 ? '' : 's'}
+                    {' '}
+                    · <span className="text-foreground">{paused.length}</span> pausada
+                    {paused.length === 1 ? '' : 's'}
                   </>
                 )}
               </>
@@ -161,11 +174,11 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
       </nav>
 
       {rows.length === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Display size="sm">Sin recurrencias</Display>
           <Body className="mx-auto mt-3 max-w-md">
-            Una recurrencia genera previsiones automáticas en el futuro — pago de alquiler,
-            sueldo, suscripciones. Cargá la primera y aparecerán en{' '}
+            Una recurrencia genera previsiones automáticas en el futuro — pago de alquiler, sueldo,
+            suscripciones. Cargá la primera y aparecerán en{' '}
             <Link href="/forecasts" className="link not-italic">
               /forecasts
             </Link>
@@ -179,11 +192,11 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-y border-border">
+              <tr className="border-border border-y">
                 {['Nombre', 'Frecuencia', 'Cuenta · Categoría'].map((h) => (
                   <th
                     key={h}
-                    className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                    className="text-muted-foreground px-3 py-2.5 text-left font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                   >
                     {h}
                   </th>
@@ -191,7 +204,7 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                 {['Monto', 'Próxima'].map((h) => (
                   <th
                     key={h}
-                    className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                    className="text-muted-foreground px-3 py-2.5 text-right font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                   >
                     {h}
                   </th>
@@ -207,7 +220,7 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                   <tr
                     key={row.id}
                     className={cn(
-                      'group border-t border-border/40 transition-colors hover:bg-primary/[0.04]',
+                      'group border-border/40 hover:bg-primary/[0.04] border-t transition-colors',
                       !row.active && 'opacity-60',
                     )}
                   >
@@ -226,12 +239,12 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                         />
                         <Link
                           href={`/recurrences/${row.id}`}
-                          className="font-display text-base font-semibold text-foreground hover:text-primary"
+                          className="font-display text-foreground hover:text-primary text-base font-semibold"
                         >
                           {row.name}
                         </Link>
                         {!row.active && (
-                          <span className="rounded-full bg-muted px-2 py-[1px] font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <span className="bg-muted text-muted-foreground rounded-full px-2 py-[1px] font-sans text-[9px] font-semibold tracking-[0.18em] uppercase">
                             pausada
                           </span>
                         )}
@@ -239,7 +252,7 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                     </td>
                     <td className="px-3 py-3">
                       <span
-                        className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold uppercase tracking-[0.14em]"
+                        className="inline-block rounded-full border px-2.5 py-[3px] font-sans text-[10px] font-semibold tracking-[0.14em] uppercase"
                         style={{
                           borderColor: 'color-mix(in oklab, var(--primary) 40%, transparent)',
                           color: 'var(--primary)',
@@ -249,7 +262,7 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                           row.frequency}
                       </span>
                     </td>
-                    <td className="px-3 py-3 font-sans text-xs text-muted-foreground">
+                    <td className="text-muted-foreground px-3 py-3 font-sans text-xs">
                       {row.accountName ?? '—'}
                       {row.categoryName && (
                         <>
@@ -259,7 +272,7 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                       )}
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <Num className="text-sm text-foreground">
+                      <Num className="text-foreground text-sm">
                         {formatAmount(row.amount, row.currency)}
                       </Num>
                     </td>
@@ -278,7 +291,7 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                             <div>
                               <Label
                                 className={cn(
-                                  'normal-case tracking-[0.1em]',
+                                  'tracking-[0.1em] normal-case',
                                   urgent && 'text-[color:var(--attn)]',
                                 )}
                               >
@@ -294,11 +307,11 @@ export default async function RecurrencesPage({ searchParams }: { searchParams: 
                           )}
                         </>
                       ) : (
-                        <Num className="text-sm text-muted-foreground">—</Num>
+                        <Num className="text-muted-foreground text-sm">—</Num>
                       )}
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/recurrences/${row.id}`}>Editar</Link>
                         </Button>
@@ -340,10 +353,10 @@ function FilterPill({
     <Link
       href={href}
       className={cn(
-        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase transition-colors',
         active
-          ? 'border-b-2 border-primary text-primary'
-          : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+          ? 'border-primary text-primary border-b-2'
+          : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent',
       )}
     >
       {children}

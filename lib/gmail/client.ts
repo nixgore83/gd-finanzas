@@ -96,9 +96,7 @@ export async function getAttachments(messageId: string): Promise<GmailAttachment
     if (!att.data.data) continue;
 
     // Gmail API returns base64url-encoded data
-    const data = Uint8Array.from(
-      Buffer.from(att.data.data, 'base64url'),
-    );
+    const data = Uint8Array.from(Buffer.from(att.data.data, 'base64url'));
 
     attachments.push({
       filename: part.filename,

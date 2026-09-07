@@ -38,7 +38,7 @@ export function SortableHeader<F extends string>({
           ? `${label}: orden ${dir === 'asc' ? 'ascendente' : 'descendente'}${criteria.length >= 2 ? `, prioridad ${idx + 1}` : ''}`
           : `Ordenar por ${label}`
       }
-      className={cn('inline-flex select-none items-center gap-1 hover:text-foreground', className)}
+      className={cn('hover:text-foreground inline-flex items-center gap-1 select-none', className)}
     >
       {label}
       <span className={cn('text-xs', active ? 'text-foreground' : 'text-muted-foreground/40')}>

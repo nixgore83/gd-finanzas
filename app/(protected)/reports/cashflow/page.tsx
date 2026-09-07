@@ -12,8 +12,18 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 function pad2(n: number): string {
@@ -28,11 +38,17 @@ function parseYearMonth(sp: Record<string, string | string[] | undefined>): {
   const monthRaw = sp.month;
   const now = new Date();
   const year =
-    typeof yearRaw === 'string' && /^\d{4}$/.test(yearRaw) && Number(yearRaw) >= 2020 && Number(yearRaw) <= 2100
+    typeof yearRaw === 'string' &&
+    /^\d{4}$/.test(yearRaw) &&
+    Number(yearRaw) >= 2020 &&
+    Number(yearRaw) <= 2100
       ? Number(yearRaw)
       : now.getFullYear();
   const month =
-    typeof monthRaw === 'string' && /^\d{1,2}$/.test(monthRaw) && Number(monthRaw) >= 1 && Number(monthRaw) <= 12
+    typeof monthRaw === 'string' &&
+    /^\d{1,2}$/.test(monthRaw) &&
+    Number(monthRaw) >= 1 &&
+    Number(monthRaw) <= 12
       ? Number(monthRaw)
       : now.getMonth() + 1;
   return { year, month };
@@ -72,11 +88,7 @@ function toneVar(tone: 'good' | 'bad' | 'neutral'): string {
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export default async function CashflowReportPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function CashflowReportPage({ searchParams }: { searchParams: SearchParams }) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -119,16 +131,16 @@ export default async function CashflowReportPage({
             Real vs presupuesto en USD. Click en categoría hoja para ver las transacciones.
           </Body>
         </div>
-        <nav className="flex items-baseline gap-5 font-display">
+        <nav className="font-display flex items-baseline gap-5">
           <Link
             href={`/reports/cashflow?year=${prev.year}&month=${pad2(prev.month)}`}
-            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-sm italic transition-colors"
           >
             ◀ {MONTH_LABELS[prev.month - 1]}
           </Link>
           <Link
             href={`/reports/cashflow?year=${next.year}&month=${pad2(next.month)}`}
-            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-sm italic transition-colors"
           >
             {MONTH_LABELS[next.month - 1]} ▶
           </Link>
@@ -136,7 +148,7 @@ export default async function CashflowReportPage({
       </header>
 
       {/* TOPLINE KPI STRIP */}
-      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-3">
+      <section className="bg-border grid grid-cols-1 gap-px sm:grid-cols-3">
         <KpiBox
           label="Ingresos"
           real={report.totals.income.real}
@@ -165,24 +177,24 @@ export default async function CashflowReportPage({
 
       {/* DETAIL TABLE */}
       {report.rows.length === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Body>
             Sin categorías cargadas. Corré{' '}
-            <code className="font-mono text-foreground">npm run db:seed:categories</code>.
+            <code className="text-foreground font-mono">npm run db:seed:categories</code>.
           </Body>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-y border-border">
-                <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <tr className="border-border border-y">
+                <th className="text-muted-foreground px-3 py-2.5 text-left font-sans text-[10px] font-semibold tracking-[0.18em] uppercase">
                   Categoría
                 </th>
                 {['Budget', 'Real', 'Δ USD', 'Δ %'].map((h) => (
                   <th
                     key={h}
-                    className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                    className="text-muted-foreground px-3 py-2.5 text-right font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                   >
                     {h}
                   </th>
@@ -204,12 +216,7 @@ export default async function CashflowReportPage({
                         : 'border-border/40 hover:bg-primary/[0.04]',
                     )}
                   >
-                    <td
-                      className={cn(
-                        'px-3 py-2.5',
-                        row.category.depth === 1 && 'pl-10',
-                      )}
-                    >
+                    <td className={cn('px-3 py-2.5', row.category.depth === 1 && 'pl-10')}>
                       {isParent ? (
                         <div className="flex items-center gap-2">
                           <span
@@ -217,29 +224,27 @@ export default async function CashflowReportPage({
                             className="inline-block h-3 w-[3px]"
                             style={{
                               background:
-                                row.category.kind === 'income'
-                                  ? 'var(--good)'
-                                  : 'var(--bad)',
+                                row.category.kind === 'income' ? 'var(--good)' : 'var(--bad)',
                             }}
                           />
-                          <span className="font-display text-base font-semibold text-foreground">
+                          <span className="font-display text-foreground text-base font-semibold">
                             {row.category.name}
                           </span>
                         </div>
                       ) : (
                         <Link
                           href={drillHref(row.category.id)}
-                          className="font-display text-base text-foreground transition-colors hover:text-primary hover:underline"
+                          className="font-display text-foreground hover:text-primary text-base transition-colors hover:underline"
                         >
                           {row.category.name}
                         </Link>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <Num className="text-sm text-muted-foreground">{formatUsd(row.budget)}</Num>
+                      <Num className="text-muted-foreground text-sm">{formatUsd(row.budget)}</Num>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <Num className="text-sm text-foreground">{formatUsd(row.real)}</Num>
+                      <Num className="text-foreground text-sm">{formatUsd(row.real)}</Num>
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <Num className="text-sm font-semibold" style={{ color: cVar }}>
@@ -260,7 +265,7 @@ export default async function CashflowReportPage({
                 const t = deltaTone(k, report.totals[k].delta);
                 const cVar = toneVar(t);
                 return (
-                  <tr key={k} className="border-t border-border/60">
+                  <tr key={k} className="border-border/60 border-t">
                     <td className="px-3 py-2.5">
                       <span
                         className={cn(
@@ -272,12 +277,12 @@ export default async function CashflowReportPage({
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <Num className="text-sm text-muted-foreground">
+                      <Num className="text-muted-foreground text-sm">
                         {formatUsd(report.totals[k].budget)}
                       </Num>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <Num className="text-sm text-foreground">
+                      <Num className="text-foreground text-sm">
                         {formatUsd(report.totals[k].real)}
                       </Num>
                     </td>
@@ -287,24 +292,22 @@ export default async function CashflowReportPage({
                       </Num>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <Num className="text-sm text-muted-foreground">—</Num>
+                      <Num className="text-muted-foreground text-sm">—</Num>
                     </td>
                   </tr>
                 );
               })}
-              <tr className="border-t-2 border-border bg-card/50">
+              <tr className="border-border bg-card/50 border-t-2">
                 <td className="px-3 py-3">
-                  <span className="font-display text-lg font-semibold text-foreground">
-                    Neto
-                  </span>
+                  <span className="font-display text-foreground text-lg font-semibold">Neto</span>
                 </td>
                 <td className="px-3 py-3 text-right">
-                  <Num className="text-sm text-muted-foreground">
+                  <Num className="text-muted-foreground text-sm">
                     {formatUsd(report.totals.net.budget)}
                   </Num>
                 </td>
                 <td className="px-3 py-3 text-right">
-                  <Num className="text-base font-semibold text-foreground">
+                  <Num className="text-foreground text-base font-semibold">
                     {formatUsd(report.totals.net.real)}
                   </Num>
                 </td>
@@ -314,7 +317,7 @@ export default async function CashflowReportPage({
                   </Num>
                 </td>
                 <td className="px-3 py-3 text-right">
-                  <Num className="text-sm text-muted-foreground">—</Num>
+                  <Num className="text-muted-foreground text-sm">—</Num>
                 </td>
               </tr>
             </tfoot>
@@ -341,11 +344,7 @@ function KpiBox({
   variant: 'good' | 'bad' | 'primary';
 }) {
   const colorVar =
-    variant === 'good'
-      ? 'var(--good)'
-      : variant === 'bad'
-        ? 'var(--bad)'
-        : 'var(--primary)';
+    variant === 'good' ? 'var(--good)' : variant === 'bad' ? 'var(--bad)' : 'var(--primary)';
   const toneColor = toneVar(tone);
   return (
     <div className="bg-card p-5">
@@ -353,9 +352,9 @@ function KpiBox({
       <Display size="md" className="mt-3 block tabular-nums" style={{ color: colorVar }}>
         {formatUsd(real)}
       </Display>
-      <Hair className="my-3 bg-border/60" />
+      <Hair className="bg-border/60 my-3" />
       <div className="flex items-baseline justify-between gap-2">
-        <Num className="text-xs text-muted-foreground">budget {formatUsd(budget)}</Num>
+        <Num className="text-muted-foreground text-xs">budget {formatUsd(budget)}</Num>
         <Num className="text-xs font-semibold" style={{ color: toneColor }}>
           {formatUsd(deltaUsd)}
         </Num>

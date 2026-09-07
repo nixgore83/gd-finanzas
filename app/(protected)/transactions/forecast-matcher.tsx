@@ -64,9 +64,7 @@ export function ForecastMatcher(props: Props) {
             <p className="font-medium text-sky-900">
               Linkeada a recurrencia: {props.recurrenceName}
             </p>
-            <p className="text-xs text-sky-700">
-              Previsión esperada: {props.expectedDate}
-            </p>
+            <p className="text-xs text-sky-700">Previsión esperada: {props.expectedDate}</p>
           </div>
           <Button
             variant="outline"
@@ -106,7 +104,7 @@ export function ForecastMatcher(props: Props) {
   return (
     <div className="rounded-md border p-4">
       <h2 className="mb-2 text-sm font-medium">Previsiones candidatas</h2>
-      <p className="mb-3 text-xs text-muted-foreground">
+      <p className="text-muted-foreground mb-3 text-xs">
         Estas previsiones de recurrencias podrían corresponder a esta transacción (mismo monto ±10%
         en USD, ±5 días).
       </p>
@@ -114,11 +112,11 @@ export function ForecastMatcher(props: Props) {
         {props.candidates.map((c) => (
           <li
             key={c.id}
-            className="flex items-center justify-between gap-3 rounded border bg-muted/30 px-3 py-2 text-sm"
+            className="bg-muted/30 flex items-center justify-between gap-3 rounded border px-3 py-2 text-sm"
           >
             <div>
               <p className="font-medium">{c.recurrenceName}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 {c.expectedDate} · {formatAmount(c.expectedAmount, c.currency)}
               </p>
             </div>

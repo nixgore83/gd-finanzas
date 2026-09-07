@@ -43,9 +43,7 @@ function parseArgs(): Args {
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
-  const thirtyAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const thirtyAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return {
     variable,

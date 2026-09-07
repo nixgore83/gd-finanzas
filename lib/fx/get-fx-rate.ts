@@ -24,7 +24,7 @@ export class FxRateNotFoundError extends Error {
  */
 export async function getFxRate(args: { date: string }): Promise<ResolvedFxRate> {
   const db = getDb();
-  
+
   // Calcular ventana de 30 días hacia atrás respecto a la fecha target
   const targetDate = new Date(args.date);
   const thirtyDaysAgoDate = new Date(targetDate.getTime() - 30 * 24 * 60 * 60 * 1000);

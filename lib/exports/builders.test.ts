@@ -72,7 +72,15 @@ describe('buildIngresosCsv', () => {
 
   it('include columnas multi-moneda', () => {
     const out = buildIngresosCsv(
-      [tx({ kind: 'income', amountOriginal: '100', currencyOriginal: 'USD', amountUsd: '100', amountArs: '125000' })],
+      [
+        tx({
+          kind: 'income',
+          amountOriginal: '100',
+          currencyOriginal: 'USD',
+          amountUsd: '100',
+          amountArs: '125000',
+        }),
+      ],
       accountsById,
       categoriesById,
     );
@@ -96,9 +104,30 @@ describe('buildConsumosTcCsv', () => {
   it('agrupa por mes + moneda con suma y count', () => {
     const out = buildConsumosTcCsv(
       [
-        tx({ kind: 'expense', accountId: 'acc-galicia-amex', date: '2026-05-10', amountOriginal: '100', amountUsd: '0.10', amountArs: '100' }),
-        tx({ kind: 'expense', accountId: 'acc-galicia-amex', date: '2026-05-20', amountOriginal: '200', amountUsd: '0.20', amountArs: '200' }),
-        tx({ kind: 'expense', accountId: 'acc-galicia-amex', date: '2026-06-01', amountOriginal: '50', amountUsd: '0.05', amountArs: '50' }),
+        tx({
+          kind: 'expense',
+          accountId: 'acc-galicia-amex',
+          date: '2026-05-10',
+          amountOriginal: '100',
+          amountUsd: '0.10',
+          amountArs: '100',
+        }),
+        tx({
+          kind: 'expense',
+          accountId: 'acc-galicia-amex',
+          date: '2026-05-20',
+          amountOriginal: '200',
+          amountUsd: '0.20',
+          amountArs: '200',
+        }),
+        tx({
+          kind: 'expense',
+          accountId: 'acc-galicia-amex',
+          date: '2026-06-01',
+          amountOriginal: '50',
+          amountUsd: '0.05',
+          amountArs: '50',
+        }),
       ],
       accountsById,
     );
@@ -136,10 +165,18 @@ describe('buildServicioDomesticoCsv', () => {
       tx({
         kind: 'expense',
         transactionSubtype: 'domestic_service',
-        meta: { empleado_nombre: 'X', empleado_cuil: 'mal-cuil', concepto: 'sueldo', periodo: '2026-05' },
+        meta: {
+          empleado_nombre: 'X',
+          empleado_cuil: 'mal-cuil',
+          concepto: 'sueldo',
+          periodo: '2026-05',
+        },
       }),
     ]);
-    const lines = out.replace(/^﻿/, '').split('\r\n').filter((l) => l.length > 0);
+    const lines = out
+      .replace(/^﻿/, '')
+      .split('\r\n')
+      .filter((l) => l.length > 0);
     expect(lines.length).toBe(1); // solo header
   });
 });

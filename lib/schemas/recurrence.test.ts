@@ -50,9 +50,9 @@ describe('recurrenceInputSchema', () => {
   });
 
   it('rechaza endDate < startDate', () => {
-    expect(() =>
-      recurrenceInputSchema.parse({ ...valid, endDate: '2025-12-31' }),
-    ).toThrow(/fin debe ser/);
+    expect(() => recurrenceInputSchema.parse({ ...valid, endDate: '2025-12-31' })).toThrow(
+      /fin debe ser/,
+    );
   });
 
   it('acepta endDate == startDate', () => {
@@ -66,23 +66,15 @@ describe('recurrenceInputSchema', () => {
 
   it('rechaza name vacío y >80', () => {
     expect(() => recurrenceInputSchema.parse({ ...valid, name: '' })).toThrow();
-    expect(() =>
-      recurrenceInputSchema.parse({ ...valid, name: 'x'.repeat(81) }),
-    ).toThrow();
+    expect(() => recurrenceInputSchema.parse({ ...valid, name: 'x'.repeat(81) })).toThrow();
   });
 
   it('rechaza UUIDs inválidos', () => {
-    expect(() =>
-      recurrenceInputSchema.parse({ ...valid, accountId: 'not-uuid' }),
-    ).toThrow();
-    expect(() =>
-      recurrenceInputSchema.parse({ ...valid, categoryId: 'not-uuid' }),
-    ).toThrow();
+    expect(() => recurrenceInputSchema.parse({ ...valid, accountId: 'not-uuid' })).toThrow();
+    expect(() => recurrenceInputSchema.parse({ ...valid, categoryId: 'not-uuid' })).toThrow();
   });
 
   it('rechaza currency fuera de ARS/USD', () => {
-    expect(() =>
-      recurrenceInputSchema.parse({ ...valid, currency: 'EUR' as 'USD' }),
-    ).toThrow();
+    expect(() => recurrenceInputSchema.parse({ ...valid, currency: 'EUR' as 'USD' })).toThrow();
   });
 });

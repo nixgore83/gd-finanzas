@@ -11,9 +11,7 @@ export type ResolvedSession = {
 };
 
 export class SessionError extends Error {
-  constructor(
-    public readonly reason: 'unauthenticated' | 'mfa_required' | 'no_household',
-  ) {
+  constructor(public readonly reason: 'unauthenticated' | 'mfa_required' | 'no_household') {
     super(reason);
     this.name = 'SessionError';
   }
@@ -48,4 +46,3 @@ export const requireHouseholdSession = cache(async (): Promise<ResolvedSession> 
   if (!memb) throw new SessionError('no_household');
   return { userId: user.id, householdId: memb.householdId };
 });
-

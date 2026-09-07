@@ -45,9 +45,7 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-export function buildEvolutionSeries(
-  buckets: readonly EvolutionBucket[],
-): EvolutionSeriesPoint[] {
+export function buildEvolutionSeries(buckets: readonly EvolutionBucket[]): EvolutionSeriesPoint[] {
   // Orden ascendente por (year, month)
   const sorted = [...buckets].sort((a, b) =>
     a.year !== b.year ? a.year - b.year : a.month - b.month,

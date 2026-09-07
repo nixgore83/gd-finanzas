@@ -9,9 +9,7 @@ export type ReviewLineStatus = 'pending' | 'accepted' | 'rejected' | 'edited';
 
 export type LineSummary = Record<ReviewLineStatus, number>;
 
-export function summarizeLineStatuses(
-  statuses: readonly ReviewLineStatus[],
-): LineSummary {
+export function summarizeLineStatuses(statuses: readonly ReviewLineStatus[]): LineSummary {
   const summary: LineSummary = { pending: 0, accepted: 0, rejected: 0, edited: 0 };
   for (const status of statuses) summary[status] += 1;
   return summary;

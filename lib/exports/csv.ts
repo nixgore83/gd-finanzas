@@ -30,8 +30,6 @@ export function toCsv<T extends Record<string, unknown>>(
   headers: readonly { key: keyof T & string; label: string }[],
 ): string {
   const headerLine = headers.map((h) => escapeCell(h.label)).join(',');
-  const dataLines = rows.map((row) =>
-    headers.map((h) => escapeCell(row[h.key])).join(','),
-  );
+  const dataLines = rows.map((row) => headers.map((h) => escapeCell(row[h.key])).join(','));
   return UTF8_BOM + [headerLine, ...dataLines].join('\r\n') + '\r\n';
 }

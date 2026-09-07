@@ -13,9 +13,7 @@ export type UnlinkForecastResult =
 
 const inputSchema = z.object({ transactionId: z.string().uuid() });
 
-export async function unlinkTransactionForecast(
-  formData: FormData,
-): Promise<UnlinkForecastResult> {
+export async function unlinkTransactionForecast(formData: FormData): Promise<UnlinkForecastResult> {
   const parsed = inputSchema.safeParse({ transactionId: formData.get('transactionId') });
   if (!parsed.success) return { ok: false, error: 'invalid_input' };
 

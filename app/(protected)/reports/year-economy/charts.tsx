@@ -16,7 +16,18 @@ import {
 import type { YearEconomyMonthly } from '@/lib/reports/year-economy';
 
 const MONTH_SHORT = [
-  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
 ];
 
 function formatUsd(value: number): string {
@@ -105,7 +116,7 @@ export function SavingsChart({
   const c = resolveThemeColors();
 
   return (
-    <div className="h-72 border border-border bg-card/40 p-4">
+    <div className="border-border bg-card/40 h-72 border p-4">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 24, bottom: 0, left: 8 }}>
           <CartesianGrid stroke={c.border} strokeDasharray="2 4" />
@@ -176,7 +187,7 @@ export function MonthlyChart({ monthly }: { monthly: readonly YearEconomyMonthly
   const c = resolveThemeColors();
 
   return (
-    <div className="h-72 border border-border bg-card/40 p-4">
+    <div className="border-border bg-card/40 h-72 border p-4">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: 8 }}>
           <CartesianGrid stroke={c.border} strokeDasharray="2 4" />

@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type ActionResult =
   | { ok: true; id?: string }
@@ -35,7 +29,9 @@ export function TagForm({ action, initial, hiddenId, submitLabel, title, descrip
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [hasColor, setHasColor] = useState<boolean>(initial?.color !== null && initial !== undefined);
+  const [hasColor, setHasColor] = useState<boolean>(
+    initial?.color !== null && initial !== undefined,
+  );
   const [color, setColor] = useState<string>(initial?.color ?? DEFAULT_COLOR);
 
   function handleSubmit(formData: FormData) {
@@ -86,7 +82,7 @@ export function TagForm({ action, initial, hiddenId, submitLabel, title, descrip
               placeholder="Rabbit Hole, vacaciones 2026, Pau…"
               aria-invalid={errors.name ? true : undefined}
             />
-            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+            {errors.name && <p className="text-destructive text-sm">{errors.name}</p>}
           </div>
 
           <div className="space-y-2">
@@ -107,13 +103,13 @@ export function TagForm({ action, initial, hiddenId, submitLabel, title, descrip
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 disabled={isPending || !hasColor}
-                className="h-9 w-16 cursor-pointer rounded border border-input disabled:opacity-40"
+                className="border-input h-9 w-16 cursor-pointer rounded border disabled:opacity-40"
               />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 {hasColor ? color : 'sin color'}
               </span>
             </div>
-            {errors.color && <p className="text-sm text-destructive">{errors.color}</p>}
+            {errors.color && <p className="text-destructive text-sm">{errors.color}</p>}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

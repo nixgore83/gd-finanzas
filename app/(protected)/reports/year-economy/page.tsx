@@ -82,11 +82,7 @@ function leadCopy(semaphore: Semaphore, pct: number | null, year: number): strin
   return `El año va ${pctText} por debajo del objetivo de ahorro. Conviene revisar el plan operativo antes de la próxima revisión.`;
 }
 
-export default async function YearEconomyPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function YearEconomyPage({ searchParams }: { searchParams: SearchParams }) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -135,7 +131,7 @@ export default async function YearEconomyPage({
                 {year}
               </Display>
               <span
-                className="inline-flex items-center gap-2 border-l border-border pl-5 font-sans text-[11px] font-semibold uppercase tracking-[0.18em]"
+                className="border-border inline-flex items-center gap-2 border-l pl-5 font-sans text-[11px] font-semibold tracking-[0.18em] uppercase"
                 style={{ color: semaphoreVar }}
               >
                 <span
@@ -145,9 +141,7 @@ export default async function YearEconomyPage({
                 />
                 {SEMAPHORE_LABEL[semaphore]}
                 {report.trajectory.pct !== null && (
-                  <span className="font-mono">
-                    · {(report.trajectory.pct * 100).toFixed(0)}%
-                  </span>
+                  <span className="font-mono">· {(report.trajectory.pct * 100).toFixed(0)}%</span>
                 )}
               </span>
             </div>
@@ -157,16 +151,16 @@ export default async function YearEconomyPage({
           </div>
 
           {/* Year navigation */}
-          <nav className="flex items-baseline gap-5 font-display">
+          <nav className="font-display flex items-baseline gap-5">
             <Link
               href={`/reports/year-economy?year=${year - 1}`}
-              className="text-base italic text-muted-foreground transition-colors hover:text-primary"
+              className="text-muted-foreground hover:text-primary text-base italic transition-colors"
             >
               ◀ {year - 1}
             </Link>
             <Link
               href={`/reports/year-economy?year=${year + 1}`}
-              className="text-base italic text-muted-foreground transition-colors hover:text-primary"
+              className="text-muted-foreground hover:text-primary text-base italic transition-colors"
             >
               {year + 1} ▶
             </Link>
@@ -177,7 +171,7 @@ export default async function YearEconomyPage({
       <Hair thick />
 
       {/* ============ TRAJECTORY HERO BLOCK ============ */}
-      <section className="relative overflow-hidden border border-border bg-card/40 px-7 py-7">
+      <section className="border-border bg-card/40 relative overflow-hidden border px-7 py-7">
         {/* Subtle ambient tint from the semaphore */}
         <div
           aria-hidden
@@ -191,46 +185,45 @@ export default async function YearEconomyPage({
           {/* Accumulated YTD — the headliner */}
           <div>
             <Label>Acumulado YTD</Label>
-            <Display
-              size="xl"
-              className="mt-3 block tabular-nums"
-              style={{ color: semaphoreVar }}
-            >
+            <Display size="xl" className="mt-3 block tabular-nums" style={{ color: semaphoreVar }}>
               {formatUsd(report.trajectory.actualAccumUsd)}
             </Display>
-            <div className="mt-2 font-display text-base italic text-muted-foreground">
-              de <Num className="not-italic text-foreground">{formatUsd(report.trajectory.expectedAccumUsd)}</Num>{' '}
+            <div className="font-display text-muted-foreground mt-2 text-base italic">
+              de{' '}
+              <Num className="text-foreground not-italic">
+                {formatUsd(report.trajectory.expectedAccumUsd)}
+              </Num>{' '}
               esperado al mes <Num className="not-italic">{report.trajectory.monthsElapsed}</Num>
             </div>
           </div>
 
           {/* Target/mes */}
-          <div className="border-l border-border pl-6">
+          <div className="border-border border-l pl-6">
             <Label>Meta de ahorro mensual</Label>
-            <Display size="lg" className="mt-3 block tabular-nums text-primary">
+            <Display size="lg" className="text-primary mt-3 block tabular-nums">
               {formatUsd(report.trajectory.targetMonthlyUsd)}
             </Display>
-            <div className="mt-2 font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="text-muted-foreground mt-2 font-sans text-[10px] tracking-[0.18em] uppercase">
               editable en{' '}
-              <Link href="/settings/metas" className="link normal-case tracking-normal">
+              <Link href="/settings/metas" className="link tracking-normal normal-case">
                 /settings/metas
               </Link>
             </div>
           </div>
 
           {/* Investment YTD — the often-forgotten piece */}
-          <div className="border-l border-border pl-6">
+          <div className="border-border border-l pl-6">
             <Label>Inversión YTD</Label>
-            <Display size="lg" className="mt-3 block tabular-nums text-[color:var(--attn)]">
+            <Display size="lg" className="mt-3 block text-[color:var(--attn)] tabular-nums">
               {formatUsd(report.kpis.investmentYtdUsd)}
             </Display>
-            <div className="mt-2 font-display text-sm italic text-muted-foreground">
+            <div className="font-display text-muted-foreground mt-2 text-sm italic">
               incluida en el ahorro
             </div>
           </div>
 
           {/* Δ vs target — the call to action */}
-          <div className="border-l border-border pl-6">
+          <div className="border-border border-l pl-6">
             <Label>Δ vs objetivo</Label>
             <Display
               size="lg"
@@ -247,8 +240,11 @@ export default async function YearEconomyPage({
               {deltaIsGood && Number.isFinite(deltaN) && deltaN > 0 ? '+' : ''}
               {formatUsd(report.trajectory.deltaUsd)}
             </Display>
-            <div className="mt-2 font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              vs <Num className="normal-case tracking-normal text-muted-foreground">{formatUsd(report.trajectory.expectedAccumUsd)}</Num>{' '}
+            <div className="text-muted-foreground mt-2 font-sans text-[10px] tracking-[0.18em] uppercase">
+              vs{' '}
+              <Num className="text-muted-foreground tracking-normal normal-case">
+                {formatUsd(report.trajectory.expectedAccumUsd)}
+              </Num>{' '}
               esperado
             </div>
           </div>
@@ -256,7 +252,7 @@ export default async function YearEconomyPage({
 
         {/* Progress track: actual vs expected */}
         <div className="relative mt-7">
-          <div className="h-1.5 w-full bg-muted/60">
+          <div className="bg-muted/60 h-1.5 w-full">
             <div
               className="h-full transition-all"
               style={{
@@ -267,11 +263,11 @@ export default async function YearEconomyPage({
           </div>
           {/* expected marker */}
           <div
-            className="absolute top-[-3px] h-[14px] w-px bg-foreground"
+            className="bg-foreground absolute top-[-3px] h-[14px] w-px"
             style={{ left: `${Math.min(100, expectedPct)}%` }}
             aria-hidden
           />
-          <div className="mt-2 flex items-center justify-between font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="text-muted-foreground mt-2 flex items-center justify-between font-sans text-[10px] tracking-[0.18em] uppercase">
             <span>Ene</span>
             <span>esperado al día de hoy ▲</span>
             <span>Dic</span>
@@ -282,8 +278,12 @@ export default async function YearEconomyPage({
       {/* ============ KPI STRIP ============ */}
       <section>
         <Label>Resumen YTD</Label>
-        <div className="mt-3 grid grid-cols-1 gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Ingresos YTD" value={formatUsd(report.kpis.incomeYtdUsd)} variant="good" />
+        <div className="bg-border mt-3 grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Ingresos YTD"
+            value={formatUsd(report.kpis.incomeYtdUsd)}
+            variant="good"
+          />
           <KpiCard label="Gastos YTD" value={formatUsd(report.kpis.expenseYtdUsd)} variant="bad" />
           <KpiCard label="Neto YTD" value={formatUsd(report.kpis.netYtdUsd)} variant="primary" />
           <KpiCard
@@ -317,13 +317,13 @@ export default async function YearEconomyPage({
       </section>
 
       {/* ============ PATRIMONIO ACUMULADO ============ */}
-      <section className="relative overflow-hidden border border-border bg-card/40 px-7 py-7">
+      <section className="border-border bg-card/40 relative overflow-hidden border px-7 py-7">
         <div className="relative">
           <div className="flex items-baseline justify-between">
             <Display size="md">Patrimonio acumulado</Display>
             <Link
               href="/patrimonio"
-              className="link font-display text-sm italic text-muted-foreground"
+              className="link font-display text-muted-foreground text-sm italic"
             >
               Ver detalle →
             </Link>
@@ -335,17 +335,17 @@ export default async function YearEconomyPage({
               <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div>
                   <Label>Net worth actual</Label>
-                  <Display size="lg" className="mt-3 block tabular-nums text-primary">
+                  <Display size="lg" className="text-primary mt-3 block tabular-nums">
                     {formatUsd(patrimonio.latestNetWorthUsd)}
                   </Display>
                 </div>
-                <div className="border-l border-border pl-6">
+                <div className="border-border border-l pl-6">
                   <Label>Target total</Label>
-                  <Display size="lg" className="mt-3 block tabular-nums text-[color:var(--attn)]">
+                  <Display size="lg" className="mt-3 block text-[color:var(--attn)] tabular-nums">
                     {formatUsd(patrimonio.targetTotalUsd)}
                   </Display>
                 </div>
-                <div className="border-l border-border pl-6">
+                <div className="border-border border-l pl-6">
                   <Label>Progreso</Label>
                   <Display
                     size="lg"
@@ -357,20 +357,22 @@ export default async function YearEconomyPage({
                           : 'var(--primary)',
                     }}
                   >
-                    {patrimonio.progressPct !== null ? `${patrimonio.progressPct.toFixed(1)}%` : '—'}
+                    {patrimonio.progressPct !== null
+                      ? `${patrimonio.progressPct.toFixed(1)}%`
+                      : '—'}
                   </Display>
                 </div>
               </div>
 
               {/* Progress bar */}
               <div className="mt-5">
-                <div className="h-2 w-full bg-muted/60">
+                <div className="bg-muted/60 h-2 w-full">
                   <div
-                    className="h-full bg-primary transition-all"
+                    className="bg-primary h-full transition-all"
                     style={{ width: `${Math.min(100, patrimonio.progressPct ?? 0)}%` }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="text-muted-foreground mt-2 flex items-center justify-between font-sans text-[10px] tracking-[0.18em] uppercase">
                   <span>USD 0</span>
                   <span>{formatUsd(patrimonio.targetTotalUsd)}</span>
                 </div>
@@ -413,7 +415,9 @@ export default async function YearEconomyPage({
         />
 
         <Body className="text-xs">
-          Target ahorro mensual: <Num className="not-italic text-foreground">{formatUsd(targetSavingsMonthlyUsd)}</Num>. Editable en{' '}
+          Target ahorro mensual:{' '}
+          <Num className="text-foreground not-italic">{formatUsd(targetSavingsMonthlyUsd)}</Num>.
+          Editable en{' '}
           <Link href="/settings/metas" className="link not-italic">
             /settings/metas
           </Link>
@@ -481,22 +485,23 @@ function CategoryTable({
         <Display size="sm" style={{ color: kindVar }}>
           {title}
         </Display>
-        <Num className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {rows.filter((r) => r.isLeaf).length} hojas · {rows.filter((r) => !r.isLeaf).length} parents
+        <Num className="text-muted-foreground text-[10px] tracking-[0.18em] uppercase">
+          {rows.filter((r) => r.isLeaf).length} hojas · {rows.filter((r) => !r.isLeaf).length}{' '}
+          parents
         </Num>
       </div>
 
-      <div className="overflow-x-auto border-y border-border">
+      <div className="border-border overflow-x-auto border-y">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border/60 bg-card/30">
-              <th className="px-3 py-2.5 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <tr className="border-border/60 bg-card/30 border-b">
+              <th className="text-muted-foreground px-3 py-2.5 text-left font-sans text-[10px] font-semibold tracking-[0.18em] uppercase">
                 Categoría
               </th>
               {['Real YTD', 'Proyec. dic', 'Budget año', 'Δ vs budget'].map((h) => (
                 <th
                   key={h}
-                  className="px-3 py-2.5 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  className="text-muted-foreground px-3 py-2.5 text-right font-sans text-[10px] font-semibold tracking-[0.18em] uppercase"
                 >
                   {h}
                 </th>
@@ -530,27 +535,22 @@ function CategoryTable({
                       : 'border-border/40 hover:bg-primary/[0.04]',
                   )}
                 >
-                  <td
-                    className={cn(
-                      'px-3 py-2.5',
-                      row.depth === 1 && 'pl-10',
-                    )}
-                  >
+                  <td className={cn('px-3 py-2.5', row.depth === 1 && 'pl-10')}>
                     {isParent ? (
-                      <span className="font-display text-base text-foreground">{row.name}</span>
+                      <span className="font-display text-foreground text-base">{row.name}</span>
                     ) : row.isLeaf ? (
                       <Link
                         href={drillHref}
-                        className="font-display text-base text-foreground hover:text-primary hover:underline"
+                        className="font-display text-foreground hover:text-primary text-base hover:underline"
                       >
                         {row.name}
                       </Link>
                     ) : (
-                      <span className="font-display text-base text-foreground">{row.name}</span>
+                      <span className="font-display text-foreground text-base">{row.name}</span>
                     )}
                     {row.isInvestment && (
                       <span
-                        className="ml-2 inline-block rounded-full px-2 py-0.5 align-middle font-sans text-[9px] font-semibold uppercase tracking-[0.14em]"
+                        className="ml-2 inline-block rounded-full px-2 py-0.5 align-middle font-sans text-[9px] font-semibold tracking-[0.14em] uppercase"
                         style={{
                           background: 'color-mix(in oklab, var(--attn) 18%, transparent)',
                           color: 'var(--attn)',
@@ -561,15 +561,15 @@ function CategoryTable({
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <Num className="text-sm text-foreground">{formatUsd(row.realYtdUsd)}</Num>
+                    <Num className="text-foreground text-sm">{formatUsd(row.realYtdUsd)}</Num>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <Num className="text-sm text-muted-foreground">
+                    <Num className="text-muted-foreground text-sm">
                       {formatUsd(row.projectedDecUsd)}
                     </Num>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <Num className="text-sm text-muted-foreground">
+                    <Num className="text-muted-foreground text-sm">
                       {formatUsd(row.budgetAnnualUsd)}
                     </Num>
                   </td>

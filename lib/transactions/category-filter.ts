@@ -9,9 +9,6 @@ import { z } from 'zod';
  * Única fuente de verdad del valor de filtro, para que la página y el export no
  * diverjan (ver `formatAccount` para el mismo criterio de "único lugar").
  */
-export const categoryFilterSchema = z.union([
-  z.string().uuid(),
-  z.literal('unclassified'),
-]);
+export const categoryFilterSchema = z.union([z.string().uuid(), z.literal('unclassified')]);
 
 export type CategoryFilterValue = z.infer<typeof categoryFilterSchema>;

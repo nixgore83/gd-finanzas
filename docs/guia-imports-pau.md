@@ -18,12 +18,12 @@ No tenés que tipear nada a mano. Solo subir el archivo y revisar que la IA lo h
 
 Hoy tus cuentas están casi vacías. Estas son **tuyas** y faltan cargar:
 
-| Cuenta (como figura en la app) | Estado actual | Qué bajar |
-|---|---|---|
-| **Galicia Caja de ahorro · Pau · ARS** | Empezada (pocos movimientos) | Resumen mensual PDF |
-| **Galicia Master · Pau · ARS** (tarjeta Mastercard) | Vacía | Resumen de tarjeta PDF |
-| **Galicia Visa · Pau · ARS** (tarjeta Visa) | Vacía | Resumen de tarjeta PDF |
-| **Galicia Inversiones · Pau · ARS** (broker) | Vacía | Resumen del broker PDF |
+| Cuenta (como figura en la app)                      | Estado actual                | Qué bajar              |
+| --------------------------------------------------- | ---------------------------- | ---------------------- |
+| **Galicia Caja de ahorro · Pau · ARS**              | Empezada (pocos movimientos) | Resumen mensual PDF    |
+| **Galicia Master · Pau · ARS** (tarjeta Mastercard) | Vacía                        | Resumen de tarjeta PDF |
+| **Galicia Visa · Pau · ARS** (tarjeta Visa)         | Vacía                        | Resumen de tarjeta PDF |
+| **Galicia Inversiones · Pau · ARS** (broker)        | Vacía                        | Resumen del broker PDF |
 
 > 📛 Así es como vas a ver los nombres en los desplegables de la app: el formato es
 > **`Institución Producto · Dueño · Moneda`**. Tus dos tarjetas se distinguen por la marca
@@ -61,7 +61,7 @@ El único paso que lleva atención es el **3 (revisar)**. El resto es casi autom
 
 ## Paso 1 — Subir el resumen
 
-1. En el menú entrás a **Imports** (en la sección *Tools*).
+1. En el menú entrás a **Imports** (en la sección _Tools_).
 2. Tocás el botón **`+ Subir extracto`** (si nunca subiste nada, el botón dice **`+ Subir el primero`**).
 3. Caés en la pantalla **"Nuevo import"**:
 
@@ -92,10 +92,10 @@ El único paso que lleva atención es el **3 (revisar)**. El resto es casi autom
 - **Tipo** → elegí según qué resumen es: **Tarjeta de crédito**, **Banco** (la caja de ahorro)
   o **Broker** (inversiones).
 - **Cuenta** → opcional. Si la elegís acá, mejor (la app ya sabe a dónde va). Si no, la
-  elegís más adelante en la revisión. Dejala en *"Sin especificar"* si tenés dudas.
+  elegís más adelante en la revisión. Dejala en _"Sin especificar"_ si tenés dudas.
 
 4. Tocás **`Subir N archivo(s)`**. Vas a ver un toast verde: **"Import creado"** (o
-   *"N imports creados"* si subiste varios).
+   _"N imports creados"_ si subiste varios).
 
 > 💡 **Tip:** podés seleccionar **varios PDFs de una** (todos los meses juntos). La app crea
 > un import por cada uno. Si subís un archivo que ya habías subido antes, te avisa y podés
@@ -108,8 +108,8 @@ El único paso que lleva atención es el **3 (revisar)**. El resto es casi autom
 Apenas subís, la app **empieza a leer el PDF sola** en segundo plano. Vas a ver el estado
 del import pasar por: **Subido → Parseando… → Revisar**.
 
-Vas a ver el mensaje: *"Parseando con LLM en segundo plano… esto puede tardar hasta un par
-de minutos."* Es normal, esperá.
+Vas a ver el mensaje: _"Parseando con LLM en segundo plano… esto puede tardar hasta un par
+de minutos."_ Es normal, esperá.
 
 ### Si el PDF tiene contraseña
 
@@ -172,7 +172,7 @@ En la columna **Acciones** de cada fila:
 ### Ponerle categoría (lo más común)
 
 En la columna **Categoría** de cada línea hay un desplegable **`Categoría…`**. Lo abrís,
-elegís (ej. *Supermercado*, *Sueldo*, *Salud*) y listo, sin abrir nada más.
+elegís (ej. _Supermercado_, _Sueldo_, _Salud_) y listo, sin abrir nada más.
 
 > 🪄 **Magia útil:** cuando categorizás o etiquetás una línea, la app te ofrece con un toast
 > aplicar lo mismo a las **líneas parecidas** (mismo comercio / misma contraparte). Si decís
@@ -181,7 +181,7 @@ elegís (ej. *Supermercado*, *Sueldo*, *Salud*) y listo, sin abrir nada más.
 ### Editar una línea (cuando algo está mal)
 
 Tocás **`Editar`** y se despliega un formulario con: Fecha, Tipo (Gasto/Ingreso), Monto,
-Moneda, Descripción, **Etiqueta de contraparte** (*"ej. Niñera, Alquiler…"*), Categoría, y
+Moneda, Descripción, **Etiqueta de contraparte** (_"ej. Niñera, Alquiler…"_), Categoría, y
 algunos extras:
 
 - ☐ **devolución/reembolso** — si es una devolución.
@@ -208,7 +208,7 @@ aplicarles algo **en lote**:
 
 > 💡 **Truco recomendado:** usá los filtros de arriba para mostrar un grupo parecido
 > (ej. filtrás "Sin categorizar" + buscás "Coto"), tildás todas con **`Seleccionar las N
-> filtradas`**, y les ponés la categoría de una sola vez con **`Aplicar categoría`**.
+filtradas`**, y les ponés la categoría de una sola vez con **`Aplicar categoría`**.
 
 ### Atajos para terminar rápido
 
@@ -288,7 +288,7 @@ En la pantalla **Imports**, si hay meses faltantes, aparece un bloque amarillo
 ## Errores comunes / FAQ
 
 **"Subí el PDF pero no aparecen las líneas."**
-→ Mirá el estado: si dice *Parseando…*, esperá uno o dos minutos. Si dice *Revisar*, recargá.
+→ Mirá el estado: si dice _Parseando…_, esperá uno o dos minutos. Si dice _Revisar_, recargá.
 Si el PDF tenía contraseña, fijate que el recuadro de contraseña no esté esperándote.
 
 **"La IA puso mal una categoría / un monto."**
@@ -304,7 +304,7 @@ ni ingreso (es plata que se movió de un bolsillo a otro).
 
 **"¿Tengo que cargar todo de golpe?"**
 → No. Podés ir de a un mes. Lo importante es no dejar huecos: o cargás el resumen, o marcás
-el mes como *sin mov.*
+el mes como _sin mov._
 
 ---
 

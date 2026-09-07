@@ -42,9 +42,7 @@ describe('transferInputSchema', () => {
   });
 
   it('rechaza accounts iguales', () => {
-    expect(() =>
-      transferInputSchema.parse({ ...valid, accountToId: UUID_A }),
-    ).toThrow(/distintas/);
+    expect(() => transferInputSchema.parse({ ...valid, accountToId: UUID_A })).toThrow(/distintas/);
   });
 
   it('rechaza montos negativos / vacíos / cero string', () => {
@@ -64,31 +62,21 @@ describe('transferInputSchema', () => {
 
   it('fxRateOverride: vacío → null, válido → 6 decimales, inválido → throw', () => {
     expect(transferInputSchema.parse(valid).fxRateOverride).toBeNull();
-    expect(
-      transferInputSchema.parse({ ...valid, fxRateOverride: '1500' }).fxRateOverride,
-    ).toBe('1500.000000');
-    expect(() =>
-      transferInputSchema.parse({ ...valid, fxRateOverride: '-1' }),
-    ).toThrow();
-    expect(() =>
-      transferInputSchema.parse({ ...valid, fxRateOverride: 'abc' }),
-    ).toThrow();
+    expect(transferInputSchema.parse({ ...valid, fxRateOverride: '1500' }).fxRateOverride).toBe(
+      '1500.000000',
+    );
+    expect(() => transferInputSchema.parse({ ...valid, fxRateOverride: '-1' })).toThrow();
+    expect(() => transferInputSchema.parse({ ...valid, fxRateOverride: 'abc' })).toThrow();
   });
 
   it('rechaza descripción vacía y > 200', () => {
     expect(() => transferInputSchema.parse({ ...valid, description: '' })).toThrow();
-    expect(() =>
-      transferInputSchema.parse({ ...valid, description: 'x'.repeat(201) }),
-    ).toThrow();
+    expect(() => transferInputSchema.parse({ ...valid, description: 'x'.repeat(201) })).toThrow();
   });
 
   it('rechaza UUIDs inválidos', () => {
-    expect(() =>
-      transferInputSchema.parse({ ...valid, accountFromId: 'not-uuid' }),
-    ).toThrow();
-    expect(() =>
-      transferInputSchema.parse({ ...valid, accountToId: 'not-uuid' }),
-    ).toThrow();
+    expect(() => transferInputSchema.parse({ ...valid, accountFromId: 'not-uuid' })).toThrow();
+    expect(() => transferInputSchema.parse({ ...valid, accountToId: 'not-uuid' })).toThrow();
   });
 
   describe('tagIds', () => {

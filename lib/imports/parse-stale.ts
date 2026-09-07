@@ -17,8 +17,7 @@ export function isParseStale(
   now: Date,
 ): boolean {
   if (!parsingStartedAt) return false;
-  const started =
-    parsingStartedAt instanceof Date ? parsingStartedAt : new Date(parsingStartedAt);
+  const started = parsingStartedAt instanceof Date ? parsingStartedAt : new Date(parsingStartedAt);
   if (Number.isNaN(started.getTime())) return false;
   return now.getTime() - started.getTime() > PARSE_STALE_AFTER_MS;
 }

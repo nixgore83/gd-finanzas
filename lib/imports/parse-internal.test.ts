@@ -52,7 +52,9 @@ vi.mock('@/lib/categories/tree', () => ({ loadCategoryTree: vi.fn(async () => []
 vi.mock('@/lib/imports/parsers/category-prompt', () => ({
   buildCategoryPromptBlock: () => '',
 }));
-vi.mock('@/lib/imports/period', () => ({ computeImportPeriod: vi.fn(async () => ({ start: null, end: null })) }));
+vi.mock('@/lib/imports/period', () => ({
+  computeImportPeriod: vi.fn(async () => ({ start: null, end: null })),
+}));
 vi.mock('@/lib/imports/pdf-decrypt', () => ({ unlockPdfForImport: vi.fn() }));
 vi.mock('@/lib/env', () => ({
   getImportParserEnv: () => ({

@@ -20,7 +20,20 @@ type Props = {
   initialBudgets: { categoryId: string; month: number; amountUsd: string }[];
 };
 
-const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTH_LABELS = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+];
 
 function keyOf(catId: string, month: number): string {
   return `${catId}-${month}`;
@@ -199,12 +212,17 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
         <table className="w-full border-collapse">
           {/* ============ HEAD ============ */}
           <thead>
-            <tr className="border-y border-border">
+            <tr className="border-border border-y">
               <th
                 scope="col"
-                className="sticky left-0 z-10 bg-background px-4 py-3 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
+                className="bg-background text-muted-foreground sticky left-0 z-10 px-4 py-3 text-left font-sans text-[10px] font-semibold tracking-[0.22em] uppercase"
               >
-                <SortableHeader label="Categoría" field="name" criteria={sortCriteria} onSort={handleSort} />
+                <SortableHeader
+                  label="Categoría"
+                  field="name"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
               </th>
               {MONTH_LABELS.map((m, i) => {
                 const monthNum = i + 1;
@@ -214,10 +232,8 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                     key={m}
                     scope="col"
                     className={cn(
-                      'px-2 py-3 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.22em]',
-                      current
-                        ? 'bg-primary/[0.08] text-primary'
-                        : 'text-muted-foreground',
+                      'px-2 py-3 text-right font-sans text-[10px] font-semibold tracking-[0.22em] uppercase',
+                      current ? 'bg-primary/[0.08] text-primary' : 'text-muted-foreground',
                     )}
                   >
                     {m}
@@ -226,9 +242,14 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
               })}
               <th
                 scope="col"
-                className="px-4 py-3 text-right font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
+                className="text-muted-foreground px-4 py-3 text-right font-sans text-[10px] font-semibold tracking-[0.22em] uppercase"
               >
-                <SortableHeader label="Año" field="total" criteria={sortCriteria} onSort={handleSort} />
+                <SortableHeader
+                  label="Año"
+                  field="total"
+                  criteria={sortCriteria}
+                  onSort={handleSort}
+                />
               </th>
             </tr>
           </thead>
@@ -245,15 +266,15 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                   key={c.id}
                   className={cn(
                     'transition-colors',
-                    isParent && 'border-t border-border bg-card/40',
-                    !isParent && 'border-t border-border/40 hover:bg-primary/[0.03]',
+                    isParent && 'border-border bg-card/40 border-t',
+                    !isParent && 'border-border/40 hover:bg-primary/[0.03] border-t',
                     !isParent && prevWasParent && 'border-t-border',
                   )}
                 >
                   {/* Categoria cell */}
                   <td
                     className={cn(
-                      'sticky left-0 z-10 whitespace-nowrap px-4 py-2.5',
+                      'sticky left-0 z-10 px-4 py-2.5 whitespace-nowrap',
                       isParent ? 'bg-card/40' : 'bg-background',
                     )}
                   >
@@ -268,10 +289,10 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                           )}
                           aria-hidden
                         />
-                        <span className="font-display text-base text-foreground">{c.name}</span>
+                        <span className="font-display text-foreground text-base">{c.name}</span>
                       </div>
                     ) : (
-                      <span className="pl-5 font-sans text-[13px] text-muted-foreground">
+                      <span className="text-muted-foreground pl-5 font-sans text-[13px]">
                         {c.name}
                       </span>
                     )}
@@ -308,9 +329,9 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                             }}
                             className={cn(
                               'font-mono tabular-nums',
-                              'w-16 border border-transparent bg-transparent px-1.5 py-1 text-right text-[13px] text-foreground',
-                              'focus:border-primary/60 focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary/40',
-                              past && 'cursor-not-allowed text-muted-foreground/60',
+                              'text-foreground w-16 border border-transparent bg-transparent px-1.5 py-1 text-right text-[13px]',
+                              'focus:border-primary/60 focus:bg-background focus:ring-primary/40 focus:ring-1 focus:outline-none',
+                              past && 'text-muted-foreground/60 cursor-not-allowed',
                             )}
                             aria-label={`${c.name} ${MONTH_LABELS[m - 1]} ${year}`}
                           />
@@ -333,7 +354,7 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                   })}
 
                   {/* Year total */}
-                  <td className="border-l border-border/60 px-4 py-2.5 text-right">
+                  <td className="border-border/60 border-l px-4 py-2.5 text-right">
                     <Num
                       className={cn(
                         'text-sm',
@@ -354,9 +375,9 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
           {/* ============ FOOTER ============ */}
           <tfoot>
             {/* Income subtotal */}
-            <tr className="border-t-2 border-border">
-              <td className="sticky left-0 z-10 bg-background px-4 py-2.5">
-                <span className="font-display text-base italic text-[color:var(--good)]">
+            <tr className="border-border border-t-2">
+              <td className="bg-background sticky left-0 z-10 px-4 py-2.5">
+                <span className="font-display text-base text-[color:var(--good)] italic">
                   Subtotal Ingresos
                 </span>
               </td>
@@ -369,14 +390,14 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                     isPastMonth(m) && !isCurrentMonth(m) && 'bg-muted/30',
                   )}
                 >
-                  <Num className="text-[13px] text-foreground">
+                  <Num className="text-foreground text-[13px]">
                     {formatCompact(monthTotalByKind(m, 'income').toNumber()) || (
                       <span className="text-muted-foreground/40">—</span>
                     )}
                   </Num>
                 </td>
               ))}
-              <td className="border-l border-border/60 px-4 py-2.5 text-right">
+              <td className="border-border/60 border-l px-4 py-2.5 text-right">
                 <Num className="text-sm font-semibold text-[color:var(--good)]">
                   {formatUsd(yearTotalsBy('income').toNumber()) || '—'}
                 </Num>
@@ -384,9 +405,9 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
             </tr>
 
             {/* Expense subtotal */}
-            <tr className="border-t border-border/60">
-              <td className="sticky left-0 z-10 bg-background px-4 py-2.5">
-                <span className="font-display text-base italic text-[color:var(--bad)]">
+            <tr className="border-border/60 border-t">
+              <td className="bg-background sticky left-0 z-10 px-4 py-2.5">
+                <span className="font-display text-base text-[color:var(--bad)] italic">
                   Subtotal Gastos
                 </span>
               </td>
@@ -399,14 +420,14 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                     isPastMonth(m) && !isCurrentMonth(m) && 'bg-muted/30',
                   )}
                 >
-                  <Num className="text-[13px] text-foreground">
+                  <Num className="text-foreground text-[13px]">
                     {formatCompact(monthTotalByKind(m, 'expense').toNumber()) || (
                       <span className="text-muted-foreground/40">—</span>
                     )}
                   </Num>
                 </td>
               ))}
-              <td className="border-l border-border/60 px-4 py-2.5 text-right">
+              <td className="border-border/60 border-l px-4 py-2.5 text-right">
                 <Num className="text-sm font-semibold text-[color:var(--bad)]">
                   {formatUsd(yearTotalsBy('expense').toNumber()) || '—'}
                 </Num>
@@ -414,9 +435,9 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
             </tr>
 
             {/* Net row — the headliner */}
-            <tr className="border-t-2 border-border bg-card/50">
-              <td className="sticky left-0 z-10 bg-card/50 px-4 py-3">
-                <span className="font-display text-lg italic text-foreground">Neto</span>
+            <tr className="border-border bg-card/50 border-t-2">
+              <td className="bg-card/50 sticky left-0 z-10 px-4 py-3">
+                <span className="font-display text-foreground text-lg italic">Neto</span>
               </td>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
                 const net = monthTotalByKind(m, 'income').minus(monthTotalByKind(m, 'expense'));
@@ -444,8 +465,8 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
                   </td>
                 );
               })}
-              <td className="border-l border-border px-4 py-3 text-right">
-                <Num className="text-base font-semibold text-primary">
+              <td className="border-border border-l px-4 py-3 text-right">
+                <Num className="text-primary text-base font-semibold">
                   {(() => {
                     const total = Array.from({ length: 12 }, (_, i) => i + 1)
                       .map((m) =>
@@ -462,13 +483,13 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
       </div>
 
       {/* ============ LEGEND ============ */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-1 pt-3 font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="text-muted-foreground flex flex-wrap items-center gap-x-6 gap-y-2 px-1 pt-3 font-sans text-[10px] tracking-[0.18em] uppercase">
         <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 bg-primary/[0.08]" aria-hidden />
+          <span className="bg-primary/[0.08] inline-block h-3 w-3" aria-hidden />
           <span>mes en curso · editable</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 bg-muted/30" aria-hidden />
+          <span className="bg-muted/30 inline-block h-3 w-3" aria-hidden />
           <span>mes pasado · read-only</span>
         </div>
         <div className="flex items-center gap-2">
@@ -479,7 +500,7 @@ export function BudgetGrid({ year, currentYearMonth, categories, initialBudgets 
           <span className="inline-block h-3 w-[3px] bg-[color:var(--bad)]" aria-hidden />
           <span>gasto</span>
         </div>
-        <span className="ml-auto font-display text-sm italic normal-case tracking-normal">
+        <span className="font-display ml-auto text-sm tracking-normal normal-case italic">
           Tab para moverse · Enter o blur para guardar
         </span>
       </div>

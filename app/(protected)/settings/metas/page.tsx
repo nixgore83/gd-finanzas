@@ -79,8 +79,8 @@ export default async function MetasPage() {
           Metas financieras
         </Display>
         <Body className="mt-2 max-w-2xl">
-          Los números que validamos con Pau el 5 de mayo 2026. Editables — alimentan
-          el bloque <em className="not-italic text-foreground">Trayectoria a IF</em> del Reporte D.
+          Los números que validamos con Pau el 5 de mayo 2026. Editables — alimentan el bloque{' '}
+          <em className="text-foreground not-italic">Trayectoria a IF</em> del Reporte D.
         </Body>
       </header>
 

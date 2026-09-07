@@ -64,12 +64,12 @@ export default async function TagsPage() {
       <Hair thick />
 
       {rows.length === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Display size="sm">Sin etiquetas</Display>
           <Body className="mx-auto mt-3 max-w-md">
-            Las etiquetas son una dimensión libre que se superpone a las categorías —
-            sirven para marcar &laquo;reintegrable&raquo;, &laquo;pau&raquo;, &laquo;rabbit-hole&raquo;
-            o lo que quieras agrupar.
+            Las etiquetas son una dimensión libre que se superpone a las categorías — sirven para
+            marcar &laquo;reintegrable&raquo;, &laquo;pau&raquo;, &laquo;rabbit-hole&raquo; o lo que
+            quieras agrupar.
           </Body>
           <Button asChild className="mt-6" size="lg">
             <Link href="/tags/new">+ Crear la primera</Link>
@@ -80,25 +80,22 @@ export default async function TagsPage() {
           {rows.map((row) => (
             <li
               key={row.id}
-              className="group flex items-center justify-between gap-4 border border-border bg-card/40 px-4 py-3 transition-colors hover:border-primary/40"
+              className="group border-border bg-card/40 hover:border-primary/40 flex items-center justify-between gap-4 border px-4 py-3 transition-colors"
             >
-              <Link
-                href={`/tags/${row.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3"
-              >
+              <Link href={`/tags/${row.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                 <span
                   aria-hidden
-                  className="inline-block size-3 shrink-0 rounded-full ring-1 ring-border"
+                  className="ring-border inline-block size-3 shrink-0 rounded-full ring-1"
                   style={{ background: row.color ?? 'var(--muted)' }}
                 />
-                <span className="truncate font-mono text-sm text-foreground transition-colors group-hover:text-primary">
+                <span className="text-foreground group-hover:text-primary truncate font-mono text-sm transition-colors">
                   {row.name}
                 </span>
               </Link>
               <div className="flex items-center gap-3">
                 <Link
                   href={`/transactions?tagId=${row.id}`}
-                  className="link font-mono text-xs text-muted-foreground"
+                  className="link text-muted-foreground font-mono text-xs"
                   title="Ver transacciones con esta etiqueta"
                 >
                   <Num>{row.txCount}</Num>

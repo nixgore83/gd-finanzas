@@ -15,8 +15,18 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 function formatAmount(amount: string, currency: 'ARS' | 'USD'): string {
@@ -44,24 +54,36 @@ function shortDate(iso: string): string {
   const d = parts[2];
   const m = parts[1];
   if (!d || !m) return iso;
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   const mi = Number.parseInt(m, 10) - 1;
   return `${d} ${months[mi] ?? ''}`;
 }
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-function parseSort(sp: Record<string, string | string[] | undefined>): { field: string; dir: 'asc' | 'desc' } {
+function parseSort(sp: Record<string, string | string[] | undefined>): {
+  field: string;
+  dir: 'asc' | 'desc';
+} {
   const field = typeof sp.sort === 'string' ? sp.sort : 'date';
   const dir = typeof sp.dir === 'string' && sp.dir === 'desc' ? 'desc' : 'asc';
   return { field, dir };
 }
 
-export default async function ForecastsPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function ForecastsPage({ searchParams }: { searchParams: SearchParams }) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -84,12 +106,7 @@ export default async function ForecastsPage({
     .from(forecasts)
     .innerJoin(recurrences, eq(recurrences.id, forecasts.recurrenceId))
     .leftJoin(accounts, eq(accounts.id, recurrences.accountId))
-    .where(
-      and(
-        eq(recurrences.householdId, session.householdId),
-        eq(forecasts.status, 'pending'),
-      ),
-    )
+    .where(and(eq(recurrences.householdId, session.householdId), eq(forecasts.status, 'pending')))
     .orderBy(asc(forecasts.expectedDate));
 
   const sp = await searchParams;
@@ -145,7 +162,7 @@ export default async function ForecastsPage({
       </header>
 
       {rows.length > 0 && (
-        <div className="flex items-center gap-2 font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-2 font-sans text-[10px] tracking-[0.18em] uppercase">
           <span>Ordenar por:</span>
           {[
             { field: 'date', label: 'Fecha' },
@@ -160,14 +177,12 @@ export default async function ForecastsPage({
                 key={s.field}
                 href={href}
                 className={cn(
-                  'inline-flex items-center gap-0.5 rounded px-2 py-1 transition-colors hover:text-foreground',
+                  'hover:text-foreground inline-flex items-center gap-0.5 rounded px-2 py-1 transition-colors',
                   isActive && 'bg-primary/10 text-foreground',
                 )}
               >
                 {s.label}
-                {isActive && (
-                  <span className="text-xs">{sortDir === 'asc' ? '▲' : '▼'}</span>
-                )}
+                {isActive && <span className="text-xs">{sortDir === 'asc' ? '▲' : '▼'}</span>}
               </Link>
             );
           })}
@@ -177,11 +192,11 @@ export default async function ForecastsPage({
       <Hair thick />
 
       {rows.length === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Display size="sm">Nada en cola</Display>
           <Body className="mx-auto mt-3 max-w-md">
-            Una previsión se genera automáticamente desde cada recurrencia activa. Si no
-            tenés ninguna, andá a{' '}
+            Una previsión se genera automáticamente desde cada recurrencia activa. Si no tenés
+            ninguna, andá a{' '}
             <Link href="/recurrences" className="link not-italic">
               /recurrences
             </Link>
@@ -197,7 +212,7 @@ export default async function ForecastsPage({
             }, 0);
             return (
               <section key={monthKey}>
-                <header className="flex items-baseline justify-between border-b border-border pb-2">
+                <header className="border-border flex items-baseline justify-between border-b pb-2">
                   <div className="flex items-baseline gap-3">
                     <Display size="sm">{monthLabel(`${monthKey}-01`)}</Display>
                     <Label>
@@ -209,9 +224,7 @@ export default async function ForecastsPage({
                     <Num
                       className={cn(
                         'mt-1 block text-base',
-                        monthTotal >= 0
-                          ? 'text-[color:var(--good)]'
-                          : 'text-[color:var(--bad)]',
+                        monthTotal >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
                       )}
                     >
                       {monthTotal >= 0 ? '+' : ''}
@@ -231,9 +244,9 @@ export default async function ForecastsPage({
                   {items.map((row) => (
                     <li
                       key={row.id}
-                      className="group grid grid-cols-[80px_1fr_auto_auto] items-baseline gap-4 border-b border-border/40 py-3 transition-colors hover:bg-primary/[0.04]"
+                      className="group border-border/40 hover:bg-primary/[0.04] grid grid-cols-[80px_1fr_auto_auto] items-baseline gap-4 border-b py-3 transition-colors"
                     >
-                      <Num className="text-[11px] uppercase tracking-[0.1em] text-primary">
+                      <Num className="text-primary text-[11px] tracking-[0.1em] uppercase">
                         {shortDate(row.expectedDate)}
                       </Num>
                       <div className="min-w-0">
@@ -248,11 +261,11 @@ export default async function ForecastsPage({
                                   : 'var(--bad)',
                             }}
                           />
-                          <span className="truncate font-display text-base font-semibold text-foreground">
+                          <span className="font-display text-foreground truncate text-base font-semibold">
                             {row.recurrenceName}
                           </span>
                         </div>
-                        <Label className="mt-1 normal-case tracking-[0.1em]">
+                        <Label className="mt-1 tracking-[0.1em] normal-case">
                           {row.accountName ?? '—'}
                         </Label>
                       </div>
@@ -267,11 +280,8 @@ export default async function ForecastsPage({
                         {row.recurrenceKind === 'income' ? '+' : '−'}
                         {formatAmount(row.expectedAmount, row.currency).replace('−', '')}
                       </Num>
-                      <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                        <CancelForecastButton
-                          id={row.id}
-                          recurrenceName={row.recurrenceName}
-                        />
+                      <div className="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                        <CancelForecastButton id={row.id} recurrenceName={row.recurrenceName} />
                       </div>
                     </li>
                   ))}

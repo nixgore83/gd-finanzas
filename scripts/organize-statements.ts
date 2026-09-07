@@ -148,8 +148,12 @@ function main(): void {
   const ruteo = moves.filter((m) => m.reason === 'ruteo');
   const dupes = moves.filter((m) => m.reason === 'duplicado');
 
-  console.warn(`\n=== REORGANIZACIÓN ${APPLY ? '(APLICANDO)' : '(DRY RUN — no se mueve nada)'} ===`);
-  console.warn(`archivos: ${files.length}  |  a mover: ${moves.length}  |  ya en su lugar: ${files.length - moves.length - sinRuteo.length}`);
+  console.warn(
+    `\n=== REORGANIZACIÓN ${APPLY ? '(APLICANDO)' : '(DRY RUN — no se mueve nada)'} ===`,
+  );
+  console.warn(
+    `archivos: ${files.length}  |  a mover: ${moves.length}  |  ya en su lugar: ${files.length - moves.length - sinRuteo.length}`,
+  );
 
   if (ruteo.length > 0) {
     console.warn(`\n--- ${ruteo.length} archivo(s) mal ubicados ---`);
@@ -165,7 +169,9 @@ function main(): void {
   }
 
   if (dupes.length > 0) {
-    console.warn(`\n--- ${dupes.length} copia(s) sobrante(s) → ${DUPES_FOLDER}/ (no se borra nada) ---`);
+    console.warn(
+      `\n--- ${dupes.length} copia(s) sobrante(s) → ${DUPES_FOLDER}/ (no se borra nada) ---`,
+    );
     for (const m of dupes) console.warn(`      ${m.from}`);
   }
 
@@ -211,7 +217,9 @@ function main(): void {
 
   const vaciadas = pruneEmptyDirs(DIR);
 
-  console.warn(`\n[organize] listo — ${moved} movidos, ${skipped} salteados. Ningún archivo borrado.`);
+  console.warn(
+    `\n[organize] listo — ${moved} movidos, ${skipped} salteados. Ningún archivo borrado.`,
+  );
   if (vaciadas.length > 0) {
     console.warn(`[organize] carpetas vacías eliminadas: ${vaciadas.join(', ')}`);
   }

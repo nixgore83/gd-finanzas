@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  contentTypeForExt,
-  extractExtension,
-  importCreateMetaSchema,
-} from './import';
+import { contentTypeForExt, extractExtension, importCreateMetaSchema } from './import';
 
 describe('importCreateMetaSchema', () => {
   it('valida happy path', () => {

@@ -13,7 +13,11 @@ export function CancelForecastButton({ id, recurrenceName }: Props) {
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
-    if (!confirm(`¿Cancelar esta previsión de "${recurrenceName}"? No se va a regenerar a menos que edites la recurrencia.`)) {
+    if (
+      !confirm(
+        `¿Cancelar esta previsión de "${recurrenceName}"? No se va a regenerar a menos que edites la recurrencia.`,
+      )
+    ) {
       return;
     }
     const fd = new FormData();

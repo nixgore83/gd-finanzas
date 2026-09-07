@@ -43,7 +43,7 @@ export function InvestmentToggle({
       onClick={() => handleChange(!value)}
       className={cn(
         'relative h-7 w-12 cursor-pointer rounded-full transition-colors',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        'focus-visible:ring-primary/50 focus:outline-none focus-visible:ring-2',
         'disabled:cursor-not-allowed disabled:opacity-60',
         value ? 'bg-[color:var(--attn)]' : 'bg-muted',
       )}
@@ -52,9 +52,7 @@ export function InvestmentToggle({
         aria-hidden
         className={cn(
           'absolute top-1 size-5 rounded-full transition-all',
-          value
-            ? 'left-6 bg-background shadow-sm'
-            : 'left-1 bg-foreground/70',
+          value ? 'bg-background left-6 shadow-sm' : 'bg-foreground/70 left-1',
         )}
       />
     </button>

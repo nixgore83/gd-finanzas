@@ -30,7 +30,9 @@ export async function GET(request: Request) {
       .where(and(eq(forecasts.status, 'pending'), lt(forecasts.expectedDate, threshold)))
       .returning({ id: forecasts.id });
 
-    console.warn(`[cron/forecasts-missed] marked ${result.length} as missed (threshold ${threshold})`);
+    console.warn(
+      `[cron/forecasts-missed] marked ${result.length} as missed (threshold ${threshold})`,
+    );
     return NextResponse.json({ ok: true, marked: result.length, threshold });
   } catch (err) {
     console.error('[cron/forecasts-missed] failed', {
@@ -39,4 +41,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 });
   }
 }
-

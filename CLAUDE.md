@@ -15,6 +15,7 @@ Si encontrás algo en el PRD que parece ser una regla de negocio mal definida, n
 **Mantener el PRD sincronizado con la realidad.** El PRD tiende a quedar viejo a medida
 que el código avanza. Cuando el Notion MCP esté disponible, mantenerlo al día es parte
 del trabajo:
+
 - Al cerrar un hito o feature no-trivial, reflejarlo en el PRD: bumpear el changelog
   (fecha + "Claude") y marcar qué quedó implementado.
 - Cuando analices código del repo y detectes que el PRD divergió de la implementación
@@ -162,6 +163,7 @@ sobre el mismo working tree.** El estado del repo puede cambiar entre una tool c
 siguiente sin que vos lo hayas tocado. Estas precauciones son **NO NEGOCIABLES**:
 
 ### Branch propio, siempre
+
 - **Nunca trabajes ni commitees directo en `main`.** Antes de escribir código, creá tu
   propio branch: `git fetch origin && git switch -c <tipo>/<descripcion-corta> origin/main`.
 - **Un branch por agente.** No compartas branch con otro agente ni reutilices uno ajeno.
@@ -170,8 +172,10 @@ siguiente sin que vos lo hayas tocado. Estas precauciones son **NO NEGOCIABLES**
   commitear de otro agente. Si el harness ofrece `isolation: "worktree"`, usalo.
 
 ### Git: solo operaciones acotadas a TUS archivos
+
 Estas operaciones tocan el working tree entero o el WIP ajeno y están **prohibidas** salvo
 que el usuario lo pida explícitamente:
+
 - ❌ `git stash` / `git stash pop` — se lleva los cambios sin commitear de los demás.
   (Para chequear si un error es tuyo, no stashees: mirá `git diff -- <archivo>`.)
 - ❌ `git reset --hard`, `git checkout -- .`, `git clean`, `git restore .` sin path.
@@ -182,12 +186,14 @@ que el usuario lo pida explícitamente:
   `git switch`, `git worktree`, push de tu propio branch.
 
 ### Typecheck / test / lint en árbol compartido
+
 - `npm run typecheck && npm test && npm run lint` corren sobre **todo** el working tree,
   que puede incluir cambios a medio hacer de otro agente.
 - **Un error en un archivo que vos no tocaste probablemente es WIP ajeno: no lo "arregles",
   avisalo.** Para distinguir lo tuyo, mirá `git diff` de tus paths antes de atribuirte un fallo.
 
 ### Archivos compartidos
+
 - `CLAUDE.md`, `STATUS.md`, `package.json`, lockfiles, `db/schema/*` y `db/migrations/*` son
   puntos calientes de conflicto. Editá **mínimo y por append** cuando se pueda, y **re-leé el
   archivo justo antes de escribir** (puede haber cambiado bajo tus pies).
@@ -195,12 +201,14 @@ que el usuario lo pida explícitamente:
   nueva; dos migraciones en paralelo sobre el mismo schema se pisan.
 
 ### Procesos y servicios
+
 - No mates ni reinicies dev servers, watchers ni procesos en background: otro agente puede
   depender de ellos.
 - Migraciones/seeds contra la DB compartida: coordiná, no apliques cambios destructivos en
   paralelo.
 
 ### Cierre
+
 - Commiteá **solo tus archivos** (por path), pusheá **tu** branch y abrí PR.
   **No mergees a `main` por tu cuenta** mientras pueda haber trabajo ajeno abierto.
 
@@ -208,20 +216,20 @@ que el usuario lo pida explícitamente:
 
 ## Hitos del proyecto
 
-| # | Hito | Output |
-|---|---|---|
-| 0 | Setup | Next.js + Supabase + Vercel + login funcional + CLAUDE.md + STATUS.md |
-| 1 | Modelo base + cuentas | Schema completo, CRUD de cuentas, seed de instituciones |
-| 2 | FX feed BCRA | Cron diario, caching, helper `getFxRate(date, ccy)` |
-| 3 | Transacciones manuales | Form alta + lista + edit + delete + transferencias |
-| — | (Sesión de categorías con Nico antes del Hito 4) | Taxonomía cerrada |
-| 4 | Recurrencias + previsiones | Forecasts rolling 12 meses + confirmación 1-click |
-| 5 | Dashboard + Reporte A | Budget mensual + cashflow real vs budget — **V1.0 funcional** |
-| 6 | Reportes B + C | Donut por categoría + evolución 12 meses |
-| 7 | Reporte D + Settings metas | Año económico + bloque "Trayectoria a IF" |
-| 8 | Imports con AI parser | Galicia Amex como primer caso |
-| 9 | Export contador | .zip con 5 CSVs |
-| 10 | Backups Drive ✅ | Cron semanal — **V1.1 funcional 🎉** |
+| #   | Hito                                             | Output                                                                |
+| --- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| 0   | Setup                                            | Next.js + Supabase + Vercel + login funcional + CLAUDE.md + STATUS.md |
+| 1   | Modelo base + cuentas                            | Schema completo, CRUD de cuentas, seed de instituciones               |
+| 2   | FX feed BCRA                                     | Cron diario, caching, helper `getFxRate(date, ccy)`                   |
+| 3   | Transacciones manuales                           | Form alta + lista + edit + delete + transferencias                    |
+| —   | (Sesión de categorías con Nico antes del Hito 4) | Taxonomía cerrada                                                     |
+| 4   | Recurrencias + previsiones                       | Forecasts rolling 12 meses + confirmación 1-click                     |
+| 5   | Dashboard + Reporte A                            | Budget mensual + cashflow real vs budget — **V1.0 funcional**         |
+| 6   | Reportes B + C                                   | Donut por categoría + evolución 12 meses                              |
+| 7   | Reporte D + Settings metas                       | Año económico + bloque "Trayectoria a IF"                             |
+| 8   | Imports con AI parser                            | Galicia Amex como primer caso                                         |
+| 9   | Export contador                                  | .zip con 5 CSVs                                                       |
+| 10  | Backups Drive ✅                                 | Cron semanal — **V1.1 funcional 🎉**                                  |
 
 Deadline funcional: **review de octubre 2026**, primera revisión semestral del plan financiero con webapp andando.
 

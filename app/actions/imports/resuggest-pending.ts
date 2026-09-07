@@ -52,9 +52,7 @@ export async function resuggestPendingLines(input: {
   const [imp] = await db
     .select({ id: imports.id, accountId: imports.accountId })
     .from(imports)
-    .where(
-      and(eq(imports.id, parsed.data.importId), eq(imports.householdId, session.householdId)),
-    )
+    .where(and(eq(imports.id, parsed.data.importId), eq(imports.householdId, session.householdId)))
     .limit(1);
   if (!imp) return { ok: false, error: 'not_found' };
 
@@ -120,9 +118,7 @@ export async function resuggestPendingLines(input: {
           ...(categoryChanged ? { proposedCategoryId: nextCategoryId } : {}),
           // status queda 'pending': es una sugerencia, la revisión sigue pendiente.
         })
-        .where(
-          and(eq(importLines.id, row.id), eq(importLines.importId, parsed.data.importId)),
-        );
+        .where(and(eq(importLines.id, row.id), eq(importLines.importId, parsed.data.importId)));
       updated += 1;
     }
   } catch (err) {

@@ -96,12 +96,10 @@ export const parsedTxLineSchema = z.preprocess((val) => {
 
   // Alias → canonical
   if (out.amountOriginal == null) {
-    out.amountOriginal =
-      out.amount ?? out.monto ?? out.importe ?? out.amount_original ?? out.value;
+    out.amountOriginal = out.amount ?? out.monto ?? out.importe ?? out.amount_original ?? out.value;
   }
   if (out.currencyOriginal == null) {
-    out.currencyOriginal =
-      out.currency ?? out.moneda ?? out.currency_original ?? out.ccy;
+    out.currencyOriginal = out.currency ?? out.moneda ?? out.currency_original ?? out.ccy;
   }
   if (out.description == null) {
     out.description =
@@ -196,7 +194,13 @@ export const parsedTxLineSchema = z.preprocess((val) => {
     const cp = out.counterparty as Record<string, unknown>;
     const norm: Record<string, unknown> = {
       name: cp.name ?? cp.nombre ?? cp.ordenante ?? cp.beneficiario ?? cp.titular,
-      accountRef: cp.accountRef ?? cp.account_ref ?? cp.cuenta ?? cp.nroCuenta ?? cp.account_number ?? cp.accountNumber,
+      accountRef:
+        cp.accountRef ??
+        cp.account_ref ??
+        cp.cuenta ??
+        cp.nroCuenta ??
+        cp.account_number ??
+        cp.accountNumber,
       cuil: cp.cuil ?? cp.cuit ?? cp.cuilCuit ?? cp.cuil_cuit,
       cbu: cp.cbu,
       alias: cp.alias,
@@ -215,51 +219,64 @@ export const parsedTxLineSchema = z.preprocess((val) => {
 
 export type ParsedTxLine = z.infer<typeof parsedTxLineStrictSchema>;
 
-const summarySchema = z.preprocess((val) => {
-  if (!val || typeof val !== 'object') return val;
-  const obj = val as Record<string, unknown>;
-  const out: Record<string, unknown> = { ...obj };
-  // Alias handling
-  if (out.totalExpense == null) {
-    out.totalExpense = out.total_expense ?? out.totalGastos ?? out.total_gastos ?? out.totalCharges;
-  }
-  if (out.totalIncome == null) {
-    out.totalIncome = out.total_income ?? out.totalPagos ?? out.total_pagos ?? out.totalPayments ?? out.totalCredits;
-  }
-  if (out.currency == null) {
-    out.currency = out.moneda ?? out.currencyOriginal;
-  }
-  // Number → string
-  if (typeof out.totalExpense === 'number') out.totalExpense = String(out.totalExpense);
-  if (typeof out.totalIncome === 'number') out.totalIncome = String(out.totalIncome);
-  // Uppercase currency
-  if (typeof out.currency === 'string') out.currency = out.currency.toUpperCase();
-  return out;
-}, z.object({
-  totalExpense: z.string().optional(),
-  totalIncome: z.string().optional(),
-  currency: z.enum(['ARS', 'USD']).optional(),
-}));
+const summarySchema = z.preprocess(
+  (val) => {
+    if (!val || typeof val !== 'object') return val;
+    const obj = val as Record<string, unknown>;
+    const out: Record<string, unknown> = { ...obj };
+    // Alias handling
+    if (out.totalExpense == null) {
+      out.totalExpense =
+        out.total_expense ?? out.totalGastos ?? out.total_gastos ?? out.totalCharges;
+    }
+    if (out.totalIncome == null) {
+      out.totalIncome =
+        out.total_income ??
+        out.totalPagos ??
+        out.total_pagos ??
+        out.totalPayments ??
+        out.totalCredits;
+    }
+    if (out.currency == null) {
+      out.currency = out.moneda ?? out.currencyOriginal;
+    }
+    // Number → string
+    if (typeof out.totalExpense === 'number') out.totalExpense = String(out.totalExpense);
+    if (typeof out.totalIncome === 'number') out.totalIncome = String(out.totalIncome);
+    // Uppercase currency
+    if (typeof out.currency === 'string') out.currency = out.currency.toUpperCase();
+    return out;
+  },
+  z.object({
+    totalExpense: z.string().optional(),
+    totalIncome: z.string().optional(),
+    currency: z.enum(['ARS', 'USD']).optional(),
+  }),
+);
 
 /**
  * Cuenta PROPIA del extracto (la del encabezado del PDF, no la contraparte).
  * Su `number` se usa para auto-sugerir la cuenta destino del import.
  */
-const statementAccountSchema = z.preprocess((val) => {
-  if (!val || typeof val !== 'object') return val;
-  const obj = val as Record<string, unknown>;
-  const number = obj.number ?? obj.nroCuenta ?? obj.account_number ?? obj.accountNumber ?? obj.cuenta;
-  const holder = obj.holder ?? obj.titular ?? obj.nombre ?? obj.name;
-  const out: Record<string, unknown> = {};
-  if (typeof number === 'string' && number.trim() !== '') out.number = number.trim();
-  if (typeof holder === 'string' && holder.trim() !== '') out.holder = holder.trim();
-  return Object.keys(out).length > 0 ? out : undefined;
-}, z
-  .object({
-    number: z.string().max(100).optional(),
-    holder: z.string().max(200).optional(),
-  })
-  .optional());
+const statementAccountSchema = z.preprocess(
+  (val) => {
+    if (!val || typeof val !== 'object') return val;
+    const obj = val as Record<string, unknown>;
+    const number =
+      obj.number ?? obj.nroCuenta ?? obj.account_number ?? obj.accountNumber ?? obj.cuenta;
+    const holder = obj.holder ?? obj.titular ?? obj.nombre ?? obj.name;
+    const out: Record<string, unknown> = {};
+    if (typeof number === 'string' && number.trim() !== '') out.number = number.trim();
+    if (typeof holder === 'string' && holder.trim() !== '') out.holder = holder.trim();
+    return Object.keys(out).length > 0 ? out : undefined;
+  },
+  z
+    .object({
+      number: z.string().max(100).optional(),
+      holder: z.string().max(200).optional(),
+    })
+    .optional(),
+);
 
 export const parserOutputSchema = z.object({
   lines: z.array(parsedTxLineSchema),

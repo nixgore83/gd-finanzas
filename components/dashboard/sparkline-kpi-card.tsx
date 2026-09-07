@@ -40,15 +40,7 @@ const COLOR_TO_VARIANT: Record<NonNullable<Props['color']>, NonNullable<Props['v
  * - Sparkline area sin grid, con gradient fade y dot final
  * - Delta como pill discreto a la derecha
  */
-export function SparklineKpiCard({
-  label,
-  value,
-  altValue,
-  delta,
-  data,
-  variant,
-  color,
-}: Props) {
+export function SparklineKpiCard({ label, value, altValue, delta, data, variant, color }: Props) {
   const series = data.map((v, i) => ({ i, v }));
   const v: NonNullable<Props['variant']> = variant ?? (color ? COLOR_TO_VARIANT[color] : 'primary');
 
@@ -65,18 +57,16 @@ export function SparklineKpiCard({
   const gradId = `kpi-grad-${label.replace(/\s+/g, '-').toLowerCase()}`;
 
   return (
-    <div className="group flex h-full flex-col border border-border bg-card p-5 transition-colors hover:border-primary/40">
+    <div className="group border-border bg-card hover:border-primary/40 flex h-full flex-col border p-5 transition-colors">
       <Label>{label}</Label>
 
       <div className="mt-3 flex items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <Display size="md" className="block tabular-nums text-foreground">
+          <Display size="md" className="text-foreground block tabular-nums">
             {value}
           </Display>
           {altValue && (
-            <Num className="mt-1 block text-[11px] text-muted-foreground">
-              ≈ {altValue}
-            </Num>
+            <Num className="text-muted-foreground mt-1 block text-[11px]">≈ {altValue}</Num>
           )}
         </div>
         <div className="-mb-1 h-10 w-24 shrink-0">
@@ -104,10 +94,10 @@ export function SparklineKpiCard({
       </div>
 
       {delta && (
-        <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+        <div className="border-border/60 mt-4 flex items-center justify-between border-t pt-3">
           <span
             className={cn(
-              'font-sans text-[10px] font-semibold uppercase tracking-[0.14em]',
+              'font-sans text-[10px] font-semibold tracking-[0.14em] uppercase',
               delta.tone === 'good' && 'text-[color:var(--good)]',
               delta.tone === 'bad' && 'text-[color:var(--bad)]',
               delta.tone === 'neutral' && 'text-muted-foreground',
@@ -115,7 +105,7 @@ export function SparklineKpiCard({
           >
             <Num>{delta.text}</Num>
           </span>
-          <span className="font-sans text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="text-muted-foreground font-sans text-[9px] tracking-[0.18em] uppercase">
             vs mes ant.
           </span>
         </div>

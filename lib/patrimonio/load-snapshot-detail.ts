@@ -58,10 +58,7 @@ export async function loadSnapshotDetail(
     })
     .from(netWorthSnapshots)
     .where(
-      and(
-        eq(netWorthSnapshots.id, snapshotId),
-        eq(netWorthSnapshots.householdId, householdId),
-      ),
+      and(eq(netWorthSnapshots.id, snapshotId), eq(netWorthSnapshots.householdId, householdId)),
     )
     .limit(1);
 
@@ -117,19 +114,29 @@ export async function loadSnapshotDetail(
 
   return {
     ...snapshot,
-    balances: balanceRows.map(({ accName, accCardBrand, accCurrencyDefault, accInstitutionName, ...b }) => ({
-      ...b,
-      accountName: formatAccount({
-        institutionName: accInstitutionName,
-        type: b.accountType,
-        cardBrand: accCardBrand,
-        name: accName,
-        ownerTag: b.ownerTag,
-        currency: accCurrencyDefault,
+    balances: balanceRows.map(
+      ({ accName, accCardBrand, accCurrencyDefault, accInstitutionName, ...b }) => ({
+        ...b,
+        accountName: formatAccount({
+          institutionName: accInstitutionName,
+          type: b.accountType,
+          cardBrand: accCardBrand,
+          name: accName,
+          ownerTag: b.ownerTag,
+          currency: accCurrencyDefault,
+        }),
       }),
-    })),
+    ),
     holdings: holdingRows.map(
-      ({ accName, accType, accCardBrand, accCurrencyDefault, accInstitutionName, accOwnerTag, ...h }) => ({
+      ({
+        accName,
+        accType,
+        accCardBrand,
+        accCurrencyDefault,
+        accInstitutionName,
+        accOwnerTag,
+        ...h
+      }) => ({
         ...h,
         accountName: formatAccount({
           institutionName: accInstitutionName,

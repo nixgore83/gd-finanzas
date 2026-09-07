@@ -98,8 +98,8 @@ export default async function BackupsPage() {
           </Display>
           <Body className="mt-2 max-w-2xl">
             Snapshot semanal de toda la base — domingos 23:00 AR. Retención de los{' '}
-            <span className="not-italic font-medium text-foreground">{BACKUP_RETENTION}</span>{' '}
-            más recientes. Los más viejos se borran automáticamente.
+            <span className="text-foreground font-medium not-italic">{BACKUP_RETENTION}</span> más
+            recientes. Los más viejos se borran automáticamente.
           </Body>
         </div>
         {!configError && <RunNowButton />}
@@ -114,10 +114,9 @@ export default async function BackupsPage() {
           style={{ background: 'color-mix(in oklab, var(--attn) 8%, transparent)' }}
         >
           <Label style={{ color: 'var(--attn)' }}>Setup pendiente</Label>
-          <p className="mt-2 font-display text-base text-foreground">{configError}</p>
+          <p className="font-display text-foreground mt-2 text-base">{configError}</p>
           <Body className="mt-2 text-sm">
-            Pasos en{' '}
-            <code className="font-mono not-italic text-foreground">STATUS.md</code> →{' '}
+            Pasos en <code className="text-foreground font-mono not-italic">STATUS.md</code> →{' '}
             <em>Procedimientos administrativos / Backups Drive</em>.
           </Body>
         </div>
@@ -127,7 +126,7 @@ export default async function BackupsPage() {
       {!configError && (
         <section>
           <Label>Estado del sistema</Label>
-          <div className="mt-3 grid grid-cols-2 gap-px bg-border md:grid-cols-4">
+          <div className="bg-border mt-3 grid grid-cols-2 gap-px md:grid-cols-4">
             <StatusCard label="Carpeta Drive" value="gd-finanzas backups" />
             <StatusCard
               label="Último backup"
@@ -157,28 +156,28 @@ export default async function BackupsPage() {
         <Hair className="mt-3 mb-1" />
 
         {files.length === 0 ? (
-          <div className="border border-dashed border-border p-10 text-center">
+          <div className="border-border border border-dashed p-10 text-center">
             <Body>
-              {configError
-                ? 'Configurá las env vars antes de poder listar backups.'
-                : (
-                  <>
-                    Sin backups todavía. Apretá{' '}
-                    <span className="not-italic text-foreground">Backup ahora</span> o
-                    esperá al cron del próximo domingo.
-                  </>
-                )}
+              {configError ? (
+                'Configurá las env vars antes de poder listar backups.'
+              ) : (
+                <>
+                  Sin backups todavía. Apretá{' '}
+                  <span className="text-foreground not-italic">Backup ahora</span> o esperá al cron
+                  del próximo domingo.
+                </>
+              )}
             </Body>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-border border-b">
                   {['Fecha', 'Archivo', 'Tamaño', 'Drive'].map((h, i) => (
                     <th
                       key={h}
-                      className={`px-3 py-2.5 ${i === 2 ? 'text-right' : 'text-left'} font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground`}
+                      className={`px-3 py-2.5 ${i === 2 ? 'text-right' : 'text-left'} text-muted-foreground font-sans text-[10px] font-semibold tracking-[0.18em] uppercase`}
                     >
                       {h}
                     </th>
@@ -189,12 +188,12 @@ export default async function BackupsPage() {
                 {files.map((f, i) => (
                   <tr
                     key={f.id}
-                    className="border-t border-border/40 transition-colors hover:bg-primary/[0.04]"
+                    className="border-border/40 hover:bg-primary/[0.04] border-t transition-colors"
                   >
                     <td className="px-3 py-3">
-                      <Num className="text-sm text-foreground">{formatDate(f.createdTime)}</Num>
+                      <Num className="text-foreground text-sm">{formatDate(f.createdTime)}</Num>
                       <div className="mt-0.5">
-                        <Label className="normal-case tracking-[0.05em]">
+                        <Label className="tracking-[0.05em] normal-case">
                           {relativeAgo(f.createdTime)}
                           {i === 0 && (
                             <span
@@ -211,17 +210,17 @@ export default async function BackupsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <Num className="text-xs text-muted-foreground">{f.name}</Num>
+                      <Num className="text-muted-foreground text-xs">{f.name}</Num>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <Num className="text-sm text-foreground">{formatSize(f.sizeBytes)}</Num>
+                      <Num className="text-foreground text-sm">{formatSize(f.sizeBytes)}</Num>
                     </td>
                     <td className="px-3 py-3">
                       <a
                         href={`https://drive.google.com/file/d/${f.id}/view`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="link font-display text-sm italic text-muted-foreground"
+                        className="link font-display text-muted-foreground text-sm italic"
                       >
                         abrir en Drive ↗
                       </a>
@@ -258,7 +257,7 @@ function StatusCard({
     <div className="bg-card p-5">
       <Label>{label}</Label>
       <div
-        className="mt-3 font-display text-xl font-light tabular-nums"
+        className="font-display mt-3 text-xl font-light tabular-nums"
         style={{ color: colorVar }}
       >
         {value}

@@ -19,7 +19,8 @@ import { UNREADABLE_DATE_MARKER } from '@/lib/imports/parsers/tc-date-rules';
  */
 
 /** Marcador de cuota en la descripción: "C.03/06", "C 3/6", "CUOTA 3/6", "CUOTA 3 DE 6". */
-const CUOTA_RE = /(\bc\s*\.?\s*\d{1,2}\s*\/\s*\d{1,2}\b)|(\bcuotas?\s*\d{1,2}\s*(\/|de)\s*\d{1,2}\b)/i;
+const CUOTA_RE =
+  /(\bc\s*\.?\s*\d{1,2}\s*\/\s*\d{1,2}\b)|(\bcuotas?\s*\d{1,2}\s*(\/|de)\s*\d{1,2}\b)/i;
 
 /**
  * Mínimo de líneas fechables (no-cuota, con fecha legible) que deben compartir la
@@ -75,7 +76,9 @@ export function detectDateCollapse(
  * Texto del banner de error del import cuando se detectó colapso. Va a
  * `imports.error_message` (bajo RLS, nunca a logs).
  */
-export function dateCollapseMessage(result: Extract<DateCollapseResult, { collapsed: true }>): string {
+export function dateCollapseMessage(
+  result: Extract<DateCollapseResult, { collapsed: true }>,
+): string {
   return (
     `⚠ Fechas sospechosas: ${result.lineCount} líneas de consumo quedaron todas con la misma fecha (${result.date}), ` +
     'que suele ser la fecha de cierre. El parser no pudo extraer la fecha real de cada consumo. ' +

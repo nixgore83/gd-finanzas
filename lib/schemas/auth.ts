@@ -1,10 +1,6 @@
 import { z } from 'zod';
 
-export const emailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .email({ message: 'Email inválido' });
+export const emailSchema = z.string().trim().toLowerCase().email({ message: 'Email inválido' });
 
 export const mfaCodeSchema = z
   .string()

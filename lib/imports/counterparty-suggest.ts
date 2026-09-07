@@ -152,7 +152,12 @@ export async function lookupCounterpartyHistory(
     const tagRows = await db
       .select({ transactionId: transactionTags.transactionId, tagId: transactionTags.tagId })
       .from(transactionTags)
-      .where(inArray(transactionTags.transactionId, txRows.map((r) => r.id)));
+      .where(
+        inArray(
+          transactionTags.transactionId,
+          txRows.map((r) => r.id),
+        ),
+      );
     if (tagRows.length > 0) {
       const byTx = new Map<string, string[]>();
       for (const t of tagRows) {
@@ -199,10 +204,7 @@ export async function lookupCounterpartyHistory(
  * - label/tags: también en transferencias (el tag es su clasificador).
  * - deducible/doméstico: solo gastos no-transfer; doméstico además excluye refunds.
  */
-export function enrichLineWithHistory(
-  line: ParsedTxLine,
-  h: CounterpartyHistory,
-): ParsedTxLine {
+export function enrichLineWithHistory(line: ParsedTxLine, h: CounterpartyHistory): ParsedTxLine {
   let out = line;
   if (h.label && out.counterparty && !out.counterparty.label?.trim()) {
     out = { ...out, counterparty: { ...out.counterparty, label: h.label } };

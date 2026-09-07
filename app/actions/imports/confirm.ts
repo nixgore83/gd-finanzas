@@ -4,7 +4,16 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { accounts, forecasts, imports, importLines, recurrences, tags, transactions, transactionTags } from '@/db/schema';
+import {
+  accounts,
+  forecasts,
+  imports,
+  importLines,
+  recurrences,
+  tags,
+  transactions,
+  transactionTags,
+} from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 import { parsedTxLineSchema } from '@/lib/imports/parsers/types';
 import { buildTransactionFields } from '@/app/actions/transactions/_build';
@@ -38,7 +47,13 @@ export type ConfirmImportResult =
     }
   | {
       ok: false;
-      error: 'session' | 'not_found' | 'invalid_state' | 'no_account' | 'unresolved_lines' | 'unknown';
+      error:
+        | 'session'
+        | 'not_found'
+        | 'invalid_state'
+        | 'no_account'
+        | 'unresolved_lines'
+        | 'unknown';
       message?: string;
       lineErrors?: Array<{ lineId: string; reason: string }>;
     };
@@ -85,19 +100,15 @@ export async function confirmImport(input: {
   const pendingLines = await db
     .select({ id: importLines.id })
     .from(importLines)
-    .where(
-      and(
-        eq(importLines.importId, input.importId),
-        eq(importLines.status, 'pending'),
-      ),
-    )
+    .where(and(eq(importLines.importId, input.importId), eq(importLines.status, 'pending')))
     .limit(1);
 
   if (pendingLines.length > 0) {
     return {
       ok: false,
       error: 'unresolved_lines',
-      message: 'No se puede confirmar la importación porque quedan líneas pendientes de revisar (debés aceptarlas o rechazarlas).',
+      message:
+        'No se puede confirmar la importación porque quedan líneas pendientes de revisar (debés aceptarlas o rechazarlas).',
     };
   }
 
@@ -141,10 +152,7 @@ export async function confirmImport(input: {
       .select({ id: importLines.id })
       .from(importLines)
       .where(
-        and(
-          eq(importLines.importId, input.importId),
-          inArray(importLines.status, ['pending']),
-        ),
+        and(eq(importLines.importId, input.importId), inArray(importLines.status, ['pending'])),
       )
       .limit(1);
 
@@ -152,12 +160,7 @@ export async function confirmImport(input: {
       const linked = await db
         .select({ id: importLines.id })
         .from(importLines)
-        .where(
-          and(
-            eq(importLines.importId, input.importId),
-            isNotNull(importLines.transactionId),
-          ),
-        );
+        .where(and(eq(importLines.importId, input.importId), isNotNull(importLines.transactionId)));
 
       await db
         .update(imports)
@@ -172,7 +175,14 @@ export async function confirmImport(input: {
 
       revalidatePath(`/imports/${input.importId}`);
       revalidatePath('/imports');
-      return { ok: true, createdCount: 0, rejectedCount: 0, remaining: 0, autoMatchCount: 0, lineErrors: [] };
+      return {
+        ok: true,
+        createdCount: 0,
+        rejectedCount: 0,
+        remaining: 0,
+        autoMatchCount: 0,
+        lineErrors: [],
+      };
     }
 
     return { ok: false, error: 'invalid_state', message: 'No hay líneas pendientes de confirmar' };
@@ -393,11 +403,7 @@ export async function confirmImport(input: {
                     lte(transactions.date, shiftIsoDate(parsed.data.date, MATCH_DATE_WINDOW_DAYS)),
                   ),
                 );
-              matchedCandidateId = selectOperationRefTransferMatch(
-                opCandidates,
-                opRef,
-                isOutgoing,
-              );
+              matchedCandidateId = selectOperationRefTransferMatch(opCandidates, opRef, isOutgoing);
             }
           }
 
@@ -572,12 +578,7 @@ export async function confirmImport(input: {
         await tx
           .update(importLines)
           .set({ transactionId: txRow.id })
-          .where(
-            and(
-              eq(importLines.id, line.id),
-              eq(importLines.importId, input.importId),
-            ),
-          );
+          .where(and(eq(importLines.id, line.id), eq(importLines.importId, input.importId)));
         await insertLineTags(txRow.id);
         createdCount += 1;
 

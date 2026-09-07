@@ -21,9 +21,7 @@
  */
 
 /** `set` asigna la contraparte; `clear` la borra (la línea sigue siendo transfer). */
-export type TransferAccountBulkAction =
-  | { op: 'set'; transferAccountId: string }
-  | { op: 'clear' };
+export type TransferAccountBulkAction = { op: 'set'; transferAccountId: string } | { op: 'clear' };
 
 export type TransferAccountPatch = {
   /** Claves a mergear (shallow) sobre `parsed_data`. */

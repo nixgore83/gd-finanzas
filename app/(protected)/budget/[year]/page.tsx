@@ -36,10 +36,12 @@ export default async function BudgetYearPage({ params }: { params: RouteParams }
 
   if (categories.length === 0) {
     return (
-      <div className="mx-auto max-w-xl space-y-4 border border-dashed border-border p-10 text-center">
+      <div className="border-border mx-auto max-w-xl space-y-4 border border-dashed p-10 text-center">
         <Display size="md">Sin categorías cargadas</Display>
         <Body>
-          Corré <code className="font-mono not-italic text-foreground">npm run db:seed:categories</code> primero.
+          Corré{' '}
+          <code className="text-foreground font-mono not-italic">npm run db:seed:categories</code>{' '}
+          primero.
         </Body>
       </div>
     );
@@ -65,28 +67,28 @@ export default async function BudgetYearPage({ params }: { params: RouteParams }
           <Label>Planificar · Presupuesto</Label>
           <div className="mt-2 flex items-baseline gap-4">
             <Display size="lg">Presupuesto</Display>
-            <Display size="lg" className="tabular-nums text-primary">
+            <Display size="lg" className="text-primary tabular-nums">
               {year}
             </Display>
           </div>
           <Body className="mt-1 max-w-2xl">
-            Cifras en USD. Solo las hojas son editables — los padres muestran subtotales
-            calculados. Meses pasados son read-only.
+            Cifras en USD. Solo las hojas son editables — los padres muestran subtotales calculados.
+            Meses pasados son read-only.
           </Body>
         </div>
 
         {/* Year navigation */}
-        <nav className="flex items-baseline gap-5 font-display">
+        <nav className="font-display flex items-baseline gap-5">
           <Link
             href={`/budget/${year - 1}`}
-            className="text-base italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-base italic transition-colors"
           >
             ◀ {year - 1}
           </Link>
-          <span className="text-2xl font-light tabular-nums text-foreground">{year}</span>
+          <span className="text-foreground text-2xl font-light tabular-nums">{year}</span>
           <Link
             href={`/budget/${year + 1}`}
-            className="text-base italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-base italic transition-colors"
           >
             {year + 1} ▶
           </Link>

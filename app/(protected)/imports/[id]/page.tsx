@@ -45,11 +45,7 @@ function formatDate(d: Date | null): string {
   }).format(d);
 }
 
-export default async function ImportDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function ImportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   let session;
   try {
     session = await requireHouseholdSession();
@@ -146,10 +142,7 @@ export default async function ImportDetailPage({
           eq(transactions.accountId, row.accountId),
           // Distinto origen: la duplicación aparece cuando el mismo movimiento
           // entra por dos archivos, no dentro del mismo.
-          or(
-            isNull(transactions.importBatchId),
-            ne(transactions.importBatchId, row.id),
-          ),
+          or(isNull(transactions.importBatchId), ne(transactions.importBatchId, row.id)),
         ),
       );
 
@@ -200,7 +193,8 @@ export default async function ImportDetailPage({
   // Auto-sugerencia de cuenta destino: si el parser extrajo el nº de cuenta del
   // extracto y matchea una cuenta ya "aprendida", la preseleccionamos.
   const suggestedAccountId = row.statementAccountRef
-    ? accountRows.find((a) => a.accountNumber && a.accountNumber === row.statementAccountRef)?.id ?? null
+    ? (accountRows.find((a) => a.accountNumber && a.accountNumber === row.statementAccountRef)
+        ?.id ?? null)
     : null;
 
   // Cuenta destino elegida al subir. Se arma con `formatAccount` (mismo nombre
@@ -234,7 +228,7 @@ export default async function ImportDetailPage({
         <div>
           <h1 className="text-2xl font-semibold">Import</h1>
           {row.fileName && (
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{row.fileName}</p>
+            <p className="text-muted-foreground mt-1 font-mono text-xs">{row.fileName}</p>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -244,18 +238,18 @@ export default async function ImportDetailPage({
               href={pdfUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className="border-border bg-card text-foreground hover:bg-accent inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
             >
               Ver PDF ↗
             </a>
           )}
-          <Link href="/imports" className="text-sm text-muted-foreground hover:underline">
+          <Link href="/imports" className="text-muted-foreground text-sm hover:underline">
             ← Imports
           </Link>
         </div>
       </div>
 
-      <div className="space-y-4 rounded-md border bg-card p-4 text-sm">
+      <div className="bg-card space-y-4 rounded-md border p-4 text-sm">
         {/* Bloque 1: lo que eligió el usuario al subir + estado del import. */}
         <dl className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <div>
@@ -306,11 +300,7 @@ export default async function ImportDetailPage({
             <div>
               <dt className="text-muted-foreground">Nº de cuenta</dt>
               <dd className="font-medium">
-                {row.statementAccountRef ? (
-                  <Num>{row.statementAccountRef}</Num>
-                ) : (
-                  '—'
-                )}
+                {row.statementAccountRef ? <Num>{row.statementAccountRef}</Num> : '—'}
               </dd>
             </div>
             <div>
@@ -329,14 +319,12 @@ export default async function ImportDetailPage({
               : 'rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900'
           }
         >
-          <p className="font-medium">
-            {row.status === 'reviewing' ? 'Atención' : 'Error'}
-          </p>
+          <p className="font-medium">{row.status === 'reviewing' ? 'Atención' : 'Error'}</p>
           <p>{row.errorMessage}</p>
           {row.status === 'reviewing' && (
             <p className="mt-1 text-xs">
-              Las líneas sin transacción quedaron editables. Corregí lo que indica el
-              detalle de arriba y reintentá &ldquo;Confirmar import&rdquo;.
+              Las líneas sin transacción quedaron editables. Corregí lo que indica el detalle de
+              arriba y reintentá &ldquo;Confirmar import&rdquo;.
               {/* La pista del FX sólo si el FX fue realmente el problema: sugerirla
                   siempre mandaba a revisar cotizaciones en imports que fallaban por
                   otra causa (caso real 2026-08-14). */}
@@ -348,22 +336,26 @@ export default async function ImportDetailPage({
         </div>
       )}
 
-      {(row.status === 'uploaded' || row.status === 'error' || row.status === 'parsed' || row.status === 'reviewing') && hasParser && (
-        <div className="rounded-md border bg-card p-4">
-          <p className="text-sm">
-            Parser disponible: <span className="font-medium">{row.institutionName}</span>{' '}
-            ({IMPORT_TYPE_LABELS[row.type]}). Al parsear se extraen las transacciones del
-            archivo y vas a poder revisarlas antes de confirmar.
-          </p>
-          <div className="mt-3">
-            <ParseButton
-              importId={row.id}
-              isPdf={!row.fileUrl?.toLowerCase().endsWith('.csv')}
-              hasStoredPassword={!!(row.accountPdfPassword || row.pdfPassword)}
-            />
+      {(row.status === 'uploaded' ||
+        row.status === 'error' ||
+        row.status === 'parsed' ||
+        row.status === 'reviewing') &&
+        hasParser && (
+          <div className="bg-card rounded-md border p-4">
+            <p className="text-sm">
+              Parser disponible: <span className="font-medium">{row.institutionName}</span> (
+              {IMPORT_TYPE_LABELS[row.type]}). Al parsear se extraen las transacciones del archivo y
+              vas a poder revisarlas antes de confirmar.
+            </p>
+            <div className="mt-3">
+              <ParseButton
+                importId={row.id}
+                isPdf={!row.fileUrl?.toLowerCase().endsWith('.csv')}
+                hasStoredPassword={!!(row.accountPdfPassword || row.pdfPassword)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {!hasParser && row.institutionName && (
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -383,8 +375,8 @@ export default async function ImportDetailPage({
             </p>
           ) : (
             <p>
-              Parseando con LLM en segundo plano… esto puede tardar hasta un par de
-              minutos. Refrescá la página en un rato.
+              Parseando con LLM en segundo plano… esto puede tardar hasta un par de minutos.
+              Refrescá la página en un rato.
             </p>
           )}
           {hasParser && (

@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -61,7 +55,13 @@ function accountLabel(a: AccountOption): string {
 type CategoryOption = { id: string; name: string; kind: 'income' | 'expense'; depth: 0 | 1 };
 
 type ActionResult =
-  | { ok: true; id?: string; autoMatch?: { matched: true; forecastId: string; recurrenceName: string } | { matched: false } }
+  | {
+      ok: true;
+      id?: string;
+      autoMatch?:
+        | { matched: true; forecastId: string; recurrenceName: string }
+        | { matched: false };
+    }
   | { ok: false; error: string; fields?: Record<string, string> };
 
 type Initial = {
@@ -141,9 +141,7 @@ export function TransactionForm({
     initialKind === 'expense' && (initial?.amountOriginal?.startsWith('-') ?? false);
   const [isReembolso, setIsReembolso] = useState<boolean>(initialIsReembolso);
 
-  const [accountId, setAccountId] = useState<string>(
-    initial?.accountId ?? firstAccount?.id ?? '',
-  );
+  const [accountId, setAccountId] = useState<string>(initial?.accountId ?? firstAccount?.id ?? '');
 
   const filteredCategories = useMemo(
     () => categories.filter((c) => c.kind === kind),
@@ -284,7 +282,7 @@ export function TransactionForm({
                   ))}
                 </SelectContent>
               </Select>
-              {errors.kind && <p className="text-sm text-destructive">{errors.kind}</p>}
+              {errors.kind && <p className="text-destructive text-sm">{errors.kind}</p>}
             </div>
 
             <div className="space-y-2">
@@ -298,7 +296,7 @@ export function TransactionForm({
                 disabled={isPending}
                 aria-invalid={errors.date ? true : undefined}
               />
-              {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+              {errors.date && <p className="text-destructive text-sm">{errors.date}</p>}
             </div>
           </div>
 
@@ -316,16 +314,13 @@ export function TransactionForm({
                 ))}
               </SelectContent>
             </Select>
-            {errors.accountId && <p className="text-sm text-destructive">{errors.accountId}</p>}
+            {errors.accountId && <p className="text-destructive text-sm">{errors.accountId}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="categoryId">Categoría</Label>
             <Select value={categoryId} onValueChange={setCategoryId} disabled={isPending}>
-              <SelectTrigger
-                id="categoryId"
-                aria-invalid={errors.categoryId ? true : undefined}
-              >
+              <SelectTrigger id="categoryId" aria-invalid={errors.categoryId ? true : undefined}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -339,16 +334,12 @@ export function TransactionForm({
                 ))}
               </SelectContent>
             </Select>
-            {errors.categoryId && (
-              <p className="text-sm text-destructive">{errors.categoryId}</p>
-            )}
+            {errors.categoryId && <p className="text-destructive text-sm">{errors.categoryId}</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="amountOriginal">
-                {isReembolso ? 'Monto recuperado' : 'Monto'}
-              </Label>
+              <Label htmlFor="amountOriginal">{isReembolso ? 'Monto recuperado' : 'Monto'}</Label>
               <Input
                 id="amountOriginal"
                 name="amountOriginal"
@@ -367,7 +358,7 @@ export function TransactionForm({
                 aria-invalid={errors.amountOriginal ? true : undefined}
               />
               {errors.amountOriginal && (
-                <p className="text-sm text-destructive">{errors.amountOriginal}</p>
+                <p className="text-destructive text-sm">{errors.amountOriginal}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -392,7 +383,7 @@ export function TransactionForm({
                 </SelectContent>
               </Select>
               {errors.currencyOriginal && (
-                <p className="text-sm text-destructive">{errors.currencyOriginal}</p>
+                <p className="text-destructive text-sm">{errors.currencyOriginal}</p>
               )}
             </div>
           </div>
@@ -409,9 +400,7 @@ export function TransactionForm({
               placeholder="Supermercado, sueldo, alquiler…"
               aria-invalid={errors.description ? true : undefined}
             />
-            {errors.description && (
-              <p className="text-sm text-destructive">{errors.description}</p>
-            )}
+            {errors.description && <p className="text-destructive text-sm">{errors.description}</p>}
           </div>
 
           <div className="space-y-2">
@@ -424,11 +413,11 @@ export function TransactionForm({
               defaultValue={initial?.notes ?? ''}
               disabled={isPending}
               className={cn(
-                'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+                'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
               )}
               aria-invalid={errors.notes ? true : undefined}
             />
-            {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
+            {errors.notes && <p className="text-destructive text-sm">{errors.notes}</p>}
           </div>
 
           <TagMultiSelect
@@ -437,9 +426,9 @@ export function TransactionForm({
             onChange={setSelectedTagIds}
             disabled={isPending}
           />
-          {errors.tagIds && <p className="text-sm text-destructive">{errors.tagIds}</p>}
+          {errors.tagIds && <p className="text-destructive text-sm">{errors.tagIds}</p>}
 
-          <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+          <div className="bg-muted/20 space-y-2 rounded-md border p-3">
             <div className="flex items-center gap-2">
               <input
                 id="deducibleGanancias"
@@ -447,7 +436,7 @@ export function TransactionForm({
                 checked={deducibleGanancias}
                 onChange={(e) => setDeducibleGanancias(e.target.checked)}
                 disabled={isPending}
-                className="size-4 rounded border-input"
+                className="border-input size-4 rounded"
               />
               <Label htmlFor="deducibleGanancias" className="cursor-pointer">
                 Deducible Ganancias
@@ -462,16 +451,16 @@ export function TransactionForm({
                   checked={isReembolso}
                   onChange={(e) => setIsReembolso(e.target.checked)}
                   disabled={isPending}
-                  className="mt-0.5 size-4 rounded border-input"
+                  className="border-input mt-0.5 size-4 rounded"
                 />
                 <div>
                   <Label htmlFor="isReembolso" className="cursor-pointer">
                     Es una devolución / reembolso recibido
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Resta lo que te devolvieron de un gasto. Entra como gasto negativo en la
-                    categoría elegida: baja tu gasto neto, no suma a ingresos. Si el gasto
-                    original era deducible, tildá también «Deducible Ganancias».
+                    categoría elegida: baja tu gasto neto, no suma a ingresos. Si el gasto original
+                    era deducible, tildá también «Deducible Ganancias».
                   </p>
                 </div>
               </div>
@@ -500,8 +489,8 @@ export function TransactionForm({
             )}
 
             {transactionSubtype === 'domestic_service' && kind === 'expense' && (
-              <div className="space-y-3 rounded-md border bg-background p-3">
-                <p className="text-xs text-muted-foreground">
+              <div className="bg-background space-y-3 rounded-md border p-3">
+                <p className="text-muted-foreground text-xs">
                   Datos del empleado para el export del contador (CSV 03).
                 </p>
                 <div className="grid grid-cols-2 gap-3">
@@ -557,7 +546,7 @@ export function TransactionForm({
                     />
                   </div>
                 </div>
-                {errors.meta && <p className="text-sm text-destructive">{errors.meta}</p>}
+                {errors.meta && <p className="text-destructive text-sm">{errors.meta}</p>}
               </div>
             )}
           </div>
@@ -575,14 +564,14 @@ export function TransactionForm({
               aria-invalid={errors.fxRateOverride ? true : undefined}
             />
             {initialFxInfo && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Cotización usada actualmente:{' '}
                 <span className="font-mono">{initialFxInfo.fxRateUsed}</span> (
                 {initialFxInfo.fxRateSource}). Vacío = recomputar con BCRA del día.
               </p>
             )}
             {errors.fxRateOverride && (
-              <p className="text-sm text-destructive">{errors.fxRateOverride}</p>
+              <p className="text-destructive text-sm">{errors.fxRateOverride}</p>
             )}
           </div>
 

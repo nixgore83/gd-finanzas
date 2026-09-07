@@ -49,27 +49,18 @@ export async function bulkDeleteTransactions(input: { ids: string[] }): Promise<
         ),
       );
 
-    const pairIds = targets
-      .map((t) => t.transferPairId)
-      .filter((p): p is string => p !== null);
+    const pairIds = targets.map((t) => t.transferPairId).filter((p): p is string => p !== null);
     const directIds = targets.map((t) => t.id);
 
     const orClauses = [inArray(transactions.id, directIds)];
     if (pairIds.length > 0) orClauses.push(inArray(transactions.transferPairId, pairIds));
 
-    const cond =
-      orClauses.length === 1
-        ? orClauses[0]!
-        : or(...orClauses);
+    const cond = orClauses.length === 1 ? orClauses[0]! : or(...orClauses);
 
     const deleted = await db
       .delete(transactions)
       .where(
-        and(
-          eq(transactions.householdId, session.householdId),
-          cond,
-          isNotNull(transactions.id),
-        ),
+        and(eq(transactions.householdId, session.householdId), cond, isNotNull(transactions.id)),
       )
       .returning({ id: transactions.id });
 

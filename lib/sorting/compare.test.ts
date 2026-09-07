@@ -24,8 +24,7 @@ const rows: Row[] = [
   { name: 'alfa', amount: 5, category: 'Auto' },
 ];
 
-const sort = (criteria: SortCriterion<F>[]) =>
-  [...rows].sort(buildComparator(criteria, FACTORIES));
+const sort = (criteria: SortCriterion<F>[]) => [...rows].sort(buildComparator(criteria, FACTORIES));
 
 describe('buildComparator', () => {
   it('empate en el primario se resuelve por el secundario', () => {

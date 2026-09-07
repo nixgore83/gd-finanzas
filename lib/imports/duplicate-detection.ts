@@ -81,8 +81,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Días entre dos fechas ISO, sin pasar por husos horarios. */
 function dayDiff(a: string, b: string): number {
-  const ms = Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))
-    - Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10));
+  const ms =
+    Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10)) -
+    Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10));
   return Math.abs(Math.round(ms / 86_400_000));
 }
 

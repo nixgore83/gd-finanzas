@@ -52,10 +52,16 @@ describe('findAlreadyImported — el caso que motivó todo', () => {
     // Visto en la reconciliación de junio: la misma operación fechada distinto
     // según la fuente.
     const existentes = [tx('t1', '2026-03-10', '999.99')];
-    expect(findAlreadyImported([line('l1', '2026-03-11', '999.99')], existentes).has('l1')).toBe(true);
-    expect(findAlreadyImported([line('l2', '2026-03-09', '999.99')], existentes).has('l2')).toBe(true);
+    expect(findAlreadyImported([line('l1', '2026-03-11', '999.99')], existentes).has('l1')).toBe(
+      true,
+    );
+    expect(findAlreadyImported([line('l2', '2026-03-09', '999.99')], existentes).has('l2')).toBe(
+      true,
+    );
     // Dos días ya es demasiado.
-    expect(findAlreadyImported([line('l3', '2026-03-12', '999.99')], existentes).has('l3')).toBe(false);
+    expect(findAlreadyImported([line('l3', '2026-03-12', '999.99')], existentes).has('l3')).toBe(
+      false,
+    );
   });
 });
 

@@ -8,6 +8,7 @@
 ---
 
 ## Hito en curso
+
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
 
 ### Sesión 2026-08-13/14 — Carga masiva desde Drive + alta de Banco Industrial (PRs #84, #85)
@@ -16,6 +17,7 @@ Pedido de Nico: "se me está haciendo MUY cuesta arriba la carga de data, ¿pued
 y la importás?". Cargar los resúmenes de a uno por la UI era el cuello de botella del proyecto.
 
 **Auditoría previa (142 archivos en Drive vs 92 imports en prod):**
+
 - 69 hashes ya cargados, 50 no. **31 de los 50 eran de Pau: no había NADA de ella.**
   Pasó desapercibido porque su Visa Galicia tenía `expects_monthly_import = false`, así que el
   detector de gaps nunca la marcó como faltante. Corregido en prod.
@@ -28,38 +30,41 @@ y la importás?". Cargar los resúmenes de a uno por la UI era el cuello de bote
   que se limpiaron a mano en jun/jul.
 
 **Entregado:**
+
 - [x] `lib/imports/bulk-routing.ts` (puro, 32 tests): tabla de ruteo + **dedup por (cuenta, fecha
-  de cierre)**, la capa que faltaba. `accountNumberMatchesHint` resuelve dos convenciones distintas
-  (el hint `5727` del nombre de archivo vs el `0905/02100757/27` guardado; el sufijo `/3` de
-  sub-cuenta necesita match exacto — comparar dígitos matchearía la sub-cuenta equivocada).
+      de cierre)**, la capa que faltaba. `accountNumberMatchesHint` resuelve dos convenciones distintas
+      (el hint `5727` del nombre de archivo vs el `0905/02100757/27` guardado; el sufijo `/3` de
+      sub-cuenta necesita match exacto — comparar dígitos matchearía la sub-cuenta equivocada).
 - [x] **Banco Industrial**: institución + 3 cuentas de Pau creadas en prod (Visa, caja ARS
-  `743449/3`, caja USD `743449/2`) + parsers `bind-tc` y `bind-banco`. **Sin migración**: la
-  sub-cuenta EUR está "SIN MOVIMIENTOS", así que no se tocó `currencyEnum`.
+      `743449/3`, caja USD `743449/2`) + parsers `bind-tc` y `bind-banco`. **Sin migración**: la
+      sub-cuenta EUR está "SIN MOVIMIENTOS", así que no se tocó `currencyEnum`.
 - [x] **Bloque `CUENTA DESTINO`** en `parse-internal` (aditivo): un extracto consolidado no se puede
-  acotar a su cuenta sin decirle al parser cuál es. Verificado: el mismo PDF de BIND subido dos
-  veces dio 32 líneas para la sub-cuenta ARS y 3 para la USD, sin mezclarlas.
+      acotar a su cuenta sin decirle al parser cuál es. Verificado: el mismo PDF de BIND subido dos
+      veces dio 32 líneas para la sub-cuenta ARS y 3 para la USD, sin mezclarlas.
 - [x] `scripts/bulk-import.ts` (sube y parsea, **nunca confirma**) y `scripts/organize-statements.ts`
-  (deja la carpeta reflejando la realidad; no borra nada, exige `--apply`).
+      (deja la carpeta reflejando la realidad; no borra nada, exige `--apply`).
 - [x] **Carpeta de Drive reorganizada**: 58 archivos movidos, 142 intactos, 0 borrados, idempotente.
-  Nuevas carpetas `TC/Visa BIND Pau`, `TC/Visa Galicia Pau`, `Cuentas/Galicia Nico`,
-  `Cuentas/Galicia Pau`, `Cuentas/BIND Pau`. Las copias sobrantes viven en `_duplicados/`.
+      Nuevas carpetas `TC/Visa BIND Pau`, `TC/Visa Galicia Pau`, `Cuentas/Galicia Nico`,
+      `Cuentas/Galicia Pau`, `Cuentas/BIND Pau`. Las copias sobrantes viven en `_duplicados/`.
 - **Resultado: 41 imports / 1.696 líneas cargados, 0 en error, 0 con fechas colapsadas.**
   Todo en `parsed`, esperando revisión humana. Suite 597 → 644.
 
 **4 bugs que sólo aparecieron corriéndolo de verdad, no en los tests:**
+
 1. **El ruteo no sobrevivía a la reorganización** — las reglas matcheaban sólo la carpeta original,
    así que al mover los archivos quedaban 23 sin ruteo. La reorganización rompía lo que venía a
    ordenar. Cubierto con test de regresión + test de idempotencia.
 2. **La moneda de los consolidados de Galicia no está en el nombre** — el mismo patrón se usa para
    la caja en pesos y la de dólares (`02-01` es USD, `02-07` es ARS). Ahora se lee del encabezado
-   del PDF y, si no se puede leer, **no se adivina**: va a CONFLICTO. *Corolario: la sospecha de
+   del PDF y, si no se puede leer, **no se adivina**: va a CONFLICTO. _Corolario: la sospecha de
    mis-routing en datos ya cargados era INFUNDADA — los imports atados a la Galicia USD estaban
-   bien; lo que estaba mal era la regla nueva.*
+   bien; lo que estaba mal era la regla nueva._
 3. **`pdf-parse` dejaba los bytes detached** — pdf.js toma posesión del ArrayBuffer, así que tras
    verificar el ruteo los mismos bytes ya no servían para subir.
 4. **`revalidatePath` volteaba un parseo ya persistido** fuera de una request de Next.
 
 **Y 2 bugs de fondo en el pipeline (PR #85), los dos disfrazados de otra cosa:**
+
 - **Truncamiento silencioso a 16k tokens.** `runParser` usaba `messages.create` con
   `max_tokens: 16000`; cuatro extractos largos (395, 276, 247 y 181 líneas) partían el JSON a la
   mitad y morían con `invalid_json` — un límite de tokens que se presentaba como error de parseo.
@@ -74,16 +79,17 @@ y la importás?". Cargar los resúmenes de a uno por la UI era el cuello de bote
   los bytes intactos en vez de adivinar).
 
 **Pendientes de esta sesión:**
+
 - [ ] **Revisar y confirmar los 41 imports en `/imports`.** Nada se confirmó automáticamente.
 - [ ] Empezar por la Visa Galicia de Pau (verificada: 7 imports, uno por cierre, 0 duplicados).
 - [ ] **2 resúmenes de la Visa BIND** quedaron con todas sus líneas en una sola fecha (4 el 14/05,
-  2 el 31/05). Con <5 líneas el detector de colapso no se dispara; vale un vistazo.
+      2 el 31/05). Con <5 líneas el detector de colapso no se dispara; vale un vistazo.
 - [ ] **1 `POSIBLE_DUP` no subido**: `CAJA DE AHORRO 02-03-2026` choca con un import existente de
-  esa cuenta (`period_end 2026-03-06`). Decidir si es el mismo extracto.
+      esa cuenta (`period_end 2026-03-06`). Decidir si es el mismo extracto.
 - [ ] **Master Galicia de Pau**: sigue sin esperar import mensual, porque no hay ni un resumen suyo
-  en la carpeta. Decidir si se usa o se archiva.
+      en la carpeta. Decidir si se usa o se archiva.
 - [ ] **No están en esta carpeta** (siguen desactualizados): extractos de brokers (Balanz ×2, Cocos,
-  ICBC broker — última data marzo/abril) y nada de agosto.
+      ICBC broker — última data marzo/abril) y nada de agosto.
 - [ ] **Sync PRD Notion pendiente**: institución BIND + cuentas de Pau + regla de dedup por período.
 
 ### Sesión 2026-08-12 — El gate de transferencias: buscar match siempre, inventar contraparte casi nunca
@@ -100,11 +106,11 @@ encontraba su contraparte si el resumen de la tarjeta se importaba **primero** (
 sueltas que no se pareaban nunca). En el orden inverso sí funcionaba — de ahí que no se hubiera visto.
 
 - [x] **Buscar match: siempre.** La query ya filtra por `currency_original` (PR #82), que es el filtro
-  correcto; el default de la cuenta no aportaba nada. Con esto el pago de TC en USD se parea solo en
-  cualquiera de los dos órdenes de importación.
+      correcto; el default de la cuenta no aportaba nada. Con esto el pago de TC en USD se parea solo en
+      cualquiera de los dos órdenes de importación.
 - [x] **Inventar la contraparte: solo si opera en la moneda de la línea.** Extraído a un predicado puro
-  documentado, `shouldSynthesizeCounterpartyLeg(cpDefault, lineCcy)`, con el razonamiento del duplicado
-  en el docstring y en los tests para que no se "arregle" de nuevo en el futuro.
+      documentado, `shouldSynthesizeCounterpartyLeg(cpDefault, lineCcy)`, con el razonamiento del duplicado
+      en el docstring y en los tests para que no se "arregle" de nuevo en el futuro.
 - **Que una pata quede sin parear hasta que llegue el otro extracto es el estado correcto**, no un bug.
 - **Datos en prod:** las patas sueltas actuales no tienen contrapata en la base (cruzadas por moneda,
   monto ±1% y fecha ±7d) → nada retroactivo para parear. El cambio aplica a confirms futuros.
@@ -122,12 +128,12 @@ una sola moneda por cuenta no alcanza.
   `SU PAGO` de USD 1,01 en el resumen de la Master se habría guardado como **ARS 1,01** con conversión
   errada. Las líneas normales de income/expense nunca tuvieron el problema (usan la moneda de la línea).
 - [x] **Fix.** Nuevo helper puro `computeLegAmounts(amount, currency, rate, sign)` en `_build-transfer.ts`;
-  ambos builders aceptan la moneda explícita y caen a la de la cuenta solo como fallback. `confirm.ts`
-  pasa `parsed_data.currencyOriginal` en la pata propia y en las dos del branch same-currency.
+      ambos builders aceptan la moneda explícita y caen a la de la cuenta solo como fallback. `confirm.ts`
+      pasa `parsed_data.currencyOriginal` en la pata propia y en las dos del branch same-currency.
 - [x] **Matcher.** La búsqueda de contraparte a parear ahora filtra por `currency_original`: una cuenta
-  puede tener patas sin parear en ambas monedas y el match por monto habría pareado USD 1,01 con ARS 1,01.
+      puede tener patas sin parear en ambas monedas y el match por monto habría pareado USD 1,01 con ARS 1,01.
 - [x] **Form manual.** Selector de moneda por pata (default = el de la cuenta, editable);
-  `currencyFrom`/`currencyTo` opcionales en `transferInputSchema`. El edit conserva la moneda de cada pata.
+      `currencyFrom`/`currencyTo` opcionales en `transferInputSchema`. El edit conserva la moneda de cada pata.
 - **`currency_default` se queda**, pero como lo que dice el nombre: default de carga y moneda de
   referencia de la cuenta, no regla. El gate "crear las 2 patas vs solo la propia" sigue usándola como
   heurística conservadora (si no coincide, asumimos conversión y no inventamos la otra pata).
@@ -146,50 +152,51 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
 - **Estado base al auditar:** 28 cuentas, 2223 transacciones (ene→jul 2026), 94 imports, fx_rates sin
   huecos reales (los 13 días faltantes de 2026 son feriados AR), budgets completos los 12 meses.
 - [x] **Hallazgo principal — "faltan resúmenes de TC" era FALSO.** Los resúmenes estaban subidos; el
-  parser **colapsaba todas las fechas de consumo a la fecha de cierre**, así que junio aparecía casi
-  vacío y ~68 consumos quedaban apilados el 02/07. Fix en **PR #74** (ver sección propia). Firma para
-  detectarlo: un import con `period_start = period_end` y N líneas con la misma `date`.
+      parser **colapsaba todas las fechas de consumo a la fecha de cierre**, así que junio aparecía casi
+      vacío y ~68 consumos quedaban apilados el 02/07. Fix en **PR #74** (ver sección propia). Firma para
+      detectarlo: un import con `period_start = period_end` y N líneas con la misma `date`.
 - [x] **Recuperación de los imports mal fechados.** 5 afectados; se borraron 106 transacciones (ninguna
-  tenía tags, deducible, notas ni recurrencia → no se perdió trabajo manual) y se re-parsearon 4 con el
-  prompt corregido. **BNA no necesitó re-parseo**: su archivo estaba confirmado 2 veces y la copia
-  `ee9aaf9d` ya tenía las fechas reales, así que alcanzó con borrar las redundantes.
-  Resultado: Amex jul pasó de **1 fecha a 24** y el total extraído dio **exacto** contra el resumen.
+      tenía tags, deducible, notas ni recurrencia → no se perdió trabajo manual) y se re-parsearon 4 con el
+      prompt corregido. **BNA no necesitó re-parseo**: su archivo estaba confirmado 2 veces y la copia
+      `ee9aaf9d` ya tenía las fechas reales, así que alcanzó con borrar las redundantes.
+      Resultado: Amex jul pasó de **1 fecha a 24** y el total extraído dio **exacto** contra el resumen.
 - [x] **Duplicados de transacciones — 15 borradas.** De 38 grupos duplicados, **23 eran legítimos**
-  (mismo import ⇒ el extracto lista dos veces algo que pasó dos veces). Los 15 reales venían de
-  **confirmar el mismo archivo dos veces** (verificado por `file_hash`): BNA dic-25 ×9, Galicia Master
-  abr ×2 y ene ×1, ICBC ×3. Se borraron una a una y NO por import completo, porque cada import
-  duplicado tenía además 1 transacción única que se habría perdido.
+      (mismo import ⇒ el extracto lista dos veces algo que pasó dos veces). Los 15 reales venían de
+      **confirmar el mismo archivo dos veces** (verificado por `file_hash`): BNA dic-25 ×9, Galicia Master
+      abr ×2 y ene ×1, ICBC ×3. Se borraron una a una y NO por import completo, porque cada import
+      duplicado tenía además 1 transacción única que se habría perdido.
 - [x] **Traspasos cross-moneda ICBC rotos (`TR.7782699`, `TR.7795790`).** La pata ARS estaba como
-  `expense` con signo invertido y había una **copia espuria ruteada a la Visa**. Se borraron las copias,
-  se convirtieron las patas a `transfer` y se parearon. Clave para no romper nada: `_build-transfer.ts:37`
-  define que `expense` usa magnitud positiva y `transfer` usa el signo, así que la dirección `out` se
-  conserva y **el saldo de la 0926 no cambió** (sigue reconciliada exacta en 391 movimientos).
-  Transferencias sin parear: 29 → 25. Las 25 restantes no tienen contra-pata en la base (transferencias
-  a terceros marcadas por patrón, o el otro lado nunca se importó).
+      `expense` con signo invertido y había una **copia espuria ruteada a la Visa**. Se borraron las copias,
+      se convirtieron las patas a `transfer` y se parearon. Clave para no romper nada: `_build-transfer.ts:37`
+      define que `expense` usa magnitud positiva y `transfer` usa el signo, así que la dirección `out` se
+      conserva y **el saldo de la 0926 no cambió** (sigue reconciliada exacta en 391 movimientos).
+      Transferencias sin parear: 29 → 25. Las 25 restantes no tienen contra-pata en la base (transferencias
+      a terceros marcadas por patrón, o el otro lado nunca se importó).
 - [x] **Los 3 `EXT.DE.MOVIMIENTOS-5727` que daban 0 líneas: caso cerrado.** No era el descifrado. Estaban
-  **atados a la caja de ahorro 0926** en vez de a la cuenta corriente 5727. Al re-atarlos fallaron por
-  contraseña (la CC no tenía la suya), se le copió la de la 0926 y ahí parsearon **sin error pero con 0
-  líneas**, extrayendo correctamente `statement_account_ref = 0905/02100757/27` del encabezado. O sea el
-  PDF se lee bien y **no tiene movimientos**: son extractos de meses sin actividad de la CC — exactamente
-  el "gap fantasma" que Nico venía reportando. Corresponde borrarlos y marcar los meses con el chip "sin mov.".
+      **atados a la caja de ahorro 0926** en vez de a la cuenta corriente 5727. Al re-atarlos fallaron por
+      contraseña (la CC no tenía la suya), se le copió la de la 0926 y ahí parsearon **sin error pero con 0
+      líneas**, extrayendo correctamente `statement_account_ref = 0905/02100757/27` del encabezado. O sea el
+      PDF se lee bien y **no tiene movimientos**: son extractos de meses sin actividad de la CC — exactamente
+      el "gap fantasma" que Nico venía reportando. Corresponde borrarlos y marcar los meses con el chip "sin mov.".
 - [x] **Mercado Pago:** los 4 imports en `error` son **el mismo PDF** (`file_hash 80a9a18b…`) subido 4 veces,
-  3 como `tc` y 1 como `banco`. Falla porque viene por mail **con contraseña** (los que funcionaron en mayo
-  se bajaron de la web, sin cifrar). Ver PR #76.
+      3 como `tc` y 1 como `banco`. Falla porque viene por mail **con contraseña** (los que funcionaron en mayo
+      se bajaron de la web, sin cifrar). Ver PR #76.
 - [x] **Regla de negocio actualizada:** target de ahorro mensual **USD 5.700 → 6.000** (la DB ya tenía 6.000
-  desde 2026-05-18; `CLAUDE.md` y el PRD estaban viejos). PR #75. Total target sin cambios (USD 2.452.000).
+      desde 2026-05-18; `CLAUDE.md` y el PRD estaban viejos). PR #75. Total target sin cambios (USD 2.452.000).
 - [x] **Redacción de la regla de cuotas TC precisada** (PR #75). No había contradicción real: la app nunca
-  proyecta cuotas futuras; cada resumen aporta la cuota de ese mes, que es como la emite el banco.
-  Verificado sobre prod: 155 de 1447 movimientos de TC son cuotas, cada una con su número en su mes.
+      proyecta cuotas futuras; cada resumen aporta la cuota de ese mes, que es como la emite el banco.
+      Verificado sobre prod: 155 de 1447 movimientos de TC son cuotas, cada una con su número en su mes.
 - **PRD Notion:** changelog **v1.14** (auditoría) y **v1.15** (los 4 fixes + cambio de política de contraseñas).
 
 **Pendientes de esta auditoría (NO resueltos):**
+
 - [ ] **`deducible_ganancias` = 0 en las 2100 transacciones** y solo 3 tags con 4 usos → **el export contador
-  sale vacío**. La infra de captura existe desde el PR #50 pero nunca se usó. Es el gap más grande que queda
-  para la review de octubre.
+      sale vacío**. La infra de captura existe desde el PR #50 pero nunca se usó. Es el gap más grande que queda
+      para la review de octubre.
 - [ ] **Patrimonio nunca cargado:** 0 `net_worth_snapshots`, 0 `holdings`.
 - [ ] **5 cuentas sin un solo movimiento:** Galicia Visa/Master/Inversiones de Pau, Efectivo USD, y
-  **Galicia Inversiones · Nico** (creada el 10/06 para colgarle los 8 movimientos FIMA — esa asociación
-  nunca se hizo). Decidir: cargarlas o archivarlas.
+      **Galicia Inversiones · Nico** (creada el 10/06 para colgarle los 8 movimientos FIMA — esa asociación
+      nunca se hizo). Decidir: cargarlas o archivarlas.
 - [ ] **Brokers desactualizados:** Balanz Internacional (últ. 30/04), Balanz Argentina y Cocos (marzo).
 - [ ] Confirmar en la UI los 3 imports re-parseados que quedaron en `parsed`.
 - [ ] Tablas de backup en prod: `_bak_fechas_20260722` (se conserva hasta confirmar esos 3 imports).
@@ -204,7 +211,7 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
   pendientes", auto-parse al subir + click manual, cron Gmail) borraban los dos cuando aún no
   había nada e insertaban los dos su tanda.
 - **Fix:** claim atómico (`lib/imports/parse-claim.ts`): `UPDATE ... SET status='parsing'
-  WHERE estado reparseable AND (status <> 'parsing' OR está stale) RETURNING`. Gana uno solo;
+WHERE estado reparseable AND (status <> 'parsing' OR está stale) RETURNING`. Gana uno solo;
   el resto se retira con `already_parsing`. `parseImport` (server action) hace el claim de
   forma síncrona para el feedback de la UI y le pasa `alreadyClaimed` al internal. Un `parsing`
   colgado se reclama solo pasado `PARSE_STALE_AFTER_MS` (6 min), sin depender del reaper.
@@ -240,7 +247,7 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
     ~80 PDFs sin contraseña que hoy importan bien). Un PDF realmente cifrado reporta `wrong_password`,
     nunca `unsupported`, así que se mantiene el contrato "nunca mandamos bytes cifrados al LLM".
 - [x] 7 tests nuevos en `pdf-decrypt.test.ts` (fixtures generados con mupdf en runtime, sin datos reales),
-  incluido el caso owner-password-only. Suite 509/509, typecheck + lint OK.
+      incluido el caso owner-password-only. Suite 509/509, typecheck + lint OK.
 - **Acción de Nico:** los `MELI.pdf` necesitan la contraseña con la que MP manda el resumen por mail
   (para MP suele ser el DNI). Cargarla en la cuenta MP Master (`/accounts` → "Contraseña PDF") o al
   reparsear, y reintentar. El import `banco` de julio ya quedó cubierto por el Excel (32 líneas).
@@ -260,28 +267,27 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
   viajaba en el payload de la página. (El de instituciones no tiene form: solo se setean desde
   el flujo de parseo.) **Decisión de Nico: cifrar** (no documentar excepción).
 - [x] **`lib/crypto/secret-box.ts`** — AES-256-GCM con `node:crypto` (sin dependencias nuevas).
-  IV aleatorio de 12 bytes por operación + auth tag; AAD = etiqueta de versión. Payload
-  versionado `v1:<iv_b64>:<tag_b64>:<ct_b64>` para poder rotar esquema. Funciones puras (la
-  clave entra por parámetro) → 19 tests: round-trip, IV distinto por corrida, clave equivocada,
-  tampering de ciphertext y de tag, payload mal formado, versión desconocida.
+      IV aleatorio de 12 bytes por operación + auth tag; AAD = etiqueta de versión. Payload
+      versionado `v1:<iv_b64>:<tag_b64>:<ct_b64>` para poder rotar esquema. Funciones puras (la
+      clave entra por parámetro) → 19 tests: round-trip, IV distinto por corrida, clave equivocada,
+      tampering de ciphertext y de tag, payload mal formado, versión desconocida.
 - [x] **`lib/crypto/pdf-password.ts`** — binding con la env var `PDF_PASSWORD_ENC_KEY`
-  (32 bytes base64). Sin clave → **falla explícito** (`PdfPasswordKeyMissingError`), nunca
-  guarda en claro. Tolera valores legacy en texto plano hasta correr el backfill (warn sin
-  el valor). 7 tests.
+      (32 bytes base64). Sin clave → **falla explícito** (`PdfPasswordKeyMissingError`), nunca
+      guarda en claro. Tolera valores legacy en texto plano hasta correr el backfill (warn sin
+      el valor). 7 tests.
 - [x] **Descifrado en el punto de uso:** `lib/imports/parse-internal.ts` (cambio mínimo: leer +
-  persistir cifrado) y `app/api/cron/gmail-import/route.ts` (al armar `RoutableAccount`).
-  `lib/gmail/attachment-router.ts` sigue recibiendo la contraseña en claro (no se tocó).
+      persistir cifrado) y `app/api/cron/gmail-import/route.ts` (al armar `RoutableAccount`).
+      `lib/gmail/attachment-router.ts` sigue recibiendo la contraseña en claro (no se tocó).
 - [x] **Form write-only** (`account-form.tsx`): el campo ya no recibe el valor guardado;
-  `type="password"`, vacío al cargar, indicador "hay una contraseña guardada" + botones
-  Reemplazar / Borrar. La intención viaja en `pdfPasswordAction` (`keep|set|clear`) validada con
-  Zod (`parsePdfPasswordIntent`): **un input vacío no borra** — solo `clear` borra. 6 tests.
+      `type="password"`, vacío al cargar, indicador "hay una contraseña guardada" + botones
+      Reemplazar / Borrar. La intención viaja en `pdfPasswordAction` (`keep|set|clear`) validada con
+      Zod (`parsePdfPasswordIntent`): **un input vacío no borra** — solo `clear` borra. 6 tests.
 - [x] **Backfill** `npm run db:encrypt-pdf-passwords -- --apply` (idempotente, saltea `v1:`,
-  nunca imprime valores) + migración `0019_encrypt_pdf_passwords.sql` con CHECK
-  `pdf_password LIKE 'v1:%'` en ambas tablas. Orden: setear clave → backfill → migración.
+      nunca imprime valores) + migración `0019_encrypt_pdf_passwords.sql` con CHECK
+      `pdf_password LIKE 'v1:%'` en ambas tablas. Orden: setear clave → backfill → migración.
 - **PENDIENTE DE NICO (no lo hago yo):** 1) generar la clave con
   `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`, 2) setear
-  `PDF_PASSWORD_ENC_KEY` en Vercel (todos los entornos) y en `.env.local`, 3) correr el backfill,
-  4) aplicar la migración 0019. Rotar la clave invalida lo cifrado: habría que recargar las
+  `PDF_PASSWORD_ENC_KEY` en Vercel (todos los entornos) y en `.env.local`, 3) correr el backfill, 4) aplicar la migración 0019. Rotar la clave invalida lo cifrado: habría que recargar las
   contraseñas a mano.
 
 ### Sesión 2026-07-07 — Parser Mercado Pago cuenta (banco/billetera)
@@ -290,7 +296,7 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
   se baja como Excel (`account_statement-<uuid>.xlsx`) o PDF.
 - [x] **Nuevo `lib/imports/parsers/mercado-pago-banco.ts`** (`id: 'mercado-pago-banco-v1'`):
   - **Excel determinístico** (`parseXlsx`, sin LLM) — camino principal. Header `RELEASE_DATE |
-    TRANSACTION_TYPE | REFERENCE_ID | TRANSACTION_NET_AMOUNT | PARTIAL_BALANCE`; fecha `DD-MM-YYYY`,
+TRANSACTION_TYPE | REFERENCE_ID | TRANSACTION_NET_AMOUNT | PARTIAL_BALANCE`; fecha `DD-MM-YYYY`,
     monto es-AR con signo, contraparte embebida en el tipo. Summary desde `CREDITS`/`DEBITS`.
   - **PDF con LLM** (`systemPrompt`/`userPrompt`) como fallback (sin calibrar contra PDF real todavía).
 - **Reglas de clasificación (confirmadas con Nico):**
@@ -303,7 +309,7 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
   - `Inversión X` → transfer saliente a revisar (no hay cuenta de inversiones MP modelada).
   - `Rendimientos` → ingreso/Intereses. `Pago de servicio ARCA` → gasto/Impuestos.
 - [x] Wireado en `registry.ts` + tests de registry actualizados. 13 tests unitarios nuevos + validado
-  end-to-end contra el Excel real (32 líneas, clasificación correcta). Suite 493/493, typecheck + lint OK.
+      end-to-end contra el Excel real (32 líneas, clasificación correcta). Suite 493/493, typecheck + lint OK.
 - **Institución "Mercado Pago" ya sembrada** (no se tocó seed). Cuenta destino: ewallet "Mercado Pago".
 - **Pendiente / BACKLOG (idea de Nico):** auto-sync mensual del estado de cuenta MP. Bloqueo: no hay API
   oficial para cuenta personal; scraping con login viola la política de credenciales (ver
@@ -328,8 +334,8 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
   el caller marca `status='error'` con mensaje claro en vez de parsear 0 líneas fantasma.
   Los PDFs ICBC ahora andan directo, sin re-guardar a mano.
 - [x] `lib/imports/pdf-decrypt.ts` (helper) + `lib/imports/pdf-decrypt.test.ts` (5 tests, fixture
-  AES-128/AES-256 generado con mupdf en runtime, sin datos reales). Se quitó `isFatalDecryptError`
-  (obsoleto: mupdf decide con autoridad wrong-password vs éxito) y su test.
+      AES-128/AES-256 generado con mupdf en runtime, sin datos reales). Se quitó `isFatalDecryptError`
+      (obsoleto: mupdf decide con autoridad wrong-password vs éxito) y su test.
 - [x] `next.config.ts`: `serverExternalPackages: ['mupdf']` (WASM, no bundlear). Build verde.
 - **Dependencia nueva:** `mupdf@^1.28.0` — justificada: única forma de descifrar AES-128 V=4/R=4
   sin binarios externos (no corren en Vercel). Alinea con [[no-nuevas-suscripciones]] (resuelve
@@ -347,18 +353,18 @@ sección es el hilo conductor; los detalles técnicos de cada fix están en las 
 - **Causa raíz (confirmada):** el micro `licitaciones-service` corre en **Vercel**, cuyas functions
   rechazan requests con body **> ~4.5 MB** (413 en el edge, antes de FastAPI). Next le reenviaba los PDFs
   como **multipart** (`lib/licitaciones/client.ts`); la tanda pasó ese tope. Es el mismo límite que el PR
-  #60 ya había esquivado en la *subida* (Next→Storage), pero la pata *Next→micro* seguía mandando bytes.
+  #60 ya había esquivado en la _subida_ (Next→Storage), pero la pata _Next→micro_ seguía mandando bytes.
 - **Fix elegido (con Nico): quedarse en Vercel, mandar signed URLs en vez de bytes.** Se evaluó mover el
   micro a Railway/Render pero Nico no quiere otra suscripción. Como los PDFs ya viven en Storage, Next firma
   una signed URL de descarga por PDF y manda un JSON chico `{ pdf_urls, lunes }`; el micro baja los PDFs él
   mismo. El body Next→micro pasa a KB → el 4.5 MB deja de aplicar. El micro NO recibe credenciales de
   Supabase (las URLs expiran y son GET público). Escala a los 50 MB que ya valida la app.
 - [x] **gd-finanzas (PR #68):** `client.ts` (contrato multipart→JSON con URLs), `process-internal.ts`
-  (firma URLs en vez de descargar bytes), `storage.ts` (se saca `downloadLicitacionFile`, sin uso). Además
-  `client.ts` traduce el status HTTP a mensaje claro (413/5xx) — venía del PR #67. Tests actualizados (13 verdes).
+      (firma URLs en vez de descargar bytes), `storage.ts` (se saca `downloadLicitacionFile`, sin uso). Además
+      `client.ts` traduce el status HTTP a mensaje claro (413/5xx) — venía del PR #67. Tests actualizados (13 verdes).
 - [x] **Micro (`licitaciones-service` PR #2):** `/procesar` pasa a body JSON `{ pdf_urls, lunes }`, baja los
-  PDFs con `urllib` (endpoint sync → threadpool), no loguea las URLs (token firmado). Revertidos
-  `Procfile`/`render.yaml` del PR #1 (se queda en Vercel). `py_compile` OK.
+      PDFs con `urllib` (endpoint sync → threadpool), no loguea las URLs (token firmado). Revertidos
+      `Procfile`/`render.yaml` del PR #1 (se queda en Vercel). `py_compile` OK.
 - **Pendiente (Nico, manual):** confirmar que **ambos** proyectos Vercel redeployaron (el micro **primero**,
   por el cambio de contrato) y que Pau dé "Reintentar". **`LICITACIONES_SERVICE_URL` NO cambia** (mismo
   proyecto Vercel) → no hay que tocar env vars.
@@ -385,21 +391,21 @@ Claude y se descarga el Excel del calendario semanal. **Dominio ajeno a finanzas
 (auth, RLS, Storage, patrón de jobs de `imports`) pero queda autocontenido/extraíble.
 
 - [x] **Decisión arquitectónica: Opción A** (microservicio Python, no reescritura TS). Confirmado
-  leyendo `procesar.py`: la generación del Excel está calibrada a quirks de openpyxl (reset de estilos
-  por celda, round-trip del `template.xlsx`); ExcelJS round-trippea distinto → riesgo de fidelidad. Se
-  reusa el script entero envuelto en FastAPI.
+      leyendo `procesar.py`: la generación del Excel está calibrada a quirks de openpyxl (reset de estilos
+      por celda, round-trip del `template.xlsx`); ExcelJS round-trippea distinto → riesgo de fidelidad. Se
+      reusa el script entero envuelto en FastAPI.
 - [x] **DB:** tabla `licitaciones_jobs` (estados uploaded→processing→done→error + `processing_started_at`
-  para el reaper), enum `licitaciones_job_status`, **migración `0018`** idempotente + RLS household-scoped
-  (hand-written, estilo 0013–0017). **Falta aplicar a prod (Nico/MCP).**
+      para el reaper), enum `licitaciones_job_status`, **migración `0018`** idempotente + RLS household-scoped
+      (hand-written, estilo 0013–0017). **Falta aplicar a prod (Nico/MCP).**
 - [x] **Lado gd-finanzas** (branch `feat/licitaciones-calendario`): schemas Zod, `lib/licitaciones`
-  (storage bucket `licitaciones`, client del microservicio con auth Bearer + timeout 280s, process-internal
-  async, stale 10 min), 3 server actions (create/process/get-download-url), UI completa (lista + historial +
-  upload + detalle con polling 4s + descarga/reintentar), cron reaper `reap-stale-licitaciones` (`30 12 * * *`),
-  sección en el sidebar. Bucket agregado a `setup-storage.ts`.
+      (storage bucket `licitaciones`, client del microservicio con auth Bearer + timeout 280s, process-internal
+      async, stale 10 min), 3 server actions (create/process/get-download-url), UI completa (lista + historial +
+      upload + detalle con polling 4s + descarga/reintentar), cron reaper `reap-stale-licitaciones` (`30 12 * * *`),
+      sección en el sidebar. Bucket agregado a `setup-storage.ts`.
 - [x] **Microservicio** (repo aparte `../licitaciones-service`): FastAPI `POST /procesar` + `/health`,
-  `procesar.py` con refactor mínimo (modelo por env, extracción desde bytes, `procesar_en_memoria`),
-  Dockerfile + requirements + README. Devuelve el xlsx binario; **Next lo sube a Storage** (el
-  `SUPABASE_SECRET_KEY` nunca sale de Vercel). Modelo default `claude-sonnet-4-5` (parametrizable).
+      `procesar.py` con refactor mínimo (modelo por env, extracción desde bytes, `procesar_en_memoria`),
+      Dockerfile + requirements + README. Devuelve el xlsx binario; **Next lo sube a Storage** (el
+      `SUPABASE_SECRET_KEY` nunca sale de Vercel). Modelo default `claude-sonnet-4-5` (parametrizable).
 - [x] **Verificación:** typecheck + lint + **434 tests** verdes; `py_compile` OK.
 - **Pendientes (Nico):** aplicar migración `0018`; crear bucket `licitaciones` (`npm run storage:setup`);
   deployar microservicio (Railway/Render) + setear `LICITACIONES_SERVICE_URL` / `LICITACIONES_SERVICE_SECRET`
@@ -412,57 +418,57 @@ Nico reportó movimientos duplicados en la **cuenta corriente ICBC** (`0905/0210
 y meses "pendientes" fantasma. Diagnóstico: la misma cuenta entró por **varios imports que se solapan**.
 
 - [x] **Causa raíz CC:** la CC se importó por 2 PDFs angostos (`EXT (3/2).DE.MOVIMIENTOS-5727`, ene/feb)
-  + el **CSV consolidado** `347a6ae9` (atado a la caja de ahorro, confirmado después) que al confirmar
-  creó las patas CA↔CC en la CC. El match-al-confirmar no dedupeó porque las copias PDF eran `expense`
-  o transfer con fecha corrida 1 día. Resultado: 4 movimientos ×2.
+  - el **CSV consolidado** `347a6ae9` (atado a la caja de ahorro, confirmado después) que al confirmar
+    creó las patas CA↔CC en la CC. El match-al-confirmar no dedupeó porque las copias PDF eran `expense`
+    o transfer con fecha corrida 1 día. Resultado: 4 movimientos ×2.
 - [x] **Limpieza CC (SQL vía MCP, transacción atómica):** borradas **8 transacciones** (4 copias PDF +
-  1 pata dup en la 0926 + 2 patas de marzo mal-ruteadas que en realidad eran del extracto USD 0413);
-  desvinculadas+`rejected` 4 líneas de import; las 2 contrapartes del 0413 quedaron como transfer suelto;
-  agregado el `IMP 0,33` del 09/06 que faltaba (manual). **Verificado: la CC quedó EXACTA a la captura del
-  banco — 12 movimientos, débitos 166,31 / créditos 185,00.** `transaction_count` recomputado en los imports tocados.
+      1 pata dup en la 0926 + 2 patas de marzo mal-ruteadas que en realidad eran del extracto USD 0413);
+      desvinculadas+`rejected` 4 líneas de import; las 2 contrapartes del 0413 quedaron como transfer suelto;
+      agregado el `IMP 0,33` del 09/06 que faltaba (manual). **Verificado: la CC quedó EXACTA a la captura del
+      banco — 12 movimientos, débitos 166,31 / créditos 185,00.** `transaction_count` recomputado en los imports tocados.
 - [x] **Dedup caja de ahorro ICBC 0926 (`de1a10b2`) — RESUELTO (reconciliación quirúrgica contra verdad externa).**
-  Nico bajó el **listado completo del homebanking** (`0926.csv`, 380 movimientos todo 2026, débitos
-  217.997.247,39 / créditos 217.915.207,18). Se cargó a una tabla de staging y se reconcilió la app (que tenía
-  **423** txns de 7 imports solapados + estaba **incompleta**) contra esa verdad por `(fecha, monto, D/C)`:
-  354 calzaban, 69 sobraban (duplicados de los PDFs AV/Galicia/parciales + 6 fechas corridas), **20 faltaban
-  de verdad** (13 de jun 9–12, posteriores a los imports viejos). **Decisión Nico: método quirúrgico** (no rebuild,
-  porque el rebuild orfanaba **182 contra-patas en 6 cuentas** — broker/Galicia/MP/tarjetas/cash/CC). Operación
-  atómica (SQL vía MCP, con backup previo): borradas las 69 excedentes (conservando la copia **con contraparte**),
-  desapareadas las 14 contra-patas same-import en otras cuentas (sin borrarlas, como el 0413), insertados los 26
-  faltantes categorizados con las reglas reales del parser (`classifyIcbcConcept` + `detectTransfers` + fx BCRA del día).
-  **Verificado: la 0926 quedó EXACTA al banco — 380 movimientos, 0 sobran / 0 faltan, totales idénticos.** Estado:
-  192 transfers, 47 ingresos, 141 gastos, 4 sin categorizar, 84 con contraparte.
+      Nico bajó el **listado completo del homebanking** (`0926.csv`, 380 movimientos todo 2026, débitos
+      217.997.247,39 / créditos 217.915.207,18). Se cargó a una tabla de staging y se reconcilió la app (que tenía
+      **423** txns de 7 imports solapados + estaba **incompleta**) contra esa verdad por `(fecha, monto, D/C)`:
+      354 calzaban, 69 sobraban (duplicados de los PDFs AV/Galicia/parciales + 6 fechas corridas), **20 faltaban
+      de verdad** (13 de jun 9–12, posteriores a los imports viejos). **Decisión Nico: método quirúrgico** (no rebuild,
+      porque el rebuild orfanaba **182 contra-patas en 6 cuentas** — broker/Galicia/MP/tarjetas/cash/CC). Operación
+      atómica (SQL vía MCP, con backup previo): borradas las 69 excedentes (conservando la copia **con contraparte**),
+      desapareadas las 14 contra-patas same-import en otras cuentas (sin borrarlas, como el 0413), insertados los 26
+      faltantes categorizados con las reglas reales del parser (`classifyIcbcConcept` + `detectTransfers` + fx BCRA del día).
+      **Verificado: la 0926 quedó EXACTA al banco — 380 movimientos, 0 sobran / 0 faltan, totales idénticos.** Estado:
+      192 transfers, 47 ingresos, 141 gastos, 4 sin categorizar, 84 con contraparte.
   - **Pendientes menores de esta limpieza:** (a) ~150 "TRANSF. MOBILE/E-BCOS" a personas quedan como `transfer`
     (comportamiento del `detectTransfers`); si alguno es gasto real, reclasificar en la UI. (b) 14 contra-patas
     desapareadas en Galicia/broker/MP/tarjetas/cash quedaron como transfer suelto → se limpian en la reconciliación
     propia de cada cuenta. (c) 3 `TR.xxx A 0905…` entraron como gasto (fiel al parser) pero son transfers a la caja
     USD → revisar. (d) 6 movimientos con fecha corrida perdieron su nombre de contraparte al reubicarse.
 - [x] **Feature — marcar meses "sin movimientos" (gaps fantasma) — IMPLEMENTADO** (branch `feat/skip-no-movement-months`).
-  La queja original de Nico: la CC marcaba mar/abr/may como pendientes aunque no hubo movimientos. **Migración `0017`**
-  (tabla `account_skipped_months` = household+account+`year_month`, PK account+mes, **RLS household-scoped**, aplicada a
-  prod vía MCP, `.sql` versionado). `detectImportGaps` carga los meses marcados (1 query/household) y los excluye de
-  `missingMonths`; `computeMissingMonths` toma un set `skipped` (testeado). Server actions `markMonthNoMovements` /
-  `unmarkMonthNoMovements` (Zod + household scoping). UI: en "Resúmenes faltantes" de `/imports`, cada mes faltante es
-  un chip con botón "sin mov." (`GapMonthChip` cliente) que lo marca y lo saca del aviso. `/pendientes` y el badge del
-  sidebar usan el mismo helper → se arreglan solos. typecheck + lint + **407 tests** verdes. **Falta: PR + merge (Nico).**
+      La queja original de Nico: la CC marcaba mar/abr/may como pendientes aunque no hubo movimientos. **Migración `0017`**
+      (tabla `account_skipped_months` = household+account+`year_month`, PK account+mes, **RLS household-scoped**, aplicada a
+      prod vía MCP, `.sql` versionado). `detectImportGaps` carga los meses marcados (1 query/household) y los excluye de
+      `missingMonths`; `computeMissingMonths` toma un set `skipped` (testeado). Server actions `markMonthNoMovements` /
+      `unmarkMonthNoMovements` (Zod + household scoping). UI: en "Resúmenes faltantes" de `/imports`, cada mes faltante es
+      un chip con botón "sin mov." (`GapMonthChip` cliente) que lo marca y lo saca del aviso. `/pendientes` y el badge del
+      sidebar usan el mismo helper → se arreglan solos. typecheck + lint + **407 tests** verdes. **Falta: PR + merge (Nico).**
 - [x] **Caja de ahorro USD 0413 (`f627454d`) — RECONCILIADA contra verdad externa.** Nico bajó el listado del
-  homebanking (`0413.csv`, 27 movimientos USD). Aclaró 2 cosas: el `TR.7620783 -25 USD` **no era mal-parseo** (es
-  un traspaso **cross-moneda** real: 25 USD salieron del 0413 ↔ 34.000 ARS entraron al 0926); y el 558,60 estaba
-  **triplicado** (3 imports). Reconciliación quirúrgica: borrados 6 excedentes (558,60 ×2, 1043,36 dup, 3 fechas
-  corridas), insertados 10 faltantes (may/jun no importados + las 3 fechas corregidas) categorizados (transfers,
-  fx USD→ARS). **Verificado: 27 USD reales = la verdad, 0 sobran / 0 faltan.**
+      homebanking (`0413.csv`, 27 movimientos USD). Aclaró 2 cosas: el `TR.7620783 -25 USD` **no era mal-parseo** (es
+      un traspaso **cross-moneda** real: 25 USD salieron del 0413 ↔ 34.000 ARS entraron al 0926); y el 558,60 estaba
+      **triplicado** (3 imports). Reconciliación quirúrgica: borrados 6 excedentes (558,60 ×2, 1043,36 dup, 3 fechas
+      corridas), insertados 10 faltantes (may/jun no importados + las 3 fechas corregidas) categorizados (transfers,
+      fx USD→ARS). **Verificado: 27 USD reales = la verdad, 0 sobran / 0 faltan.**
   - **Nota de proceso:** un filtro `imp <> '93f28c1e'` trató `NULL` como excluido → el insert se re-ejecutó 3×
     (30 filas); se dedupeó dejando 1 set de 10. Lección: usar `IS DISTINCT FROM` con columnas nullable.
   - [x] **8 consumos de tarjeta mal-ruteados → movidos a Master Galicia · Nico (decisión Nico).** El import `93f28c1e`
-    estaba mal atado a la caja USD (y mal etiquetado como ICBC); sus 8 consumos (MERPAGO/SODIMAC/MOVISTAR/GOOGLE,
-    con cuotas, ya categorizados) se re-apuntaron a la **Master Galicia de Nico** (`c65ddc18`) — txns + el import
-    (institución corregida a Galicia). El 0413 quedó limpio en 27 USD. Quedan los 2 transfers del 0413
-    que se desaparearon en la limpieza de la CC (`e87e5bcd` MEP 558,60, `c982792a` TR -25): el MEP era una de las
-    copias del 558,60 triplicado (ya resuelto); el TR -25 es real (cross-moneda) y quedó como transfer suelto, OK.
+        estaba mal atado a la caja USD (y mal etiquetado como ICBC); sus 8 consumos (MERPAGO/SODIMAC/MOVISTAR/GOOGLE,
+        con cuotas, ya categorizados) se re-apuntaron a la **Master Galicia de Nico** (`c65ddc18`) — txns + el import
+        (institución corregida a Galicia). El 0413 quedó limpio en 27 USD. Quedan los 2 transfers del 0413
+        que se desaparearon en la limpieza de la CC (`e87e5bcd` MEP 558,60, `c982792a` TR -25): el MEP era una de las
+        copias del 558,60 triplicado (ya resuelto); el TR -25 es real (cross-moneda) y quedó como transfer suelto, OK.
 - [ ] **PENDIENTE — Gaps fantasma (feature):** la CC marca mar/abr/may como pendientes aunque no hubo
-  movimientos. Decisión Nico: **marcar a mano un mes/cuenta como "sin movimientos"** (esquema + UI + cableado
-  en `detect-gaps`). El fix del item-2 (consolidado tapa meses vacíos) no cubre cuentas importadas como PDFs
-  mensuales angostos. Plan Mode antes de implementar.
+      movimientos. Decisión Nico: **marcar a mano un mes/cuenta como "sin movimientos"** (esquema + UI + cableado
+      en `detect-gaps`). El fix del item-2 (consolidado tapa meses vacíos) no cubre cuentas importadas como PDFs
+      mensuales angostos. Plan Mode antes de implementar.
 
 ### Sesión 2026-06-11 — Backlog de feedback completo (items 1–14, branch `feat/imports-backlog`)
 
@@ -474,59 +480,59 @@ siempre visibles (el toggle solo gobierna el auto-match al confirmar) / en trans
 el TAG es el clasificador.
 
 - [x] **Items 1/5/6/7/12 — quick wins review:** borrar import desde el detalle + acciones
-  de lista siempre visibles; motivo de rechazo por línea (auto-dup vs manual); rechazadas
-  solo "Des-rechazar" (sin editar); "Volver a pendiente" en lote (rechazadas seleccionables);
-  selector de categoría oculto en transfers; rename "Sin contraparte"→"Cuenta destino sin asignar".
+      de lista siempre visibles; motivo de rechazo por línea (auto-dup vs manual); rechazadas
+      solo "Des-rechazar" (sin editar); "Volver a pendiente" en lote (rechazadas seleccionables);
+      selector de categoría oculto en transfers; rename "Sin contraparte"→"Cuenta destino sin asignar".
 - [x] **Item 2 — gaps:** cobertura = período de imports confirmados ∪ meses con líneas
-  (helpers puros + 10 tests). Un consolidado ene–jun ya no marca "faltante" un mes sin
-  movimientos. Aplica retroactivo.
+      (helpers puros + 10 tests). Un consolidado ene–jun ya no marca "faltante" un mes sin
+      movimientos. Aplica retroactivo.
 - [x] **Item 9 — lista estable:** al primer cambio se congela el set visible; ediciones
-  in-place sin refiltrar/reordenar (filas que dejan de matchear quedan atenuadas);
-  "Recargar lista" / cambiar filtro / reordenar recomputan.
+      in-place sin refiltrar/reordenar (filas que dejan de matchear quedan atenuadas);
+      "Recargar lista" / cambiar filtro / reordenar recomputan.
 - [x] **Transversal + item 13 — identidad de contraparte:** helper canónico único
-  `lib/imports/counterparty-identity.ts` (CUIT/CBU/cuenta/alias, fallback nombre
-  normalizado). Propagación intra-import: tras categorizar/etiquetar, toast ofrece
-  aplicar a las hermanas pending de la misma contraparte (`bulkSetCounterpartyLabel` nueva).
+      `lib/imports/counterparty-identity.ts` (CUIT/CBU/cuenta/alias, fallback nombre
+      normalizado). Propagación intra-import: tras categorizar/etiquetar, toast ofrece
+      aplicar a las hermanas pending de la misma contraparte (`bulkSetCounterpartyLabel` nueva).
 - [x] **Items 3+10 — EPIC captura fiscal:** deducible + tags + servicio doméstico
-  capturables en la review (panel de edición + bulk + badges); `confirm.ts` los persiste
-  (antes hardcodeaba false/[]/standard → el export contador salía vacío). Sugerencia
-  aprendida por contraparte (`lookupCounterpartyHistory` extendido + `enrichLineWithHistory`
-  puro). **Tags también en transfers** (ahí son el clasificador).
+      capturables en la review (panel de edición + bulk + badges); `confirm.ts` los persiste
+      (antes hardcodeaba false/[]/standard → el export contador salía vacío). Sugerencia
+      aprendida por contraparte (`lookupCounterpartyHistory` extendido + `enrichLineWithHistory`
+      puro). **Tags también en transfers** (ahí son el clasificador).
 - [x] **Item 4 — previsiones en review:** candidatos por línea (cuenta+kind+±5d+±10% USD)
-  al abrir el editor, badge "Previsión"; `confirm.ts` linkea el forecast elegido si sigue
-  pending (ignora si otra tx lo matcheó).
+      al abrir el editor, badge "Previsión"; `confirm.ts` linkea el forecast elegido si sigue
+      pending (ignora si otra tx lo matcheó).
 - [x] **Items 8+14 — cuenta destino por refs + match con tx existente:** **migración `0016`**
-  (`accounts.transfer_refs` jsonb, aditiva, **aplicada a prod vía MCP**, journal registrado);
-  las refs se APRENDEN al confirmar transfers y el parse auto-resuelve la cuenta destino
-  cuando matchea exactamente una. En la review, una línea transfer muestra si matchea una
-  transacción ya existente (regla de #44) con banner + pre-carga de cuenta destino.
+      (`accounts.transfer_refs` jsonb, aditiva, **aplicada a prod vía MCP**, journal registrado);
+      las refs se APRENDEN al confirmar transfers y el parse auto-resuelve la cuenta destino
+      cuando matchea exactamente una. En la review, una línea transfer muestra si matchea una
+      transacción ya existente (regla de #44) con banner + pre-carga de cuenta destino.
 - [x] **Transversal — "↻ Re-sugerir pendientes":** pase no-destructivo que re-aplica todo
-  el aprendizaje SOLO sobre líneas pending (no pisa ediciones) → los imports en curso
-  (ICBC `347a6ae9`, Galicia `e36d50d2`) se benefician sin re-parsear.
+      el aprendizaje SOLO sobre líneas pending (no pisa ediciones) → los imports en curso
+      (ICBC `347a6ae9`, Galicia `e36d50d2`) se benefician sin re-parsear.
 - **Validación:** typecheck + lint + build + **375 tests** verdes (345→375).
 - [x] **Cierre (2026-06-11):** PR **#50** mergeado a `main` (commit `0db0dcd`) y deployado a
-  prod (READY). **Sync PRD Notion hecho como changelog v1.11** — reglas de negocio nuevas:
-  captura fiscal en review, tag-clasificador en transfers, cobertura de gaps por período,
-  link de previsión en review.
+      prod (READY). **Sync PRD Notion hecho como changelog v1.11** — reglas de negocio nuevas:
+      captura fiscal en review, tag-clasificador en transfers, cobertura de gaps por período,
+      link de previsión en review.
 - [ ] **Pendiente (Nico):** smoke en prod (revisar un import en curso end-to-end con los
-  campos fiscales nuevos).
+      campos fiscales nuevos).
 
 ### Sesión 2026-06-11 (bis) — Bulk de contraparte en la review (branch `feat/bulk-counterparty`)
 
 - [x] Barra azul: bloque "Contraparte" — combobox con etiquetas conocidas (historial de
-  transacciones + las del import) con texto libre, aplica `counterparty.label` a las
-  seleccionadas. **Crea `{label}` en líneas sin counterparty parseado** (decisión Nico:
-  sin inventar identificadores — solo-label no entra al matching, test que lo fija).
-  `bulkSetCounterpartyLabel` ahora hace coalesce-create; no cambia status (metadata).
+      transacciones + las del import) con texto libre, aplica `counterparty.label` a las
+      seleccionadas. **Crea `{label}` en líneas sin counterparty parseado** (decisión Nico:
+      sin inventar identificadores — solo-label no entra al matching, test que lo fija).
+      `bulkSetCounterpartyLabel` ahora hace coalesce-create; no cambia status (metadata).
 - [x] Editor inline: campo "Etiqueta contraparte" siempre visible (antes oculto si el
-  parser no extrajo contraparte); el preprocess del schema ya limpiaba el caso vacío.
+      parser no extrajo contraparte); el preprocess del schema ya limpiaba el caso vacío.
 - [x] Helper puro `mergeCounterpartyLabels` + 5 tests (381 verdes). Typecheck + lint OK.
 - [x] **Cierre (2026-06-11):** PR **#53** mergeado a `main` (commit `d698672`, reemplazó al
-  #51 que GitHub cerró al borrarse su base tras el merge de #50) y deployado a prod (READY,
-  suite 412 sobre `main`). **Sync PRD Notion hecho como changelog v1.12** (bulk de
-  contraparte + counterparty solo-etiqueta sin identidad; categoría "Donaciones" PR #48).
+      #51 que GitHub cerró al borrarse su base tras el merge de #50) y deployado a prod (READY,
+      suite 412 sobre `main`). **Sync PRD Notion hecho como changelog v1.12** (bulk de
+      contraparte + counterparty solo-etiqueta sin identidad; categoría "Donaciones" PR #48).
 - [ ] **Pendiente (Nico):** smoke manual en prod: bulk sobre líneas sin contraparte de un
-  resumen TC.
+      resumen TC.
 
 ### Sesión 2026-06-11 — Multi-sort acumulativo en los listados (branch `feat/multi-sort-listados`)
 
@@ -536,17 +542,17 @@ acumula** (orden de click = prioridad, máx. 3), click en columna activa inviert
 dirección. Indicador: flecha + superíndice de prioridad. Aplica a las **4 tablas**.
 
 - [x] **Núcleo compartido `lib/sorting/`** (nuevo): `criteria.ts` (`SortCriterion`,
-  `applySortClick` puro), `url.ts` (`sort=date:desc,amount:asc` en un solo param, con
-  retrocompat de links viejos `?sort=x&dir=y`), `compare.ts` (comparador encadenado con
-  factories por campo — permite reglas que no se invierten con la dirección). 22 tests.
+      `applySortClick` puro), `url.ts` (`sort=date:desc,amount:asc` en un solo param, con
+      retrocompat de links viejos `?sort=x&dir=y`), `compare.ts` (comparador encadenado con
+      factories por campo — permite reglas que no se invierten con la dirección). 22 tests.
 - [x] **`SortableHeader` v2** (firma nueva `criteria`/`onSort(field, additive)`, genérico,
-  shift detection, superíndices, `select-none`). Migrados los 4 call sites de una.
+      shift detection, superíndices, `select-none`). Migrados los 4 call sites de una.
 - [x] **Server-side** (`/transactions`, `/imports`): `parseSortParam` reemplaza los `z.enum`,
-  `orderBy` por mapa de columnas + spread (tiebreaker `createdAt desc` se mantiene al final),
-  `sort-config.ts` por ruta. El param `dir` legacy se lee pero ya no se escribe.
+      `orderBy` por mapa de columnas + spread (tiebreaker `createdAt desc` se mantiene al final),
+      `sort-config.ts` por ruta. El param `dir` legacy se lee pero ya no se escribe.
 - [x] **Client-side**: review de import → `lib/imports/review-sort.ts` (conserva la regla
-  "sin categoría siempre arriba" en ambas direcciones); budget → `lib/budgets/sort.ts`
-  (multi-sort dentro de cada nivel, jerarquía padre/hijos intacta, des-duplica el sort viejo).
+      "sin categoría siempre arriba" en ambas direcciones); budget → `lib/budgets/sort.ts`
+      (multi-sort dentro de cada nivel, jerarquía padre/hijos intacta, des-duplica el sort viejo).
 - **Suite 346→375** (+29). Typecheck, lint y `next build` verdes. Sin migraciones.
 - PRD: no se toca (mejora de UX de implementación, no regla de negocio).
 
@@ -558,13 +564,13 @@ import `347a6ae9`. Causa: ese import fue la **carga manual ad-hoc por SQL** (ses
 real sí la habría marcado: `\bTRANSF\b` matchea).
 
 - [x] **Corrección de datos (SQL vía MCP):** 80 líneas `pending` del import marcadas
-  `isTransfer: true` aplicando los mismos patrones de `detect-transfers.ts` (TRANSF. MOBILE
-  ×30, E/BCOS-ONLINE ×22, DEBIN ×13, ACC.B. ×11, PUSH ×3, TRF.DATANET ×1). Las `edited`
-  (marcas manuales de Nico) no se tocaron.
+      `isTransfer: true` aplicando los mismos patrones de `detect-transfers.ts` (TRANSF. MOBILE
+      ×30, E/BCOS-ONLINE ×22, DEBIN ×13, ACC.B. ×11, PUSH ×3, TRF.DATANET ×1). Las `edited`
+      (marcas manuales de Nico) no se tocaron.
 - [x] **Regla de negocio nueva (confirmada con Nico):** `DEB PREA DEBIN 30703088534` (CUIT
-  Mercado Libre) = fondeo de la billetera propia → transfer a **Mercado Pago**. Las 13 líneas
-  ya tienen `transferAccountId` asignado por SQL; **PR #47** codifica la regla en
-  `classifyIcbcConcept` (hint `transferAccountName: 'Mercado Pago'`) + test. Suite 346 verde.
+      Mercado Libre) = fondeo de la billetera propia → transfer a **Mercado Pago**. Las 13 líneas
+      ya tienen `transferAccountId` asignado por SQL; **PR #47** codifica la regla en
+      `classifyIcbcConcept` (hint `transferAccountName: 'Mercado Pago'`) + test. Suite 346 verde.
 - **Pendiente (Nico, en la UI de review):** asignar cuenta destino a las otras 67 líneas
   transfer (ACC.B. → Galicia, etc.) con filtro Transfers + bulk, y confirmar.
 
@@ -576,42 +582,42 @@ Ahorro" vs "CA", "CC", "TC"), duplicados por dueño indistinguibles, y **cada vi
 label distinto** (no había un formateador único). Rearmado completo, decidido con Nico.
 
 - [x] **Modelo nuevo.** Display canónico **`Institución Producto · Dueño · Moneda`**
-  (ej. `Galicia Visa · Nico · ARS`). Producto = marca para TC / "Caja de ahorro" /
-  "Cuenta corriente" / "Inversiones" (broker) / "Efectivo" (cash) / nada (ewallet). `name`
-  se repurposea a **"rótulo"** opcional (casi siempre vacío; solo distinciones que ningún
-  campo captura, ej. Balanz "Argentina"/"Internacional").
+      (ej. `Galicia Visa · Nico · ARS`). Producto = marca para TC / "Caja de ahorro" /
+      "Cuenta corriente" / "Inversiones" (broker) / "Efectivo" (cash) / nada (ewallet). `name`
+      se repurposea a **"rótulo"** opcional (casi siempre vacío; solo distinciones que ningún
+      campo captura, ej. Balanz "Argentina"/"Internacional").
 - [x] **Migración `0015`** — enum `card_brand` (`visa`/`master`/`amex`) + columna nullable
-  `accounts.card_brand` (solo TC). Aditiva. **Aplicada a prod vía Supabase MCP** (idempotente,
-  `CREATE TYPE`/`ADD COLUMN IF NOT EXISTS`); el `.sql` queda versionado en `db/migrations/`.
-  Como 0013/0014, el journal de Drizzle no la registra (un `db:migrate` futuro es no-op).
+      `accounts.card_brand` (solo TC). Aditiva. **Aplicada a prod vía Supabase MCP** (idempotente,
+      `CREATE TYPE`/`ADD COLUMN IF NOT EXISTS`); el `.sql` queda versionado en `db/migrations/`.
+      Como 0013/0014, el journal de Drizzle no la registra (un `db:migrate` futuro es no-op).
 - [x] **Helper único `lib/accounts/format.ts`** (`formatAccount`, puro, 10 tests con las 28
-  cuentas reales + colisiones). Opciones `withInstitution`/`withOwner`/`withCurrency` para
-  contextos donde una parte es redundante (lista agrupada por institución, etc.).
+      cuentas reales + colisiones). Opciones `withInstitution`/`withOwner`/`withCurrency` para
+      contextos donde una parte es redundante (lista agrupada por institución, etc.).
 - [x] **Zod + form.** `card_brand` opcional con `superRefine` (solo `credit_card`); `name`
-  pasa a opcional (default `''`). Form de cuenta: campo "Marca" condicional a TC + label
-  "Rótulo (opcional)" con helper text.
+      pasa a opcional (default `''`). Form de cuenta: campo "Marca" condicional a TC + label
+      "Rótulo (opcional)" con helper text.
 - [x] **Cableado en TODOS los call sites** (antes improvisaban): forms de transacción /
-  transferencia / recurrencia, sus loaders (`+ institutionName/type/cardBrand`, join
-  `institutions`), filtros y tabla de `/transactions` (búsqueda ahora también por institución),
-  filtro de `/imports`, review de import (selector de cuenta + contraparte), upload multi-archivo,
-  snapshot de patrimonio (saldos + dropdown broker), `/settings/gmail`, detalle de transacción.
+      transferencia / recurrencia, sus loaders (`+ institutionName/type/cardBrand`, join
+      `institutions`), filtros y tabla de `/transactions` (búsqueda ahora también por institución),
+      filtro de `/imports`, review de import (selector de cuenta + contraparte), upload multi-archivo,
+      snapshot de patrimonio (saldos + dropdown broker), `/settings/gmail`, detalle de transacción.
 - [x] **Consumidores no-UI blindados** (se romperían al vaciar `name`): el matcher de
-  `transferAccountName` en `parse-internal` ahora keya por `formatAccount(...,{sin dueño/moneda})`
-  (= "ICBC Inversiones"/"Galicia Visa", la forma que emiten los parsers); routing multi-cuenta
-  del cron Gmail (`attachment-router`) desambigua por `card_brand` en vez de `name`; export
-  Ganancias y `detect-gaps` componen el nombre con `formatAccount`; `_transfer-candidates` y
-  `load-snapshot-detail` idem.
+      `transferAccountName` en `parse-internal` ahora keya por `formatAccount(...,{sin dueño/moneda})`
+      (= "ICBC Inversiones"/"Galicia Visa", la forma que emiten los parsers); routing multi-cuenta
+      del cron Gmail (`attachment-router`) desambigua por `card_brand` en vez de `name`; export
+      Ganancias y `detect-gaps` componen el nombre con `formatAccount`; `_transfer-candidates` y
+      `load-snapshot-detail` idem.
 - [x] **Limpieza de datos (SQL vía MCP):** 10 TC con su `card_brand` (incl. **HSBC US TC =
-  Master**, decisión Nico), `name=''` en 26 cuentas, rótulo conservado en las 2 Balanz Hogar USD.
-  **Verificado: las 28 cuentas dan display único.** Decisiones Nico: brokers muestran
-  "Inversiones" (no chocan con CA/CC); Master Meli → `Mercado Pago Master`.
+      Master**, decisión Nico), `name=''` en 26 cuentas, rótulo conservado en las 2 Balanz Hogar USD.
+      **Verificado: las 28 cuentas dan display único.** Decisiones Nico: brokers muestran
+      "Inversiones" (no chocan con CA/CC); Master Meli → `Mercado Pago Master`.
 - **Validación:** typecheck + lint + **345 tests** verdes. **Sin migraciones nuevas además de 0015.**
 - [x] **Cierre (2026-06-11):** PR **#45** mergeado y deployado a prod (commit `c31833c`, deploy
-  READY). Smoke HTTP OK (login 200, rutas protegidas 307→/login, sin 5xx). **Sync PRD Notion
-  hecho como changelog v1.10** (v1.9 ya lo había tomado la sesión de transferencias): §4.1
-  con `card_brand` + `name`=rótulo opcional + nota de la convención de display.
+      READY). Smoke HTTP OK (login 200, rutas protegidas 307→/login, sin 5xx). **Sync PRD Notion
+      hecho como changelog v1.10** (v1.9 ya lo había tomado la sesión de transferencias): §4.1
+      con `card_brand` + `name`=rótulo opcional + nota de la convención de display.
 - [ ] **Pendiente (Nico):** smoke visual en prod con sesión (ver `Galicia Visa · Nico · ARS`
-  en listas/forms/imports).
+      en listas/forms/imports).
 
 ### Sesión 2026-06-10 — Transferencias de doble lado: match-al-confirmar + linkeo manual + UI de review
 
@@ -619,26 +625,26 @@ Trabajo en worktree aislado (`feat/transfers-match-confirm`), en paralelo con ot
 (branch galicia-xlsx). Dos features + una corrección de datos.
 
 - [x] **Review de imports usable con cientos de filas** (PR #41, branch `feat/imports-review-filter-bulk`):
-  filtros client-side (texto + chips categoría/tipo/estado), "seleccionar todo lo filtrado",
-  paginación (50/pág) y categoría inline por fila. Disparado por el import ICBC CA ARS (367 líneas).
+      filtros client-side (texto + chips categoría/tipo/estado), "seleccionar todo lo filtrado",
+      paginación (50/pág) y categoría inline por fila. Disparado por el import ICBC CA ARS (367 líneas).
 - [x] **Pre-categorización del import ICBC CA ARS (`347a6ae9`)** por SQL: 94 líneas FCI/pago-TC
-  marcadas transfer con contraparte (FCI→ICBC Inversiones, pagos→ICBC Visa/Master); ICBC CC
-  (`0905/02100757/27`) reconocida (era cuenta existente) y 6 traspasos CA↔CC marcados transfer.
+      marcadas transfer con contraparte (FCI→ICBC Inversiones, pagos→ICBC Visa/Master); ICBC CC
+      (`0905/02100757/27`) reconocida (era cuenta existente) y 6 traspasos CA↔CC marcados transfer.
 - [x] **Match-al-confirmar (transferencias de doble lado).** Problema: `confirmImport` creaba
-  **siempre las 2 patas**, pero casi todas las cuentas se importan → la misma transferencia
-  quedaba 2 veces (infla saldo/net worth). Nuevo flujo en `confirm.ts` (rama transfer):
-  crea solo la pata propia y, si la contraparte ya tiene una pata-transfer sin parear
-  same-currency (monto+fecha, 1 sola) → **parea** en vez de duplicar; same-ccy sin match →
-  crea ambas (FCI/cash/pago-TC, el otro lado no se importa); **cross-currency** → pata propia
-  sin parear (no se puede matchear por monto). Helpers puros nuevos en `_build-transfer.ts`
-  (`buildSingleTransferLeg`, `transferDirection`, `resignAmount`, `selectSameCurrencyTransferMatch`).
+      **siempre las 2 patas**, pero casi todas las cuentas se importan → la misma transferencia
+      quedaba 2 veces (infla saldo/net worth). Nuevo flujo en `confirm.ts` (rama transfer):
+      crea solo la pata propia y, si la contraparte ya tiene una pata-transfer sin parear
+      same-currency (monto+fecha, 1 sola) → **parea** en vez de duplicar; same-ccy sin match →
+      crea ambas (FCI/cash/pago-TC, el otro lado no se importa); **cross-currency** → pata propia
+      sin parear (no se puede matchear por monto). Helpers puros nuevos en `_build-transfer.ts`
+      (`buildSingleTransferLeg`, `transferDirection`, `resignAmount`, `selectSameCurrencyTransferMatch`).
 - [x] **Linkeo manual** (`linkAsTransfer` + `_transfer-candidates` + `TransferLinker` en el
-  detalle de transacción): para cross-currency/ambiguos, lista candidatos de otra cuenta en
-  sentido opuesto (±7 días) y los parea conservando moneda/monto de cada pata (compra de USD).
-  El detalle de una pata sin parear ya no redirige: ofrece linkearla.
+      detalle de transacción): para cross-currency/ambiguos, lista candidatos de otra cuenta en
+      sentido opuesto (±7 días) y los parea conservando moneda/monto de cada pata (compra de USD).
+      El detalle de una pata sin parear ya no redirige: ofrece linkearla.
 - [x] **Limpieza one-time:** 5 transferencias USD que ya estaban duplicadas en `transactions`
-  confirmadas (cada una en 2 pares idénticos) → borrado 1 par por grupo (10 patas). Saldos
-  corregidos y verificados (ej. Galicia CA USD 952,16→476,08). 0 duplicados restantes.
+      confirmadas (cada una en 2 pares idénticos) → borrado 1 par por grupo (10 patas). Saldos
+      corregidos y verificados (ej. Galicia CA USD 952,16→476,08). 0 duplicados restantes.
 - **Sin migraciones.** Suite 309→**318** (tests puros del matcher/dirección/re-signo).
 - [x] **Sync PRD Notion:** changelog **v1.8** + regla de conciliación de transferencias en §4.3.
 
@@ -650,48 +656,48 @@ truncaba por `max_tokens`. Los PDFs de movimientos (`EXT.DE.MOVIMIENTOS`) parsea
 líneas → al usuario le faltaban movimientos (impuestos, comisiones, FCI, pagos de tarjeta).
 
 - [x] **Carga manual del CSV (import `347a6ae9`)** — Parseo determinístico ad-hoc por script
-  local (sin secretos: solo lee el archivo) + carga por SQL (MCP). 367 movimientos
-  2026-01-02→06-09, verificados por checksum de montos (suma abs `428.777.231,16`). Dedup
-  contra transferencias ya importadas (110 marcadas duplicadas; **falso positivo** de un dedup
-  por date+monto sobre montos redondos → se corrigió recuperando 5 líneas FCI/QR). Pase de
-  **categorización/transferencia** (yo como LLM, sin API): FCI→transferencia a `ICBC
-  Inversiones`, pago tarjeta→transferencia a la tarjeta, + categorías sistemáticas (Gastos
-  bancarios / Intereses / Otros ingresos / Sueldo / Supermercado). Todo como **sugerencia** en
-  `pending` (revisión humana intacta). Decisiones de negocio confirmadas con Nico (FCI y pago
-  de tarjeta = transferencias, no gasto).
+      local (sin secretos: solo lee el archivo) + carga por SQL (MCP). 367 movimientos
+      2026-01-02→06-09, verificados por checksum de montos (suma abs `428.777.231,16`). Dedup
+      contra transferencias ya importadas (110 marcadas duplicadas; **falso positivo** de un dedup
+      por date+monto sobre montos redondos → se corrigió recuperando 5 líneas FCI/QR). Pase de
+      **categorización/transferencia** (yo como LLM, sin API): FCI→transferencia a `ICBC
+Inversiones`, pago tarjeta→transferencia a la tarjeta, + categorías sistemáticas (Gastos
+      bancarios / Intereses / Otros ingresos / Sueldo / Supermercado). Todo como **sugerencia** en
+      `pending` (revisión humana intacta). Decisiones de negocio confirmadas con Nico (FCI y pago
+      de tarjeta = transferencias, no gasto).
 - [x] **#37 — Notación científica en montos del parser.** ICBC exporta montos grandes como
-  `1.4090103E7`; el regex de `amountOriginal` los rechazaba → fallaba el parseo entero. El
-  preprocess de `parsedTxLineSchema` ahora los expande a decimal plano. +2 tests.
+      `1.4090103E7`; el regex de `amountOriginal` los rechazaba → fallaba el parseo entero. El
+      preprocess de `parsedTxLineSchema` ahora los expande a decimal plano. +2 tests.
 - [x] **#38 — Parser determinístico de CSV (ICBC banco).** Campo opcional `parseCsv?` en el
-  tipo `Parser`; implementado para ICBC banco (`MM/DD/YY`→ISO, débito/crédito→kind, expande
-  científica, + inteligencia de conceptos FCI/tarjeta→transferencia y categorías). `parse-internal`
-  lo usa si existe y el formato matchea; si no (`CsvFormatError`) cae al LLM. Hint transitorio
-  `transferAccountName`→`transferAccountId` resuelto por nombre de cuenta. **A partir de ahora
-  el CSV de ICBC se parsea solo, sin LLM, sin timeout, sin costo.** Nuevo `icbc-banco.test.ts`
-  (9 casos, filas sintéticas). Suite 300→**309**.
+      tipo `Parser`; implementado para ICBC banco (`MM/DD/YY`→ISO, débito/crédito→kind, expande
+      científica, + inteligencia de conceptos FCI/tarjeta→transferencia y categorías). `parse-internal`
+      lo usa si existe y el formato matchea; si no (`CsvFormatError`) cae al LLM. Hint transitorio
+      `transferAccountName`→`transferAccountId` resuelto por nombre de cuenta. **A partir de ahora
+      el CSV de ICBC se parsea solo, sin LLM, sin timeout, sin costo.** Nuevo `icbc-banco.test.ts`
+      (9 casos, filas sintéticas). Suite 300→**309**.
 - **Confirmado:** el "fix #2 async parse" que se iba a hacer **ya estaba en `main`** (parseo en
   `after()`, `drainUploadedImports`, reaper, `reparseable` con `'parsing'`); el checkout local
   estaba viejo. El gap real era el timeout del LLM en archivos grandes, que el parser
   determinístico de CSV resuelve para bancos conocidos.
 - [x] **Galicia: carga manual del xlsx + parser determinístico (#42).** Galicia exporta la caja
-  de ahorro como **`.xlsx`** (el importador no lo aceptaba). (1) **Carga manual** (import
-  `e36d50d2`, cuenta `Galicia Caja de Ahorro` de Nico): 104 movimientos feb–jun 2026, checksum
-  `44.694.540,60`, contraparte (CUIT/CBU/nombre) extraída del campo Movimiento multilínea, 6
-  duplicados auto-rechazados. **Regla nueva confirmada con Nico**: transferencias hacia/desde
-  cuentas de **Nico Y Pau** (por CUIT, DNIs `30555106`/`28864311`) = transfer; FIMA = transfer a
-  inversión; pago de tarjeta = transfer. (2) Se **creó cuenta `Galicia Inversiones · Nico`**
-  (`72fb8a5a`) y se asociaron los 8 movimientos FIMA. (3) **#42**: el importador acepta `.xlsx`
-  (helper `lib/imports/xlsx.ts` con `jszip`, sin paquete nuevo); hook `Parser.parseXlsx`; parser
-  Galicia banco; `parse-internal` con rama xlsx + resolución `transferAccountName` **owner-aware**
-  (cuentas con nombre duplicado por dueño Nico/Pau → se elige la del mismo `owner_tag`). Suite
-  309→**324**. **A partir de ahora el xlsx de Galicia entra solo, sin LLM.**
+      de ahorro como **`.xlsx`** (el importador no lo aceptaba). (1) **Carga manual** (import
+      `e36d50d2`, cuenta `Galicia Caja de Ahorro` de Nico): 104 movimientos feb–jun 2026, checksum
+      `44.694.540,60`, contraparte (CUIT/CBU/nombre) extraída del campo Movimiento multilínea, 6
+      duplicados auto-rechazados. **Regla nueva confirmada con Nico**: transferencias hacia/desde
+      cuentas de **Nico Y Pau** (por CUIT, DNIs `30555106`/`28864311`) = transfer; FIMA = transfer a
+      inversión; pago de tarjeta = transfer. (2) Se **creó cuenta `Galicia Inversiones · Nico`**
+      (`72fb8a5a`) y se asociaron los 8 movimientos FIMA. (3) **#42**: el importador acepta `.xlsx`
+      (helper `lib/imports/xlsx.ts` con `jszip`, sin paquete nuevo); hook `Parser.parseXlsx`; parser
+      Galicia banco; `parse-internal` con rama xlsx + resolución `transferAccountName` **owner-aware**
+      (cuentas con nombre duplicado por dueño Nico/Pau → se elige la del mismo `owner_tag`). Suite
+      309→**324**. **A partir de ahora el xlsx de Galicia entra solo, sin LLM.**
 - **Cuentas Galicia duplicadas = OK** (no son dups): una de Nico y otra de Pau (Caja Ahorro,
   Visa, Master). **No tocar.**
 - **Limitación conocida:** los DNIs del household están como constante en el parser Galicia
   (`HOUSEHOLD_DNIS`); mejora futura = moverlos a config/DB.
 - **Sin migraciones.** Todo jsonb / columnas existentes.
 - [x] **Sync PRD Notion:** changelog **v1.7** (CSV ICBC) + **v1.8** (xlsx + Galicia banco) + notas
-  en §5.2 + bump de "Última actualización".
+      en §5.2 + bump de "Última actualización".
 
 ### Sesión 2026-06-09 — Contrapartes editables + UX de revisión de imports (en paralelo con otro agente)
 
@@ -702,6 +708,7 @@ Sesión de soporte/UX sobre imports, **con otro(s) agente(s) trabajando en paral
 - [x] **#21/#18** — **UX revisión:** (a) asignar categoría a una línea marcada como transfer la **desmarca** automáticamente (inline, en edición y en lote) — categoría y "cuenta contraparte" mutuamente excluyentes. (b) **Type-ahead** en los selectores inline de categoría y contraparte (`CategoryCombobox` generalizado a `Combobox` reutilizable). (c) Barra de selección masiva **sticky** arriba (movida a hija directa de la `section` para que el `sticky` no se despegue; un intento previo con scroll interno de la tabla se revirtió por feedback).
 - [x] **#22** — **Lista de imports:** (a) entra por default a la vista **"Para revisar"** = todos los estados accionables, no solo `parsed`+`reviewing` → ahora incluye `uploaded`/`parsing` (todo lo que no es `confirmed` ni `error`, derivado de `IMPORT_STATUSES`). (b) "Resúmenes faltantes" (`detect-gaps`) no reporta meses **previos a 2026** (`EARLIEST_TRACKED_MONTH='2026-01'`); el tracking del household arranca en 2026.
 - [x] **#23** — **Marcar/desmarcar transferencia en lote** (`bulkSetTransfer`, jsonb_set): la detección automática marca como transfer muchos pagos a terceros que son gastos; botones "Marcar transfer"/"No es transfer" en la barra de selección. Marcar limpia la categoría; desmarcar limpia `transferAccountId`. SQL jsonb validado contra Postgres.
+
 #### Endurecimiento del parseo + auto-parse (continuación, misma sesión, PRs #25–#32)
 
 Tras subir más extractos aparecieron imports trabados en `parsing` y 504/500. Se diagnosticó y arregló la cadena completa del parseo:
@@ -725,11 +732,13 @@ Tras subir más extractos aparecieron imports trabados en `parsing` y 504/500. S
 Caso de Nico: transferencias recibidas que no son ingresos sino **devoluciones de un gasto** (ej. paga el 100% de la cuota del cole y le devuelven la mitad → quiere que el gasto neto sea 50%). Decisión de modelado: un reembolso es un **gasto con monto negativo en la misma categoría** (no un ingreso). El mecanismo ya existía parcialmente (la tabla ya badgeaba "Devolución" por signo, schema y reportes ya neteaban); esta sesión agrega la UX guiada + blinda el donut.
 
 **Decisiones de negocio (Nico, 2026-06-08):**
+
 - Reembolso = **gasto negativo suelto contra la categoría** (sin vincular a la transacción original). Más simple; netea igual en todos los reportes.
 - Si el gasto era deducible Ganancias, el reembolso lleva `deducible_ganancias=true` → el deducible baja al **neto** (el export ya suma `monto_usd` con signo, sale solo).
 - Atribución al **mes en que se recibe** la plata (consistente con flujo de caja; puede dejar una categoría en neto negativo ese mes).
 
 **Cambios:**
+
 - [x] `transaction-form.tsx`: checkbox "Es una devolución / reembolso recibido" (solo en gasto). El usuario tipea el monto en positivo; al enviar se persiste negado (flip de signo sobre el string, sin float). Label "Monto recuperado", helper text, reset al cambiar a ingreso, y detección en modo edición (gasto con monto negativo → pre-tilda + muestra en positivo).
 - [x] `reports/breakdown/donut.tsx`: excluye del Pie las categorías con neto ≤ 0 (Recharts rompe con porciones negativas); alinea los `Cell` con las filas visibles; fallback si no queda ninguna positiva.
 - [x] `reports/breakdown/page.tsx`: clamp del ancho de la barra del detalle a ≥ 0.
@@ -754,7 +763,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] **Auto-sugerir cuenta destino por nº de extracto (decisión Nico):** el parser extrae el nº de cuenta propia del encabezado (`statementAccount.number`) → `imports.statement_account_ref`. En la revisión, si matchea `accounts.account_number` se preselecciona la cuenta ("sugerida por Nº X"); si no, banner pidiendo elegir la cuenta y se **aprende** el nº (`learnAccountNumber`, solo si la cuenta no tiene número) — red de seguridad también al confirmar. **Migración `0013`** (aditiva: `accounts.account_number`, `imports.statement_account_ref`) **aplicada a prod vía MCP de Supabase** (idempotente, `ADD COLUMN IF NOT EXISTS`). Trabajado en git worktree aislado. typecheck + lint + 278 tests + build OK.
   - **Nota:** `0013` se aplicó por MCP, no por `db:migrate`. El journal de Drizzle no la registra; el `.sql` es idempotente, así que un `db:migrate` futuro es no-op seguro.
 - [x] **Parseo async con `after()` (resuelve el pendiente V1.2 de #13):** `parseImport` ahora marca `status='parsing'` + `parsing_started_at` sincrónico y agenda el trabajo pesado (descarga + LLM + persistencia) con `after()` de `next/server` — responde al instante, no deja la request del usuario colgada esperando al LLM. Sigue acotado a `maxDuration` (300s); si se pasa, queda en `parsing` y la UI lo detecta como "cortado" vía `isParseStale(parsing_started_at)` ofreciendo reintentar (en vez de "en curso" para siempre). El cron de Gmail sigue síncrono (batch). **Migración `0014`** (`imports.parsing_started_at`, aditiva) aplicada a prod vía MCP. Helper puro `lib/imports/parse-stale.ts` con tests. typecheck + lint + 284 tests + build OK.
-  - **Follow-up opcional:** un *reaper* (cron) que marque `error` los `parsing` stale para que la lista `/imports` y los contadores no los muestren colgados. Hoy se resuelve con el reintento + el mensaje de "cortado".
+  - **Follow-up opcional:** un _reaper_ (cron) que marque `error` los `parsing` stale para que la lista `/imports` y los contadores no los muestren colgados. Hoy se resuelve con el reintento + el mensaje de "cortado".
 
 ### Sesión 2026-05-29 (cont.) — Password PDF manual + ownerTag en dropdowns (branch `feat/manual-pdf-password`, hecho con Antigravity)
 
@@ -779,9 +788,11 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 ### Sesión 2026-05-29 — Acciones pendientes (dashboard + página `/pendientes`)
 
 **Merge + deploy de `optimizaciones`:**
+
 - [x] PR #5 (`optimizaciones → main`) mergeado y deployado a producción en Vercel. Incluyó el namespacing de `globalThis.__gdFinanzasDb` (fix de code review).
 
 **Feature: Acciones pendientes (branch `feat/pending-actions`):**
+
 - [x] Data layer `lib/reports/pending-actions.ts` — `loadPendingActions` + `classifyOverdue` (puro, testeado) + `countPendingActions`. Agrega: imports para revisar (`parsed`/`reviewing`), imports con error, previsiones vencidas (`missed` + `pending` vencida en gracia), resúmenes mensuales faltantes (reusa `detectImportGaps`), y presupuesto del mes sin definir.
 - [x] Página dedicada `/pendientes` con secciones agrupadas y links de acción a `/imports/[id]`, `/imports/new`, `/forecasts`, `/budget`.
 - [x] Bloque-resumen en el dashboard (`PendingActionsSummary`) arriba del HERO; estado "Todo al día" cuando no hay pendientes.
@@ -794,6 +805,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 ### Sesión 2026-05-28 — Code Review y Optimizaciones
 
 **Revisión y Refactorización del Codebase (Branch `optimizaciones`):**
+
 - [x] **Savings Rate (Reporte D):** Se corrigió la fórmula del ratio de ahorro acumulado `savingsRateYtdPct` para usar `savingsYtd` en vez de `netYtd`, permitiendo que los egresos en categorías `isInvestment` sumen correctamente como ahorro. Test de regresión agregado.
 - [x] **Cron de Gmail:** Se eliminó el riesgo de crash del driver Postgres (conversión errónea de UUID) al pasar un `userId` nulo válido en lugar de un string vacío `''` en `createImportInternal`.
 - [x] **Paralelización de Cotizaciones:** Se optimizó `fetchQuotes` para solicitar cotizaciones de Yahoo Finance concurrentemente usando `Promise.all`, evitando la latencia secuencial en el formulario de patrimonio.
@@ -803,6 +815,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Cambios confirmados: `typecheck && lint && test` limpios. Branch `optimizaciones` creada y pusheada a GitHub.
 
 **Pendiente próxima sesión:**
+
 - [ ] Test E2E Gmail import ICBC banco (subir 4 PDFs reales en el correo de Nico, verificar routing + parsing en prod/dev)
 
 ---
@@ -812,6 +825,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 ### Sesión 2026-05-25 — ICBC Banco Parser + Multi-Attachment Gmail
 
 **ICBC banco — parser + routing multi-adjunto:**
+
 - [x] Migración 0010: `pdf_password` en tabla `accounts` (override de `institutions.pdf_password`)
 - [x] UI: campo "Contraseña PDF" en form de crear/editar cuenta
 - [x] `parse-internal.ts`: prioriza password de cuenta sobre institución
@@ -826,6 +840,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 ### Sesión 2026-05-24 — Patrimonio V2
 
 **Patrimonio implementado:**
+
 - [x] Schema DB: enum `asset_type`, tablas `net_worth_snapshots`, `account_balances`, `holdings`
 - [x] Migración 0006 aplicada + RLS policies (0003_patrimonio_rls.sql)
 - [x] Yahoo Finance helper (`yahoo-finance2`) para precios de mercado (US stocks, CEDEARs, bonos AR)
@@ -841,6 +856,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Typecheck + lint + 255 tests verdes
 
 **Transfers en imports bancarios:**
+
 - [x] Campo `isTransfer` + `transferAccountId` en `parsedTxLineSchema` (con alias handling)
 - [x] Auto-detección post-parse (`lib/imports/detect-transfers.ts`) con patrones TRANSF/TRF/DEBIN/etc.
 - [x] Integración en `parse.ts`: detectTransfers se ejecuta para imports tipo "banco"
@@ -851,6 +867,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Typecheck + lint + 255 tests verdes
 
 **Validación de imports — subtotales + link al PDF:**
+
 - [x] Columnas `summary` (JSONB) y `fileName` (text) en tabla imports + migración 0007
 - [x] `generateSignedUrl()` en `lib/imports/storage.ts` para URLs firmadas de Supabase Storage
 - [x] `parserOutputSchema` ampliado con campo `summary` opcional (totalExpense, totalIncome, currency) + alias handling
@@ -866,16 +883,19 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Typecheck + lint + 255 tests verdes
 
 **Sorting en /budget y /forecasts:**
+
 - [x] Budget grid: headers sortables por nombre de categoría y total anual (client-side, respeta jerarquía padre/hijo)
 - [x] Forecasts: sort por fecha/nombre/monto dentro de cada mes (server-side via URL params)
 
 **Alertas de información no cargada:**
+
 - [x] Columna `expects_monthly_import` en accounts + migración 0008
 - [x] Checkbox en account form + badge "Import mensual" en lista de cuentas
 - [x] `lib/imports/detect-gaps.ts`: detecta meses sin import confirmado para cuentas con flag
 - [x] Bloque de alertas en `/imports` con meses faltantes + links directos a `/imports/new`
 
 **Import desde Gmail:**
+
 - [x] Gmail API client (`lib/gmail/client.ts`) — listMessages, getAttachments, moveToProcessed, findOrCreateLabel, listUserLabels
 - [x] OAuth script (`npm run oauth:google-token`) con scopes Drive + Gmail combinados
 - [x] Columna `gmail_label_id` en accounts (migración 0009) — mapeo label ↔ cuenta
@@ -885,6 +905,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Sidebar nav: link "Gmail" en Settings
 
 **Pendiente próxima sesión:**
+
 - [ ] Import multi-archivo cross-institución (seleccionar institución/cuenta por archivo)
 - [ ] Activar Gmail import: correr `oauth:google-token`, crear labels en Gmail, configurar filtros, mapear en `/settings/gmail`
 
@@ -893,6 +914,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 ### Sesión 2026-05-22/23 — Operacional + mejoras de imports
 
 **Data real cargada:**
+
 - [x] Taxonomía de categorías cerrada con Nico (Alquiler income, Autónomos, sin Delivery, Personales con children Regalos/Suscripciones streaming/Suscripciones IA/Varios, Seguros, Gastos bancarios, Impresión 3D, Mario)
 - [x] 19 cuentas reales seedeadas (Nico + Pau + Hogar)
 - [x] Budget 2026 cargado desde Excel (188 entradas, 18 categorías × 12 meses)
@@ -901,6 +923,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Múltiples resúmenes de TC importados (ICBC Visa, Galicia Amex/Visa/Master, BNA Visa, HSBC US)
 
 **Mejoras de imports implementadas:**
+
 - [x] Redirect post-confirm con opciones (ver txns / importar otro)
 - [x] Sugerencia de categoría normalizada (quita cuotas C.XX/XX y montos entre paréntesis)
 - [x] Sugerencia desde import_lines históricas (no solo transactions)
@@ -925,6 +948,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Parsers ignoran filas de pago ("SU PAGO", etc.)
 
 **Mejoras UI:**
+
 - [x] Headers sortables en /transactions (server-side via URL params) y /imports/[id] review (client-side)
 - [x] Account default por institución en confirm + por accountId si viene del upload
 - [x] Owner tag en dropdown de cuentas (distingue Nico/Pau)
@@ -932,6 +956,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Sin-categoría primero en import review
 
 **Pendiente próxima sesión:**
+
 - [ ] **Patrimonio V2** — valuación de inversiones, saldos de cuentas, trayectoria a IF completa
 - [ ] Transfers en imports bancarios (depende de patrimonio)
 - [ ] Parser ICBC Mastercard — sigue extrayendo solo 8 líneas (problema de lectura del PDF, no del prompt)
@@ -943,6 +968,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 ## Hitos
 
 ### 🟢 Hito 0 — Setup (local)
+
 **Output esperado:** Next.js + Supabase + Vercel + login funcional + STATUS.md
 
 - [x] Estructura de repo (Next 16, TS strict, ESLint flat, Prettier, Vitest, Tailwind v4)
@@ -963,6 +989,7 @@ Sesión de soporte sobre imports en prod (Vercel Hobby). PRs #10–#14 + feature
 - [x] Validación verde: `typecheck && lint && test && build`
 
 Deploy a producción (2026-05-14):
+
 - [x] Repo en GitHub creado y pusheado a `nixgore83/gd-finanzas`
 - [x] Vercel: proyecto `gd-finanzas-z4dl`, env vars cargadas en Production, deploy verde
 - [x] Supabase: Site URL = `https://gd-finanzas-z4dl.vercel.app`, redirect URLs incluyen `/auth/callback` para prod y `localhost:3000` para dev
@@ -971,6 +998,7 @@ Deploy a producción (2026-05-14):
 - [ ] **Smoke test producción del magic link** — pendiente por rate limit del SMTP built-in de Supabase (2 mails/hora, no editable en free). Reintentar la próxima vez que haya que iniciar sesión en prod. Verificar que el link del mail tenga `redirect_to=https://gd-finanzas-z4dl.vercel.app/auth/callback` (con el path, no solo el dominio raíz).
 
 MFA TOTP (2026-05-14):
+
 - [x] TOTP habilitado en Supabase (Authentication → Multi-Factor → TOTP "Enabled")
 - [x] `mfaCodeSchema` (6 dígitos numéricos) en `lib/schemas/auth.ts`
 - [x] Helper `getMfaState()` en `lib/auth/mfa.ts` (returns `'enroll' | 'challenge' | 'ok'` según AAL)
@@ -985,6 +1013,7 @@ MFA TOTP (2026-05-14):
 ### 🟢 Hito 1 — Modelo base + cuentas
 
 **1.A — Schema + RLS (2026-05-14, hecho):**
+
 - [x] 13 tablas Drizzle en `db/schema/*` (un archivo por entidad): institutions, accounts, categories, tags, transaction_tags, transactions, recurrences, forecasts, budgets, fx_rates, imports, import_lines, financial_goals
 - [x] 11 pgEnums en `db/schema/enums.ts` (currency, account_type, category_kind, transaction_kind, transaction_subtype, transaction_source, recurrence_frequency, forecast_status, import_type, import_status, import_line_status)
 - [x] Migración `0001_parallel_groot.sql` generada y aplicada (349 líneas, FKs e índices incluidos)
@@ -995,6 +1024,7 @@ MFA TOTP (2026-05-14):
 - [x] Validación verde: typecheck + lint + 28 tests + build
 
 **1.B — CRUD cuentas + seed instituciones (2026-05-14, hecho):**
+
 - [x] Seed idempotente de 13 `institutions` (Galicia, ICBC, BBVA, Santander, Macro, BNA, Mercado Pago, Brubank, Naranja X, Balanz, Cocos, IOL, HSBC US) via `npm run db:seed:institutions`
 - [x] Schemas Zod: `lib/schemas/account.ts` con `accountInputSchema` (refine `institutionId` requerido si `type !== 'cash'`), `parseAccountFormData` helper, `ACCOUNT_TYPE_LABELS` para UI; 10 tests
 - [x] Helper `lib/auth/session.ts` con `requireHouseholdSession()` que valida user + AAL2 + membership; lanza `SessionError` tipado. Pivota el modelo de tenancy: Drizzle se conecta como `postgres` role (bypass RLS) → el `household_id` se setea explícito desde la sesión y todas las queries filtran por él
@@ -1007,6 +1037,7 @@ MFA TOTP (2026-05-14):
 ### 🟢 Hito 2 — FX feed BCRA
 
 **2.A — Cliente BCRA + helper + backfill manual (2026-05-15, hecho):**
+
 - [x] `lib/fx/bcra.ts`: `listBcraVariables()` y `fetchBcraSeries({ idVariable, desde, hasta, limit })` contra `https://api.bcra.gob.ar/estadisticas/v3.0/Monetarias`, con Zod del payload, timeout 15s y `BcraApiError` tipado
 - [x] `lib/fx/resolve.ts`: función pura `resolveFxRate(rows, targetDate, currencyPair)` con fallback al día previo y flag `BCRA_last_available`; 7 tests cubriendo match exacto, fallback, finde largo, anterior a todo, vacío, filtrado por pair, posteriores
 - [x] `lib/fx/get-fx-rate.ts`: helper `getFxRate({ date, currency })` que consulta `fx_rates` via Drizzle (`getDb()`), aplica `resolveFxRate`, devuelve `{ rate: Decimal, source, effectiveDate }`. Atajo identity para ARS (rate=1, source=`identity`). Throw `FxRateNotFoundError` si no hay nada en los últimos 30 días <= target
@@ -1015,18 +1046,21 @@ MFA TOTP (2026-05-14):
 - [x] Validación verde: typecheck + lint + 45 tests + build
 
 **2.B — Cron Vercel (2026-05-17, hecho):**
+
 - [x] `app/api/cron/fx/route.ts`: GET con auth `Authorization: Bearer ${CRON_SECRET}`, fetch BCRA con ventana de 7 días hacia atrás, UPSERT con Drizzle `onConflictDoUpdate`. Loggea solo conteos. Devuelve 401 si falla auth, 502 si BCRA falla
 - [x] `vercel.json` con cron diario `0 14 * * *` (14:00 UTC ≈ 11:00 AR) apuntando a `/api/cron/fx`
 - [x] `lib/env.ts` + `.env.example`: `CRON_SECRET` (≥16 chars) y `BCRA_FX_MINORISTA_VARIABLE_ID` (coerce a int positivo)
 - [x] Validación verde: typecheck + lint + 45 tests + build (route registrada como `ƒ /api/cron/fx`)
 
 **2.C — Migración a API v4 (2026-05-17, hecho):**
+
 - [x] La v3.0 devolvió 400 con `"Método correspondiente a la v3 ha sido deprecado."`; migrado a `https://api.bcra.gob.ar/estadisticas/v4.0`
 - [x] El endpoint de serie v4 anida los puntos en `results[].detalle[]`; `fetchBcraSeries()` ahora aplana antes de devolver — la firma pública (`BcraSeriesPoint[]`) no cambió, los callers (script de backfill, route del cron) no se tocaron
 - [x] `npm run fx:list-vars` corrió OK contra v4: **idVariable=4 = "Tipo de cambio minorista (promedio vendedor)"** (Principales Variables)
 - [x] Validación verde: typecheck + lint + 45 tests + build
 
 **2.D — Activación operacional (2026-05-17, hecho):**
+
 - [x] `BCRA_FX_MINORISTA_VARIABLE_ID=4` y `CRON_SECRET` (hex 32 bytes) cargadas en `.env.local` y en Vercel Production
 - [x] Deploy en Vercel registró `/api/cron/fx` en la pantalla de Cron Jobs (schedule `0 14 * * *`)
 - [x] Smoke `/api/cron/fx` sin auth → 401, con Run desde Vercel → 200 + upsert OK
@@ -1036,6 +1070,7 @@ MFA TOTP (2026-05-14):
 ### 🟢 Hito 3 — Transacciones manuales
 
 **3.A — Alta + lista income/expense end-to-end (2026-05-17, hecho):**
+
 - [x] `scripts/seed-categories-placeholder.ts` + `npm run db:seed:categories-placeholder`: 2 categorías por household ("Ingresos varios"/income, "Gastos varios"/expense), idempotente vía `WHERE NOT EXISTS`
 - [x] `lib/schemas/transaction.ts`: `transactionInputSchema` (date, accountId, categoryId, kind, amountOriginal positivo, currencyOriginal, description, notes opcional) + `parseTransactionFormData`; 12 tests
 - [x] `app/actions/transactions/create.ts`: valida sesión + parsea input + chequea que account y category pertenezcan al household (con WHERE doble) + matchea category.kind con transaction.kind + llama `getFxRate` + calcula amountUsd/amountArs con Decimal + INSERT con `source='manual'`, `transactionSubtype='standard'`, `createdBy=session.userId`
@@ -1044,6 +1079,7 @@ MFA TOTP (2026-05-14):
 - [x] Validación verde: typecheck + lint + 57 tests + build + `db:smoke-rls` 8/8
 
 **3.B — Edit + delete + manual FX override (2026-05-17, hecho):**
+
 - [x] `lib/schemas/transaction.ts`: sumado `fxRateOverride` (opcional, canonicaliza a 6 decimales, rechaza ≤0 / no-numérico); 15 tests
 - [x] `app/actions/transactions/_build.ts`: helper compartido `buildTransactionFields(input, householdId)` que valida refs (account + category en household, kind match) y resuelve FX (override → `manual_override`, sino `getFxRate` → fuente real)
 - [x] `app/actions/transactions/create.ts`: refactor para usar `_build`
@@ -1056,6 +1092,7 @@ MFA TOTP (2026-05-14):
 - [x] Validación verde: typecheck + lint + 60 tests + build + `db:smoke-rls` 8/8
 
 **3.C — Transferencias entre cuentas (2026-05-17, hecho):**
+
 - [x] `lib/schemas/transfer.ts`: `transferInputSchema` con refine (cuentas distintas), `amountFrom` y `amountTo` siempre obligatorios, `fxRateOverride` opcional; 9 tests
 - [x] `app/actions/transactions/_build-transfer.ts`: helper que carga ambas cuentas, valida pertenencia + archived, resuelve FX (override o BCRA), arma fromLeg (signo negativo) y toLeg (signo positivo) en su moneda original; genera `transfer_pair_id` o reusa el existente en edit
 - [x] `create-transfer.ts`: INSERT batch de 2 filas con mismo `pairId`, `kind='transfer'`, `category_id=null`
@@ -1068,12 +1105,14 @@ MFA TOTP (2026-05-14):
 - [x] Validación verde: typecheck + lint + 69 tests + build + `db:smoke-rls` 8/8
 
 **3.D.1 — Filtros + paginación (2026-05-17, hecho):**
+
 - [x] `/transactions/page.tsx`: parseo de search params con Zod field-por-field (descarta inválidos sin romper UX), WHERE dinámico con `and(...)`, dos queries (count + page), `LIMIT 50 OFFSET (page-1)*50`
 - [x] Form GET nativo arriba de la tabla: búsqueda (`q` ilike), kind, accountId, categoryId, from, to. Submit recarga con nuevos params; "Limpiar" es link a `/transactions`. Sin client interactividad → no se incluye hidden `page`, se resetea a 1 al filtrar
 - [x] Paginador abajo: "Mostrando X–Y de Z" + Prev/Next como `<Link>` preservando filtros vía helper `buildHref`. Se oculta cuando hay 1 sola página
 - [x] Validación verde: typecheck + lint + 69 tests + build + `db:smoke-rls` 8/8
 
 **3.D.2 — Tags m:n + filtro + badges (2026-05-18, hecho):**
+
 - [x] `lib/schemas/tag.ts`: `tagInputSchema` (name, color hex opcional con regex), `tagIdsSchema` (array uuids con cap=20 y dedupe); 12 tests
 - [x] `lib/schemas/transaction.ts` + `transfer.ts`: campos `tagIds` opcional (default []), parser extrae `formData.getAll('tagIds')`; +3 tests cada uno
 - [x] `app/actions/tags/`: `create.ts` + `update.ts` (con guard `23505` para unique violation → `name_taken`) + `delete.ts` (hard delete, CASCADE limpia junction)
@@ -1093,6 +1132,7 @@ Cerrar taxonomía.
 ### 🟢 Hito 4 — Recurrencias + previsiones
 
 **4.A — CRUD de recurrencias + generación auto de forecasts (2026-05-18, hecho):**
+
 - [x] `lib/recurrences/forecasts.ts`: `computeForecastDates(...)` puro, sin DB, sin timezone. Soporta monthly/bimonthly/quarterly/yearly + clamp a último día del mes. Rolling 12 meses (PRD §5.3); 11 tests cubren day 31 en feb (leap/no-leap), endDate cortando horizon, startDate posterior, etc.
 - [x] `lib/schemas/recurrence.ts`: `recurrenceInputSchema` (name/account/category/kind/amount/currency/frequency/dayOfMonth 1-31/start/end/active) + refine endDate >= startDate. `custom` del enum DB queda fuera del schema en V1. 11 tests
 - [x] `app/actions/recurrences/_sync.ts`: `syncForecasts(tx, recurrenceId, input, today)`. Borra pending del futuro (no toca history) + regenera con `computeForecastDates`. Llamable desde `db.transaction` para atomicidad
@@ -1103,6 +1143,7 @@ Cerrar taxonomía.
 - [x] Validación verde: typecheck + lint + 108 tests + build + `db:smoke-rls` 8/8
 
 **4.B — Cashflow proyectado + matching manual + missed cron (2026-05-18, hecho):**
+
 - [x] `lib/forecasts/candidates.ts`: `rankCandidates(candidates, tx)` puro, filtra por |date diff| ≤ 5d y |amount usd diff %| ≤ 10%; ordena por proximidad de fecha luego de monto; 9 tests
 - [x] `app/actions/forecasts/_candidates.ts`: helper `findMatchCandidates(txId, householdId)` con pre-filter SQL (account, kind, pending, ventana ±5d) + conversión a USD via `getFxRate` por candidate + `rankCandidates` + cap top 5
 - [x] Server actions: `cancel.ts` (pending→cancelled), `link.ts` (db.transaction: forecast→matched + tx.recurrence_id; bloquea si already_linked), `unlink.ts` (revertir)
@@ -1118,6 +1159,7 @@ Cerrar taxonomía.
 ### 🟢 Hito 5 — Dashboard + Reporte A (V1.0 funcional 🎉)
 
 **5.A — Budgets grilla editable categoría × mes (2026-05-18, hecho):**
+
 - [x] `lib/schemas/budget.ts`: `budgetInputSchema` (year 2020-2100, month 1-12, categoryId, amountUsd vía moneySchema permite 0 y negativos); 8 tests
 - [x] `lib/budgets/leaves.ts`: `isLeafCategory` + `leafIdsOf` (parent es hoja si nadie lo referencia como parent); 5 tests
 - [x] `lib/categories/tree.ts` ampliado: `CategoryNode` incluye `parentId: string | null`
@@ -1127,6 +1169,7 @@ Cerrar taxonomía.
 - [x] Validación verde: typecheck + lint + 130 tests + build + `db:smoke-rls` 8/8
 
 **5.B — Reporte A: cashflow real vs budget (2026-05-18, hecho):**
+
 - [x] `lib/reports/cashflow.ts`: `buildCashflowReport(tree, budgets, reals)` puro. Agrega children en parents recursivamente, calcula Δ USD y Δ % (null si budget=0). Helper `deltaTone(kind, delta)` para colorear: income+ = good, expense− = good. 11 tests
 - [x] `lib/reports/cashflow-data.ts`: `loadCashflowData(householdId, year, month)` carga tree + budgets + agrega `SUM(amount_usd) GROUP BY category_id` con WHERE date BETWEEN month range + kind IN income/expense + category_id NOT NULL (transfers fuera). `monthRange(y,m)` exportable
 - [x] `/reports/cashflow` server page con selector ◀ prev / next ▶, tabla con orden de árbol (parents arriba con subtotales calculados, children indentados), tfoot con Total Ingresos / Gastos / Neto. Drill-down: click en categoría hoja → `/transactions?categoryId=X&from=YYYY-MM-01&to=YYYY-MM-DD`
@@ -1136,6 +1179,7 @@ Cerrar taxonomía.
 ### 🟢 Hito 6 — Reportes B + C
 
 **6.A — Reporte B: breakdown gastos por categoría (2026-05-18, hecho):**
+
 - [x] `npm install recharts` (3.8.1, compatible con React 19)
 - [x] `lib/reports/breakdown.ts`: `rollupBuckets` puro que agrupa por hoja o por parent según `level`. Buckets con amount=0 se omiten; ordena por amount desc; calcula pct. 6 tests
 - [x] `lib/reports/breakdown-data.ts`: SQL SUM agrupado JOIN categories (con self-alias para parents) WHERE kind='expense' AND mes range → buckets crudos → `rollupBuckets`
@@ -1145,6 +1189,7 @@ Cerrar taxonomía.
 - [x] Validación verde: typecheck + lint + 147 tests + build + `db:smoke-rls` 8/8
 
 **6.B — Reporte C: evolución 12 meses (2026-05-18, hecho):**
+
 - [x] `lib/reports/evolution.ts`: `rollingMonths(endY, endM, count)` para llenar gaps + `buildEvolutionSeries` puro que ordena, calcula net y arma labels "MMM YY"; 7 tests
 - [x] `lib/reports/evolution-data.ts`: SQL GROUP BY `EXTRACT(year/month FROM date), kind` SUM en USD o ARS según param + WHERE household + kind IN income/expense + opcional categoryId; llena meses sin data con `{0, 0}`
 - [x] `/reports/evolution` page con: navegador "Mover ventana atrás/adelante", form GET con selector moneda + selector categoría (tree indentado), totales 12m abajo (Ingresos / Gastos / Neto coloreado)
@@ -1157,6 +1202,7 @@ Cerrar taxonomía.
 ### 🟡 Hito 7 — Reporte D + Settings metas
 
 **7.A — /settings/metas con financial_goals CRUD (2026-05-18, hecho):**
+
 - [x] `lib/schemas/financial-goals.ts`: `financialGoalsInputSchema` (targetAhorroMensualUsd, edades 18-120 ints, retiro/educación/buffer positivos, notas ≤2000); 8 tests
 - [x] `lib/financial-goals/defaults.ts`: constantes del PRD validadas con Pau 2026-05-05 (USD 5.700 ahorro, edades 58/60, retiro 2.23M, educación 150k, buffer 72k). Sirven solo para "primer guardado" del household — no se siembran en DB
 - [x] `app/actions/financial-goals/upsert.ts`: UPSERT por UNIQUE(household_id) con `updated_at=now(), updated_by=session.userId`
@@ -1167,6 +1213,7 @@ Cerrar taxonomía.
 **7.B — Reporte D: año económico + trayectoria a IF (2026-05-20, hecho):**
 
 Sub-hito 7.B.1 (flag `is_investment` + UI minimal):
+
 - [x] Migración `0002_marvelous_jocasta.sql`: `categories.is_investment boolean default false`
 - [x] `lib/categories/tree.ts`: `CategoryNode` incluye `isInvestment`; `loadCategoryTree` lo selecciona
 - [x] `app/actions/categories/set-investment.ts`: server action UPDATE con WHERE doble (id + householdId), Zod inline, `revalidatePath` para `/settings/categorias` y `/reports/year-economy`
@@ -1176,13 +1223,16 @@ Sub-hito 7.B.1 (flag `is_investment` + UI minimal):
 - [x] Layout nav: link "Metas" renombrado a "Settings" apuntando a `/settings` (redirect a `/settings/metas`)
 
 Sub-hito 7.B.2 (lógica pura + tests):
+
 - [x] `lib/reports/year-economy.ts`: `buildYearEconomyReport` puro. Computa KPIs YTD (income/expense/net/investment/savings + savingsRate), serie monthly de 12 cols con `isProjected`, trayectoria con semáforo (green ≥100% / yellow ≥80% / red <80% / neutral si expected=0), categoryRows agregando children en parents con realYtd vs projectedDec vs budget
 - [x] `lib/reports/year-economy.test.ts`: 14 tests cubriendo `computeMonthsElapsed` (pasado/futuro/actual), buckets vacíos, savingsRate edge income=0, semáforo green/yellow/red/neutral, investment categories sumando al savings, año pasado/futuro, categoryRows con parent agregando children, forecast con categoryId=null contado en KPIs pero no en categoryRows, proyección dic = real YTD + forecasts
 
 Sub-hito 7.B.3 (data loader):
+
 - [x] `lib/reports/year-economy-data.ts`: 4 queries — (1) SUM amountUsd GROUP BY extract(month), kind, categoryId WHERE household + kind IN income/expense + date BETWEEN year-01-01 y year-12-31; (2) forecasts pending JOIN recurrences (kind + categoryId) WHERE status='pending' + matched IS NULL + expectedDate BETWEEN max(today, year-01-01) y year-12-31, con conversión a USD via `getFxRate` row-by-row; (3) budgets SUM por categoryId del año; (4) financial_goals row con fallback a defaults
 
 Sub-hito 7.B.4 (página + charts + nav):
+
 - [x] `/reports/year-economy/page.tsx` (server): header con prev/next year, KPI cards row (4), bloque Trayectoria con badge de semáforo coloreado + 4 stats + Δ vs target, tabla categorías separada por kind (Income/Expense) con drill-down a `/transactions?categoryId=X&from=year-01-01&to=year-12-31` para hojas y badge "Inversión" para `isInvestment=true`
 - [x] `/reports/year-economy/charts.tsx` (client): `SavingsChart` con `ReferenceLine` horizontal en target + barras coloreadas distinto si `isProjected`; `MonthlyChart` con stacked bars income/expense + line del neto, similar a `evolution/chart.tsx` pero año calendario
 - [x] `reports-nav.tsx`: agregado 4to link "Año económico"
@@ -1193,6 +1243,7 @@ Sub-hito 7.B.4 (página + charts + nav):
 ### 🟢 Hito 8 — Imports con AI parser
 
 **8.A — Infra: storage, upload, hash dedup, lista (2026-05-20, hecho):**
+
 - [x] Migración `0003_crazy_iron_man.sql`: `imports.file_hash text not null default ''` + idx `imports_household_hash_idx`
 - [x] `scripts/setup-storage.ts` + `npm run storage:setup`: crea bucket privado `imports` (Supabase Storage), file size limit 20MB, allowed mime types PDF/CSV/XLSX. Idempotente
 - [x] `lib/imports/storage.ts`: cliente Supabase service-role cacheado + `uploadImportFile` / `downloadImportFile` / `buildImportPath` / `hashBytes` (SHA-256 via `crypto.subtle`)
@@ -1203,6 +1254,7 @@ Sub-hito 7.B.4 (página + charts + nav):
 - [x] Validación verde: typecheck + lint + 192 tests + build + `db:smoke-rls` 8/8
 
 **8.B — Parser Galicia TC (Amex/Visa/Master) + revisión + confirm (2026-05-20, hecho):**
+
 - [x] `npm i @anthropic-ai/sdk` (0.97.x)
 - [x] `lib/env.ts` + `.env.example`: `ANTHROPIC_API_KEY` + `IMPORT_PARSER_MODEL_DEFAULT='claude-sonnet-4-6'` + `IMPORT_PARSER_MODEL_CHEAP='claude-haiku-4-5-20251001'`
 - [x] `lib/imports/llm.ts`: `runParser({modelId, systemPrompt, userPrompt, file: pdf|text, outputSchema})` con `LlmError` tipado y reintento 1 vez si JSON inválido / schema mismatch. Extrae JSON puro defensivamente del output (busca `{...}` outer). Soporta content blocks PDF (base64 document) y CSV (text)
@@ -1220,12 +1272,14 @@ Sub-hito 7.B.4 (página + charts + nav):
 - [x] Validación verde: typecheck + lint + 202 tests + build + `db:smoke-rls` 8/8
 
 **8.C — Parser ICBC TC + Caja Ahorro (2026-05-20, hecho):**
+
 - [x] `lib/imports/parsers/icbc-tc.ts`: prompt para resúmenes TC ICBC (Visa). Separación por moneda, cuotas como línea del mes
 - [x] `lib/imports/parsers/icbc-banco.ts`: prompt para caja de ahorro ICBC. Trata transferencias como movimientos (el usuario decide si reclassificar en revisión); ignora saldos y filas resumen
 - [x] Sumados al registry; tests actualizados (5 tests del registry: galicia/icbc-tc/icbc-banco/desconocida)
 - [x] Validación verde: typecheck + lint + 203 tests + build
 
 **8.D — Parser HSBC US (TC + Cuenta, PDF + CSV) (2026-05-20, hecho):**
+
 - [x] `lib/imports/parsers/hsbc-us-tc.ts`: prompt EN para resúmenes TC HSBC US (USD-only, sin separación de moneda)
 - [x] `lib/imports/parsers/hsbc-us-banco.ts`: prompt EN para statement de cuenta HSBC US (acepta tanto PDF como CSV)
 - [x] **Refactor del dispatch**: el `mimeKind` del Parser se eliminó. El runner del server action decide pdf vs text por la **extensión del archivo** (`fileUrl.endsWith('.csv')`), no por el parser. Permite que un mismo parser acepte ambos formatos sin duplicar
@@ -1234,6 +1288,7 @@ Sub-hito 7.B.4 (página + charts + nav):
 - [x] Validación verde: typecheck + lint + 204 tests + build
 
 **8.E — Cierre Hito 8 (2026-05-20, hecho):**
+
 - [x] CLAUDE.md actualizado: `claude-sonnet-4-6` / `claude-haiku-4-5-20251001` como defaults
 - [x] STATUS.md actualizado con cierre
 - [x] Validación verde final: typecheck + lint + 204 tests + build + `db:smoke-rls` 8/8
@@ -1241,12 +1296,14 @@ Sub-hito 7.B.4 (página + charts + nav):
 **Hito 8 cerrado — Imports end-to-end para Galicia + ICBC + HSBC US.**
 
 **Acción operacional manual pendiente del usuario:**
+
 - Setear `ANTHROPIC_API_KEY` en `.env.local` y en Vercel Production.
 - Correr `npm run storage:setup` para crear el bucket privado `imports` en Supabase (o crearlo desde Supabase Studio: bucket "imports", privado, file size limit 20MB).
 
 ### 🟢 Hito 9 — Export contador
 
 **9.A — Schema/form: subtype, meta domestic_service, deducible (2026-05-20, hecho):**
+
 - [x] `lib/schemas/transaction.ts`: agregados `transactionSubtype` enum ('standard'|'domestic_service'), `deducibleGanancias` boolean, `meta` jsonb con `domesticServiceMetaSchema` (empleado_nombre, empleado_cuil regex `##-########-#`, concepto enum sueldo/aporte/aguinaldo, periodo YYYY-MM). `superRefine`: domestic_service exige meta + solo aplica a expense
 - [x] `parseTransactionFormData` lee los nuevos campos del FormData (incluye prefijo `meta_` para los 4 fields condicionales)
 - [x] `app/(protected)/transactions/transaction-form.tsx`: bloque nuevo con checkbox Deducible + Select Subtipo (solo visible si kind=expense) + render condicional de los 4 inputs domestic_service
@@ -1256,6 +1313,7 @@ Sub-hito 7.B.4 (página + charts + nav):
 - [x] Tests Zod: +9 (defaults, validación CUIL/periodo, mismatch kind, parseFormData con nuevos campos)
 
 **9.B — CSV utility + 5 builders + README puros (2026-05-20, hecho):**
+
 - [x] `npm i jszip` (3.10.x)
 - [x] `lib/exports/csv.ts`: `toCsv(rows, headers)` con BOM UTF-8, CRLF, escape de comillas/comas/newlines; 7 tests
 - [x] `lib/exports/types.ts`: types compartidos `ExportTx`, `ExportAccount`, `ExportCategory` + helpers `monthOf`, `yearOf`
@@ -1268,16 +1326,19 @@ Sub-hito 7.B.4 (página + charts + nav):
 - [x] Tests builders: +10 (filter por tipo, sort, agregación TC, expand meta, skip meta inválida, deducible filter, sin sueldo)
 
 **9.C — Zip + route handler (2026-05-20, hecho):**
+
 - [x] `lib/exports/ganancias-data.ts`: loader que carga txns del año (WHERE date BETWEEN year-01-01 y year-12-31, household scoped) + accounts + categorías + nombre household. Devuelve `GananciasData`
 - [x] `lib/exports/ganancias-zip.ts`: usa JSZip, llama a los 5 builders + README, genera Uint8Array con compression DEFLATE
 - [x] `app/api/exports/ganancias/route.ts`: GET handler con `requireHouseholdSession()` (cookie auth), validación de `?year=` con Zod (rango 2020-2100), default año actual. Devuelve `Response` con `Content-Type: application/zip` + `Content-Disposition: attachment; filename=ganancias-{year}-{household-slug}.zip` + `Cache-Control: no-store`. No persiste — cumple PRD §7
 
 **9.D — UI /exports + nav (2026-05-20, hecho):**
+
 - [x] `app/(protected)/exports/page.tsx` (server): header + card con descripción del Ganancias export + selector año + botón descarga + bloque amber con disclaimer "cubre ~30% del checklist, patrimoniales V2"
 - [x] `app/(protected)/exports/exports-client.tsx`: client component con Select de año (6 años hacia atrás) + Button asChild con `<a href download>` que apunta al route handler. Sin fetch ni transición — el browser descarga directo
 - [x] Nav link "Exports" en layout protegido entre "Imports" y "Etiquetas"
 
 **9.E — Validación + cierre (2026-05-20, hecho):**
+
 - [x] Validación verde: typecheck + lint + 236 tests + build (`/exports` y `/api/exports/ganancias` registradas) + `db:smoke-rls` 8/8
 
 **Hito 9 cerrado.**
@@ -1285,24 +1346,29 @@ Sub-hito 7.B.4 (página + charts + nav):
 ### 🟢 Hito 10 — Backups Drive (V1.1 funcional 🎉)
 
 **10.A — Deps + helper Drive + env vars (2026-05-20, hecho):**
+
 - [x] `npm i googleapis` (oficial; JWT auth refresh automático)
 - [x] `lib/env.ts` + `.env.example`: `GOOGLE_SERVICE_ACCOUNT_KEY_B64` (optional; key del service account base64-encoded para sobrevivir al multi-line JSON) y `GOOGLE_DRIVE_BACKUP_FOLDER_ID` (optional)
 - [x] `lib/backups/drive.ts`: cliente cacheado con `google.auth.JWT` (scope `drive.file`); helpers `uploadBackup` (POST multipart con stream), `listBackups` (orderBy createdTime desc), `deleteFile`, `getBackupFolderId`. `DriveConfigError` tipado para distinguir fallos de setup vs runtime
 
 **10.B — Snapshot DB puro (2026-05-20, hecho):**
+
 - [x] `lib/backups/snapshot.ts`: `loadHouseholdSnapshot(householdId)` carga 16 tablas en paralelo via `Promise.all`. Tablas household-scoped filtran por `household_id`; `fx_rates` e `institutions` van enteras (sin filter). `auth.users` ignorada. `transaction_tags`, `forecasts` e `import_lines` se cargan en pasos separados via `inArray` sobre los ids ya filtrados
 
 **10.C — Zip builder + tests (2026-05-20, hecho):**
+
 - [x] `lib/backups/build-zip.ts`: usa JSZip (ya instalado en Hito 9). Genera `snapshot.json` (dump JSON formateado) + `tables/{name}.csv` por cada tabla (reusa `toCsv` de `lib/exports/csv.ts`) + `README.txt` con conteo de filas + procedimiento manual de restore
 - [x] Tests: 5 (shape del zip, contenido JSON, CSVs vacíos con marker, headers UTF-8 BOM, README con contadores)
 
 **10.D — Cron route + prune + vercel.json (2026-05-20, hecho):**
+
 - [x] `lib/backups/prune.ts`: `pruneOldBackups(files, keep)` pura, devuelve los archivos a borrar para mantener los `keep` más recientes. Constante `BACKUP_RETENTION = 12`. 5 tests
 - [x] `lib/backups/run.ts`: orquesta `loadHouseholdSnapshot` → `buildBackupZip` → `uploadBackup` (filename `gd-finanzas-backup-YYYY-MM-DD.zip`, con sufijo `-1`/`-2` si colisiona el mismo día) → `listBackups` + `pruneOldBackups` → `deleteFile` los excedentes. Compartido entre cron y server action
 - [x] `app/api/cron/backup-drive/route.ts`: GET con `Authorization: Bearer ${CRON_SECRET}`, resuelve household (asume 1 — V1), llama `runBackup`. Loggea solo nombres + size + counts, nunca contenido. Devuelve 500 si DriveConfigError, 500 si backup_failed
 - [x] `vercel.json`: schedule `0 2 * * 1` (lunes 02:00 UTC ≈ domingo 23:00 AR)
 
 **10.E — UI /settings/backups + sub-nav (2026-05-20, hecho):**
+
 - [x] `app/actions/backups/run-now.ts`: server action `runBackupNow()` con cookie auth via `requireHouseholdSession`. Llama al mismo `runBackup` que el cron. Returns filename + sizeBytes + deleted count
 - [x] `/settings/backups/page.tsx` (server): lista `listBackups()` con tabla (Nombre, Creado, Tamaño, Link a Drive). Empty state + banner amber si `DriveConfigError` (setup pendiente). Card con botón "Backup ahora"
 - [x] `run-now-button.tsx` (client): `useTransition` + toast del resultado + `router.refresh()`
@@ -1321,6 +1387,7 @@ de V1.1" abajo y en `.env.example`.
 Post-V1.1 funcional, antes de cargar info real:
 
 **UI.A — Theme foundation (Geist + emerald + dark mode):**
+
 - [x] `npm i geist` — package oficial Vercel
 - [x] `app/layout.tsx`: aplica `GeistSans.variable` + `GeistMono.variable` al `<html>`; script anti-flash inline en `<head>` que lee `localStorage` antes del hydrate y aplica class `dark` (evita flicker)
 - [x] `app/globals.css` reescrito con Tailwind v4 `@theme` + `@custom-variant dark`. Paleta nueva basada en neutrals + emerald accent. Variables CSS en `:root` (light) y `.dark` (dark). `--color-sidebar` separada para el sidebar
@@ -1328,6 +1395,7 @@ Post-V1.1 funcional, antes de cargar info real:
 - [x] Suscripción a `(prefers-color-scheme: dark)` cuando theme='system' para responder a cambios del OS en vivo
 
 **UI.B — Sidebar nav + responsive:**
+
 - [x] `components/nav/sidebar-sections.ts`: definición declarativa de las 5 secciones (Operar/Planificar/Reportes/Tools/Settings) + `isActiveLink(pathname, link)` helper con soporte de `matchPrefix` para que `/transactions/[id]` también marque activo el item "Transacciones"
 - [x] `components/nav/sidebar.tsx` (client): sidebar 256px con header (logo) + scrollable middle (5 secciones con sub-headers small-caps) + footer (user + ThemeToggle + Salir). Highlight con `bg-primary/10 text-primary` para active
 - [x] `components/nav/mobile-nav.tsx` (client): hamburguesa + drawer custom sin Radix Dialog (50 líneas vs ~80KB de dep). Backdrop con blur, lock scroll del body mientras abierto
@@ -1335,11 +1403,13 @@ Post-V1.1 funcional, antes de cargar info real:
 - [x] `SettingsNav` eliminado (sidebar reemplaza la navegación entre Metas/Categorías/Backups). `ReportsNav` se mantiene como breadcrumb interno de reportes (patrón complementario válido)
 
 **UI.C — Dashboard polish:**
+
 - [x] `lib/reports/dashboard-data.ts` ampliado: nuevo campo `monthly: DashboardMonthPoint[]` con últimos 6 meses (income/expense/net por mes). Query agrupa por `extract(year/month from date)` + kind. Gaps se llenan con 0
 - [x] `components/dashboard/sparkline-kpi-card.tsx` (client): card con label + value + delta tinted (good/bad/neutral) + mini area chart (recharts) con gradient stop. 4 colors: emerald/rose/violet/sky
 - [x] `app/(protected)/dashboard/page.tsx` re-layout: header con título prominente y mes, grid 4 KPIs (Ingresos / Gastos / Neto / Tasa de ahorro) cada uno con sparkline + Δ vs mes anterior. Top 5 gastos con barras horizontales (rose-500/70 sobre muted). Próximas previsiones cap 8 en lugar de unlimited. Recent txns con badges tinted dark-aware
 
 **UI.D — /transactions polish + bulk actions:**
+
 - [x] Filtros wrapped en `<details>` collapsible, default cerrado cuando no hay filtros activos, abierto si alguno seteado
 - [x] Chips de filtros activos arriba del details cuando hay alguno (Tipo / Cuenta / Categoría / Tag / Desde / Hasta / Texto) + link "Limpiar"
 - [x] `app/(protected)/transactions/transactions-table.tsx` (client): wrapper que recibe rows + categorías del server. State de `Set<string>` para selected ids
@@ -1349,6 +1419,7 @@ Post-V1.1 funcional, antes de cargar info real:
 - [x] `app/actions/transactions/bulk-set-category.ts`: filtra mismatches de kind y reporta `skipped`; igual patrón que el bulk de imports
 
 **UI.E — Validación + cierre:**
+
 - [x] typecheck + lint + 246 tests + build + `db:smoke-rls` 8/8
 
 **Sub-Hito UI cerrado.**
@@ -1665,6 +1736,7 @@ Post-V1.1 funcional, antes de cargar info real:
 - **Scope de env vars: solo Production** para las 7 (los Preview deployments no funcionarían tal cual; cuando los usemos, hay que clonar al scope Preview). En Hobby no se puede editar el scope post-creación.
 
 ## Pendientes / a discutir
+
 - (Pre-Hito 4) Sesión con Nico para cerrar taxonomía de categorías.
 - Region Supabase confirmada: **us-west-2** (Oregon). El PRD/CLAUDE.md original decía us-east-1; cambiamos a us-west-2 al crear el proyecto. Latencia +50ms desde AR, no relevante para uso doméstico.
 - **Custom SMTP** (Resend/Postmark) — considerar cuando el rate limit de 2 mails/hora del SMTP built-in moleste. Hoy con 2 users y login esporádico no es urgente. Si lo hacemos antes, sirve también para futuros mails transaccionales.
@@ -1682,6 +1754,7 @@ Migración (PR #2): JWT/SA → `OAuth2Client` con refresh token. El cron sube
 los `.zip` "como el usuario" contra su quota de Drive (15 GB free).
 
 Env vars en Vercel Production (todas Sensitive):
+
 - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`
 - `GOOGLE_DRIVE_BACKUP_FOLDER_ID`
 
@@ -1695,6 +1768,7 @@ no-sensitive: Google muestra un warning "unverified app" al autorizar (lo
 aceptamos manualmente) pero no exige verificación.
 
 **Limpieza pendiente (no bloquea, hacer cuando convenga):**
+
 - Borrar la JSON key del SA viejo de `~/Downloads/`.
 - Borrar la service account `gd-finanzas-backup@...iam.gserviceaccount.com` en GCP (sin uso).
 - Re-habilitar la org policy `iam.disableServiceAccountKeyCreation` (heredada de la org) que desactivamos para crear la SA key. Ya no necesitamos crear keys de SA — defensivamente conviene re-aplicar la restricción.
@@ -1710,6 +1784,7 @@ npm run db:wipe-smoke -- --all
 Preserva: `categories`, `tags`, `fx_rates`, `institutions`, `financial_goals`, `profiles`, `auth`. Borra: transactions, imports + archivos del bucket Storage, recurrences (+ forecasts), budgets, accounts.
 
 Después cargar info real:
+
 - Accounts definitivas (Galicia Amex, ICBC Caja, etc.) con sus nombres reales.
 - Recurrences reales (sueldos, expensas, suscripciones).
 - Sesión taxonomía de categorías con Nico → re-seedear si hace falta.
@@ -1719,6 +1794,7 @@ Después cargar info real:
 ## Procedimientos administrativos
 
 ### Reset de MFA (si un usuario pierde su device)
+
 Conectarse al pooler con `DIRECT_URL` (psql o Studio) y ejecutar:
 
 ```sql
@@ -1736,6 +1812,7 @@ Después de eso, el próximo login del user lo manda automáticamente a `/auth/m
 **No registrar este SQL en consola compartida** — usar Supabase Studio o un terminal local con `DIRECT_URL`.
 
 ### `statement_timeout` por rol (aplicado 2026-06-09)
+
 Para mitigar los errores intermitentes "This page couldn't load" (timeouts en cold-start
 del free tier, no en queries lentas reales — todas miden <70ms en los logs), se subió el
 `statement_timeout` de los roles de Postgres por encima del default de Supabase. **Es config
@@ -1750,6 +1827,7 @@ NOTIFY pgrst, 'reload config';
 ```
 
 Verificar con:
+
 ```sql
 SELECT rolname, rolconfig FROM pg_roles
 WHERE rolname IN ('authenticated','authenticator','anon');
@@ -1759,6 +1837,7 @@ Defaults previos de Supabase eran anon=3s, authenticated/authenticator=8s. La ap
 como `postgres` (sin timeout), así que esto afecta sobre todo a PostgREST/Supabase SDK.
 
 ## Notas
+
 - Vercel deploy: https://gd-finanzas-z4dl.vercel.app
 - Repo GitHub: https://github.com/nixgore83/gd-finanzas (privado)
 - Supabase project ref: `kezrkqbubupdnlhhhwdi` (us-west-2)

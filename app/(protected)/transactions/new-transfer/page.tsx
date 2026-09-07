@@ -47,7 +47,7 @@ export default async function NewTransferPage() {
     return (
       <div className="mx-auto max-w-xl space-y-4 rounded-md border border-dashed p-8 text-center">
         <h2 className="text-lg font-medium">Necesitás al menos 2 cuentas</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Las transferencias mueven plata entre cuentas; necesitás 2 o más.
         </p>
         <Button asChild>

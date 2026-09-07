@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  viewToStatuses,
-  isDeletableStatus,
-  IMPORT_STATUSES,
-} from './list-filters';
+import { viewToStatuses, isDeletableStatus, IMPORT_STATUSES } from './list-filters';
 
 describe('viewToStatuses', () => {
   it('all → null (sin filtro)', () => {

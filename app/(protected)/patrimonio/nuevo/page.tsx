@@ -35,20 +35,13 @@ export default async function NuevoSnapshotPage() {
     })
     .from(accounts)
     .leftJoin(institutions, eq(accounts.institutionId, institutions.id))
-    .where(
-      and(
-        eq(accounts.householdId, session.householdId),
-        eq(accounts.archived, false),
-      ),
-    )
+    .where(and(eq(accounts.householdId, session.householdId), eq(accounts.archived, false)))
     .orderBy(accounts.name);
 
   // Get latest snapshot for pre-fill
   const allSnapshots = await loadSnapshots(session.householdId);
   const latestId = allSnapshots[0]?.id;
-  const previousDetail = latestId
-    ? await loadSnapshotDetail(latestId, session.householdId)
-    : null;
+  const previousDetail = latestId ? await loadSnapshotDetail(latestId, session.householdId) : null;
 
   // Get today's FX rate for ARS conversion
   const today = new Date().toISOString().slice(0, 10);

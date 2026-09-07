@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  describeDateRange,
-  hasDateRange,
-  isIsoDate,
-  matchesDateRange,
-} from './date-range-filter';
+import { describeDateRange, hasDateRange, isIsoDate, matchesDateRange } from './date-range-filter';
 
 describe('matchesDateRange', () => {
   it('CASO REAL: "hasta 2025-12-31" aísla el arrastre del ejercicio anterior', () => {

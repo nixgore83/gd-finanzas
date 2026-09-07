@@ -94,7 +94,12 @@ export function stripPdfPreamble(bytes: Uint8Array): Uint8Array {
   // "%PDF" = 0x25 0x50 0x44 0x46
   const limit = Math.min(bytes.length - 4, MAX_PDF_HEADER_OFFSET);
   for (let i = 0; i <= limit; i++) {
-    if (bytes[i] === 0x25 && bytes[i + 1] === 0x50 && bytes[i + 2] === 0x44 && bytes[i + 3] === 0x46) {
+    if (
+      bytes[i] === 0x25 &&
+      bytes[i + 1] === 0x50 &&
+      bytes[i + 2] === 0x44 &&
+      bytes[i + 3] === 0x46
+    ) {
       return i === 0 ? bytes : bytes.slice(i);
     }
   }

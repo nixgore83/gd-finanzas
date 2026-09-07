@@ -62,13 +62,15 @@ function resolveBorder(): string {
 
 function resolveForeground(): string {
   if (typeof window === 'undefined') return '#e8e3d4';
-  return getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#e8e3d4';
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#e8e3d4'
+  );
 }
 
 export function BreakdownDonut({ rows, total }: Props) {
   if (rows.length === 0) {
     return (
-      <div className="flex h-80 items-center justify-center border border-dashed border-border text-sm text-muted-foreground">
+      <div className="border-border text-muted-foreground flex h-80 items-center justify-center border border-dashed text-sm">
         Sin datos para graficar.
       </div>
     );
@@ -86,7 +88,7 @@ export function BreakdownDonut({ rows, total }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-80 items-center justify-center border border-dashed border-border text-sm text-muted-foreground">
+      <div className="border-border text-muted-foreground flex h-80 items-center justify-center border border-dashed text-sm">
         Sin gastos netos positivos para graficar.
       </div>
     );
@@ -97,7 +99,7 @@ export function BreakdownDonut({ rows, total }: Props) {
   const fgColor = resolveForeground();
 
   return (
-    <div className="relative h-80 border border-border bg-card/40 p-4">
+    <div className="border-border bg-card/40 relative h-80 border p-4">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -133,10 +135,10 @@ export function BreakdownDonut({ rows, total }: Props) {
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="text-muted-foreground font-sans text-[10px] font-semibold tracking-[0.22em] uppercase">
           Total
         </span>
-        <span className="mt-1 font-display text-3xl font-semibold tabular-nums text-foreground">
+        <span className="font-display text-foreground mt-1 text-3xl font-semibold tabular-nums">
           {formatUsd(total)}
         </span>
       </div>

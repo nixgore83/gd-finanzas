@@ -6,13 +6,9 @@ import { getDb } from '@/lib/db/client';
 import { householdSettings } from '@/db/schema';
 import { requireHouseholdSession, SessionError } from '@/lib/auth/session';
 
-export type UpdateSettingsResult =
-  | { ok: true }
-  | { ok: false; error: 'session' | 'unknown' };
+export type UpdateSettingsResult = { ok: true } | { ok: false; error: 'session' | 'unknown' };
 
-export async function updateAutoMatchSetting(
-  enabled: boolean,
-): Promise<UpdateSettingsResult> {
+export async function updateAutoMatchSetting(enabled: boolean): Promise<UpdateSettingsResult> {
   let session;
   try {
     session = await requireHouseholdSession();

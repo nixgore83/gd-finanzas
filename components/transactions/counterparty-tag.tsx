@@ -23,8 +23,8 @@ export function CounterpartyTag({
   ].filter(Boolean);
   if (!name && !label && ids.length === 0) return null;
   return (
-    <div className={cn('text-[10px] leading-tight text-muted-foreground', className)}>
-      {label && <span className="font-semibold text-foreground">{label}</span>}
+    <div className={cn('text-muted-foreground text-[10px] leading-tight', className)}>
+      {label && <span className="text-foreground font-semibold">{label}</span>}
       {name && <span className={cn('font-medium', label && 'ml-1')}>{name}</span>}
       {ids.length > 0 && <span className="block font-mono">{ids.join(' · ')}</span>}
     </div>

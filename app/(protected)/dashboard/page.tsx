@@ -12,8 +12,18 @@ import { cn } from '@/lib/utils';
 export const metadata = { title: 'Dashboard · gd-finanzas' };
 
 const MONTH_LABELS = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 function formatUsd(amount: string | number, withDecimals = false): string {
@@ -61,7 +71,20 @@ function shortDate(iso: string): string {
   const m = parts[1];
   const d = parts[2];
   if (!m || !d) return iso;
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   const mi = Number.parseInt(m, 10) - 1;
   return `${d} ${months[mi] ?? ''}`;
 }
@@ -122,8 +145,12 @@ export default async function DashboardPage() {
           <Body className="mt-2 max-w-xl">
             Neto del mes — la diferencia entre lo que entró y lo que salió.{' '}
             {prev && (
-              <span className="not-italic text-foreground">
-                <Num className={cn(netDelta >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]')}>
+              <span className="text-foreground not-italic">
+                <Num
+                  className={cn(
+                    netDelta >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
+                  )}
+                >
                   {netDelta >= 0 ? '+' : ''}
                   {formatUsd(netDelta)}
                 </Num>{' '}
@@ -134,35 +161,35 @@ export default async function DashboardPage() {
         </div>
 
         {/* Right: tasa de ahorro */}
-        <div className="border-l border-border pl-8">
+        <div className="border-border border-l pl-8">
           <Label>Tasa de ahorro</Label>
           <div className="mt-3 flex items-baseline gap-1">
-            <Display size="lg" className="tabular-nums text-primary">
+            <Display size="lg" className="text-primary tabular-nums">
               {savingsPct !== null ? savingsPct.toFixed(1) : '—'}
             </Display>
             {savingsPct !== null && (
-              <span className="font-display text-2xl font-light text-primary/70">%</span>
+              <span className="font-display text-primary/70 text-2xl font-light">%</span>
             )}
           </div>
           {savingsDelta !== null && (
             <div className="mt-1">
               <Num
                 className={cn(
-                  'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                  'text-[11px] font-semibold tracking-[0.14em] uppercase',
                   savingsDelta >= 0 ? 'text-[color:var(--good)]' : 'text-[color:var(--bad)]',
                 )}
               >
                 {savingsDelta > 0 ? '+' : ''}
                 {savingsDelta.toFixed(1)} pp
               </Num>{' '}
-              <span className="font-sans text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="text-muted-foreground font-sans text-[10px] tracking-[0.18em] uppercase">
                 vs mes ant.
               </span>
             </div>
           )}
           <Link
             href="/reports/cashflow"
-            className="link mt-4 inline-block font-display text-sm italic text-muted-foreground"
+            className="link font-display text-muted-foreground mt-4 inline-block text-sm italic"
           >
             Ver cashflow del mes →
           </Link>
@@ -172,7 +199,7 @@ export default async function DashboardPage() {
       <Hair thick />
 
       {/* ============ KPI STRIP ============ */}
-      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <section className="bg-border grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-4">
         <SparklineKpiCard
           label="Ingresos del mes"
           value={formatUsd(data.totals.income.real)}
@@ -224,21 +251,18 @@ export default async function DashboardPage() {
           {data.topExpenseCategories.length === 0 ? (
             <Body className="mt-3">Sin gastos registrados este mes.</Body>
           ) : (
-            <ol className="divide-y divide-border/60">
+            <ol className="divide-border/60 divide-y">
               {data.topExpenseCategories.map((c, i) => {
                 const n = Number.parseFloat(c.total) || 0;
                 const pct = topMax > 0 ? (n / topMax) * 100 : 0;
                 return (
-                  <li
-                    key={c.id}
-                    className="grid grid-cols-[20px_1fr_auto] items-center gap-3 py-3"
-                  >
-                    <Num className="text-[10px] text-muted-foreground">
+                  <li key={c.id} className="grid grid-cols-[20px_1fr_auto] items-center gap-3 py-3">
+                    <Num className="text-muted-foreground text-[10px]">
                       {String(i + 1).padStart(2, '0')}
                     </Num>
                     <div className="min-w-0">
-                      <div className="font-display text-base text-foreground">{c.name}</div>
-                      <div className="mt-1 h-[3px] w-full bg-muted">
+                      <div className="font-display text-foreground text-base">{c.name}</div>
+                      <div className="bg-muted mt-1 h-[3px] w-full">
                         <div
                           className="h-full bg-[color:var(--bad)]/80"
                           style={{ width: `${pct}%` }}
@@ -246,7 +270,7 @@ export default async function DashboardPage() {
                         />
                       </div>
                     </div>
-                    <Num className="text-sm text-foreground">{formatUsd(c.total)}</Num>
+                    <Num className="text-foreground text-sm">{formatUsd(c.total)}</Num>
                   </li>
                 );
               })}
@@ -264,21 +288,18 @@ export default async function DashboardPage() {
           {data.upcomingForecasts.length === 0 ? (
             <Body className="mt-3">Nada en los próximos 14 días.</Body>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul className="divide-border/60 divide-y">
               {data.upcomingForecasts.slice(0, 8).map((f) => (
-                <li
-                  key={f.id}
-                  className="grid grid-cols-[56px_1fr_auto] items-baseline gap-3 py-3"
-                >
-                  <Num className="text-[11px] uppercase tracking-[0.1em] text-primary">
+                <li key={f.id} className="grid grid-cols-[56px_1fr_auto] items-baseline gap-3 py-3">
+                  <Num className="text-primary text-[11px] tracking-[0.1em] uppercase">
                     {shortDate(f.expectedDate)}
                   </Num>
                   <div className="min-w-0">
-                    <div className="truncate font-display text-base text-foreground">
+                    <div className="font-display text-foreground truncate text-base">
                       {f.recurrenceName}
                     </div>
                   </div>
-                  <Num className="text-sm text-foreground">
+                  <Num className="text-foreground text-sm">
                     {formatAmount(f.expectedAmount, f.currency)}
                   </Num>
                 </li>
@@ -287,7 +308,7 @@ export default async function DashboardPage() {
           )}
           <Link
             href="/forecasts"
-            className="link mt-4 inline-block font-display text-sm italic text-muted-foreground"
+            className="link font-display text-muted-foreground mt-4 inline-block text-sm italic"
           >
             Ver todas las previsiones →
           </Link>
@@ -300,7 +321,7 @@ export default async function DashboardPage() {
           <Display size="md">Últimos movimientos</Display>
           <Link
             href="/transactions"
-            className="link font-display text-sm italic text-muted-foreground"
+            className="link font-display text-muted-foreground text-sm italic"
           >
             Ver todos →
           </Link>
@@ -313,12 +334,12 @@ export default async function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-border border-b">
                   {['Fecha', 'Tipo', 'Concepto', 'Cuenta', 'Monto'].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
-                        'py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground',
+                        'text-muted-foreground py-2 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase',
                         i === 4 ? 'text-right' : 'text-left',
                       )}
                     >
@@ -331,17 +352,17 @@ export default async function DashboardPage() {
                 {data.recentTransactions.map((tx) => (
                   <tr
                     key={tx.id}
-                    className="border-b border-border/40 transition-colors hover:bg-primary/[0.04]"
+                    className="border-border/40 hover:bg-primary/[0.04] border-b transition-colors"
                   >
                     <td className="py-3 whitespace-nowrap">
-                      <Num className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                      <Num className="text-muted-foreground text-[11px] tracking-[0.1em] uppercase">
                         {shortDate(tx.date)}
                       </Num>
                     </td>
                     <td className="py-3 pr-3">
                       <span
                         className={cn(
-                          'inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold uppercase tracking-[0.14em]',
+                          'inline-block rounded-sm px-2 py-[3px] font-sans text-[9px] font-semibold tracking-[0.14em] uppercase',
                           tx.kind === 'income' &&
                             'bg-[color:var(--good)]/15 text-[color:var(--good)]',
                           tx.kind === 'expense' &&
@@ -353,10 +374,10 @@ export default async function DashboardPage() {
                         {ALL_KIND_LABELS[tx.kind]}
                       </span>
                     </td>
-                    <td className="py-3 pr-3 font-display text-base text-foreground">
+                    <td className="font-display text-foreground py-3 pr-3 text-base">
                       {tx.description}
                     </td>
-                    <td className="py-3 pr-3 font-sans text-xs text-muted-foreground">
+                    <td className="text-muted-foreground py-3 pr-3 font-sans text-xs">
                       {tx.accountName ?? '—'}
                     </td>
                     <td className="py-3 text-right">

@@ -21,13 +21,13 @@ export default async function NewLicitacionPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Nueva tanda</h1>
-        <Link href="/licitaciones" className="text-sm text-muted-foreground hover:underline">
+        <Link href="/licitaciones" className="text-muted-foreground text-sm hover:underline">
           ← Licitaciones
         </Link>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Subí los PDFs de la semana. Claude extrae los datos y se arma el Excel del calendario.
-        Al terminar vas a poder descargarlo.
+      <p className="text-muted-foreground text-sm">
+        Subí los PDFs de la semana. Claude extrae los datos y se arma el Excel del calendario. Al
+        terminar vas a poder descargarlo.
       </p>
       <LicitacionesUploadForm />
     </div>

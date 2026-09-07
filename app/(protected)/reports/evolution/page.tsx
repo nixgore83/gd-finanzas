@@ -16,8 +16,18 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 function pad2(n: number): string {
@@ -142,22 +152,22 @@ export default async function EvolutionReportPage({
             Ventana móvil de 12 meses.
             {activeCategory && (
               <>
-                {' '}Filtrando por{' '}
-                <span className="text-foreground">{activeCategory.name}</span>.
+                {' '}
+                Filtrando por <span className="text-foreground">{activeCategory.name}</span>.
               </>
             )}
           </Body>
         </div>
-        <nav className="flex items-baseline gap-5 font-display">
+        <nav className="font-display flex items-baseline gap-5">
           <Link
             href={buildHref({ endYear: prev.year, endMonth: prev.month, currency, categoryId })}
-            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-sm italic transition-colors"
           >
             ◀ atrás
           </Link>
           <Link
             href={buildHref({ endYear: next.year, endMonth: next.month, currency, categoryId })}
-            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-sm italic transition-colors"
           >
             adelante ▶
           </Link>
@@ -168,7 +178,7 @@ export default async function EvolutionReportPage({
       <form
         method="get"
         action="/reports/evolution"
-        className="flex flex-wrap items-end gap-4 border border-border bg-card/30 px-5 py-4"
+        className="border-border bg-card/30 flex flex-wrap items-end gap-4 border px-5 py-4"
       >
         <input type="hidden" name="endYear" value={endYear} />
         <input type="hidden" name="endMonth" value={pad2(endMonth)} />
@@ -178,7 +188,7 @@ export default async function EvolutionReportPage({
             id="currency"
             name="currency"
             defaultValue={currency}
-            className="flex h-10 w-28 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="border-input bg-background flex h-10 w-28 rounded-md border px-3 py-2 text-sm"
           >
             <option value="USD">USD</option>
             <option value="ARS">ARS</option>
@@ -190,7 +200,7 @@ export default async function EvolutionReportPage({
             id="categoryId"
             name="categoryId"
             defaultValue={categoryId ?? ''}
-            className="flex h-10 w-72 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="border-input bg-background flex h-10 w-72 rounded-md border px-3 py-2 text-sm"
           >
             <option value="">Todas</option>
             {tree.map((c) => (
@@ -203,9 +213,7 @@ export default async function EvolutionReportPage({
         <Button type="submit">Aplicar</Button>
         {(currency !== 'USD' || categoryId) && (
           <Button variant="ghost" asChild>
-            <Link
-              href={buildHref({ endYear, endMonth, currency: 'USD', categoryId: null })}
-            >
+            <Link href={buildHref({ endYear, endMonth, currency: 'USD', categoryId: null })}>
               Reset
             </Link>
           </Button>
@@ -215,7 +223,7 @@ export default async function EvolutionReportPage({
       <EvolutionChart data={series} currency={currency} />
 
       {/* TOTALS STRIP */}
-      <section className="grid grid-cols-1 gap-px bg-border sm:grid-cols-3">
+      <section className="bg-border grid grid-cols-1 gap-px sm:grid-cols-3">
         <TotalBox label="Ingresos 12m" value={format(totalIncome)} variant="good" />
         <TotalBox label="Gastos 12m" value={format(totalExpense)} variant="bad" />
         <TotalBox

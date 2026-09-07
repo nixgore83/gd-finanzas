@@ -5,8 +5,18 @@ import type { DB } from '@/lib/db/client';
 export type ImportPeriod = { start: string | null; end: string | null };
 
 const MONTHS_ES = [
-  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
 ] as const;
 
 /**
@@ -49,10 +59,7 @@ export function formatPeriodRange(start: string | null, end: string | null): str
  *
  * Acepta un `DB` o un tx de Drizzle (mismo tipo de cliente).
  */
-export async function computeImportPeriod(
-  db: DB,
-  importId: string,
-): Promise<ImportPeriod> {
+export async function computeImportPeriod(db: DB, importId: string): Promise<ImportPeriod> {
   const [agg] = await db
     .select({
       start: sql<string | null>`min(${importLines.parsedData}->>'date')`,

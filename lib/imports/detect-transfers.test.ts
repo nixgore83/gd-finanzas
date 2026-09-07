@@ -15,8 +15,7 @@ function line(description: string, isTransfer = false): ParsedTxLine {
   };
 }
 
-const flags = (lines: ParsedTxLine[]): boolean[] =>
-  detectTransfers(lines).map((l) => l.isTransfer);
+const flags = (lines: ParsedTxLine[]): boolean[] => detectTransfers(lines).map((l) => l.isTransfer);
 
 describe('detectTransfers — patrones que marcan transferencia', () => {
   it('marca los conceptos clásicos de traspaso entre cuentas propias', () => {

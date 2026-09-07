@@ -24,7 +24,13 @@ describe('importTypeFromAccountType', () => {
   });
 });
 
-type Entry = { id: string; file: string; institutionId: string; type: 'tc' | 'banco' | 'broker'; accountId: string };
+type Entry = {
+  id: string;
+  file: string;
+  institutionId: string;
+  type: 'tc' | 'banco' | 'broker';
+  accountId: string;
+};
 
 const meta: AccountMeta = {
   'acc-icbc-amex': { institutionId: 'icbc', importType: 'tc' },
@@ -56,7 +62,12 @@ describe('applyBulkToEntries', () => {
   });
 
   it('preserva id y file de cada entrada', () => {
-    const out = applyBulkToEntries(entries(), { institutionId: 'icbc', type: 'tc', accountId: '' }, ALL, meta);
+    const out = applyBulkToEntries(
+      entries(),
+      { institutionId: 'icbc', type: 'tc', accountId: '' },
+      ALL,
+      meta,
+    );
     expect(out.map((e) => e.id)).toEqual(['1', '2']);
     expect(out.map((e) => e.file)).toEqual(['a.pdf', 'b.pdf']);
   });
@@ -129,7 +140,9 @@ describe('applyBulkToEntries', () => {
   });
 
   it('lista vacía → devuelve lista vacía', () => {
-    expect(applyBulkToEntries([], { institutionId: 'icbc', type: 'tc', accountId: '' }, ALL, meta)).toEqual([]);
+    expect(
+      applyBulkToEntries([], { institutionId: 'icbc', type: 'tc', accountId: '' }, ALL, meta),
+    ).toEqual([]);
   });
 });
 

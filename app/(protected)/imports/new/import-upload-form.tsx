@@ -119,7 +119,9 @@ export function ImportUploadForm({
     [accounts],
   );
 
-  function updateBulk(patch: Partial<{ institutionId: string; type: ImportType; accountId: string }>) {
+  function updateBulk(
+    patch: Partial<{ institutionId: string; type: ImportType; accountId: string }>,
+  ) {
     setBulk((b) => {
       const updated = { ...b, ...patch };
       // Cambiar institución invalida la cuenta elegida (mismo criterio por-archivo).
@@ -221,9 +223,18 @@ export function ImportUploadForm({
         if (res.ok) {
           uploadResults.push({ fileName: entry.file.name, ok: true, importId: res.importId });
         } else if (res.error === 'duplicate' && res.duplicate) {
-          uploadResults.push({ fileName: entry.file.name, ok: false, error: 'duplicate', duplicate: res.duplicate });
+          uploadResults.push({
+            fileName: entry.file.name,
+            ok: false,
+            error: 'duplicate',
+            duplicate: res.duplicate,
+          });
         } else {
-          uploadResults.push({ fileName: entry.file.name, ok: false, error: ERROR_MESSAGES[res.error] ?? 'Error' });
+          uploadResults.push({
+            fileName: entry.file.name,
+            ok: false,
+            error: ERROR_MESSAGES[res.error] ?? 'Error',
+          });
         }
       }
 
@@ -257,7 +268,7 @@ export function ImportUploadForm({
   return (
     <div className="space-y-4">
       {/* File picker */}
-      <div className="space-y-1.5 rounded-md border bg-card p-4">
+      <div className="bg-card space-y-1.5 rounded-md border p-4">
         <Label htmlFor="file">Archivos (PDF, CSV o XLSX, hasta 20 MB c/u)</Label>
         <Input
           ref={fileRef}
@@ -278,14 +289,14 @@ export function ImportUploadForm({
 
       {/* Bulk "aplicar a todos" — solo con ≥2 archivos */}
       {files.length >= 2 && (
-        <div className="space-y-3 rounded-md border border-dashed bg-muted/30 p-4">
+        <div className="bg-muted/30 space-y-3 rounded-md border border-dashed p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium">Aplicar a todos los archivos</span>
             <Button type="button" size="sm" onClick={applyBulk} disabled={isPending}>
               Aplicar a {files.length}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Tildá qué campos propagar. Elegir una Cuenta ya define su institución y tipo.
           </p>
 
@@ -365,7 +376,9 @@ export function ImportUploadForm({
                     disabled={isPending || !bulkFlags.account || bulkAccounts.length === 0}
                   >
                     <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder={bulkAccounts.length === 0 ? 'Sin cuentas' : 'Opcional'} />
+                      <SelectValue
+                        placeholder={bulkAccounts.length === 0 ? 'Sin cuentas' : 'Opcional'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none">Sin especificar</SelectItem>
@@ -401,16 +414,13 @@ export function ImportUploadForm({
               (a) => a.institutionId === entry.institutionId,
             );
             return (
-              <div
-                key={entry.id}
-                className="space-y-3 rounded-md border bg-card p-4"
-              >
+              <div key={entry.id} className="bg-card space-y-3 rounded-md border p-4">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-mono text-sm">{entry.file.name}</span>
                   <button
                     type="button"
                     onClick={() => removeEntry(entry.id)}
-                    className="shrink-0 text-sm text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive shrink-0 text-sm"
                     disabled={isPending}
                   >
                     Quitar
@@ -466,7 +476,9 @@ export function ImportUploadForm({
                       disabled={isPending || filteredAccounts.length === 0}
                     >
                       <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder={filteredAccounts.length === 0 ? 'Sin cuentas' : 'Opcional'} />
+                        <SelectValue
+                          placeholder={filteredAccounts.length === 0 ? 'Sin cuentas' : 'Opcional'}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="_none">Sin especificar</SelectItem>
@@ -493,16 +505,10 @@ export function ImportUploadForm({
             );
           })}
 
-          {progress && (
-            <p className="text-sm text-muted-foreground">{progress}</p>
-          )}
+          {progress && <p className="text-muted-foreground text-sm">{progress}</p>}
 
           <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              onClick={() => submit(false)}
-              disabled={isPending}
-            >
+            <Button type="button" onClick={() => submit(false)} disabled={isPending}>
               {isPending
                 ? 'Subiendo...'
                 : `Subir ${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`}
@@ -513,7 +519,7 @@ export function ImportUploadForm({
 
       {/* Results */}
       {results.length > 0 && (
-        <div className="space-y-2 rounded-md border bg-card p-4">
+        <div className="bg-card space-y-2 rounded-md border p-4">
           <p className="text-sm font-medium">Resultados</p>
           <ul className="space-y-1 text-sm">
             {results.map((r, i) => (
@@ -523,7 +529,7 @@ export function ImportUploadForm({
                 </span>
                 <span className="font-mono text-xs">{r.fileName}</span>
                 {r.ok && r.importId && (
-                  <a href={`/imports/${r.importId}`} className="text-xs text-primary underline">
+                  <a href={`/imports/${r.importId}`} className="text-primary text-xs underline">
                     ver
                   </a>
                 )}

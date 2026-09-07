@@ -37,7 +37,7 @@ export function LicitacionesTable({ rows }: { rows: LicitacionRow[] }) {
   return (
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="bg-muted/40 text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
           <tr>
             <th className="px-3 py-2 font-medium">Creado</th>
             <th className="px-3 py-2 font-medium">PDFs</th>
@@ -52,7 +52,7 @@ export function LicitacionesTable({ rows }: { rows: LicitacionRow[] }) {
             // existe, pero le faltan instrumentos.
             const parcial = esResultadoParcial(r.status, r.pdfCount, r.pdfsOk);
             return (
-              <tr key={r.id} className="border-b last:border-0 hover:bg-accent/30">
+              <tr key={r.id} className="hover:bg-accent/30 border-b last:border-0">
                 <td className="px-3 py-2 whitespace-nowrap">{formatDate(r.createdAt)}</td>
                 <td className="px-3 py-2">
                   {parcial ? `${r.pdfsOk} / ${r.pdfCount}` : r.pdfCount}

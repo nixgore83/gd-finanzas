@@ -41,8 +41,12 @@ describe('icbcBancoParser.parseCsv', () => {
 
   it('expande notación científica en montos', () => {
     const { lines } = parse(CSV);
-    expect(lines.find((l) => l.description === 'TRANS PAG SUEL')!.amountOriginal).toBe('14090103.00');
-    expect(lines.find((l) => l.description === 'DEB SUSCR FCI')!.amountOriginal).toBe('18000000.00');
+    expect(lines.find((l) => l.description === 'TRANS PAG SUEL')!.amountOriginal).toBe(
+      '14090103.00',
+    );
+    expect(lines.find((l) => l.description === 'DEB SUSCR FCI')!.amountOriginal).toBe(
+      '18000000.00',
+    );
   });
 
   it('marca FCI como transferencia hacia ICBC Inversiones', () => {
@@ -53,8 +57,12 @@ describe('icbcBancoParser.parseCsv', () => {
 
   it('marca pago de tarjeta como transferencia hacia la tarjeta correspondiente', () => {
     const { lines } = parse(CSV);
-    expect(lines.find((l) => l.description === 'PAGO TARJETA VISA')!.transferAccountName).toBe('ICBC Visa');
-    expect(lines.find((l) => l.description === 'PAGO TARJETA MASTERCARD')!.transferAccountName).toBe('ICBC Master');
+    expect(lines.find((l) => l.description === 'PAGO TARJETA VISA')!.transferAccountName).toBe(
+      'ICBC Visa',
+    );
+    expect(
+      lines.find((l) => l.description === 'PAGO TARJETA MASTERCARD')!.transferAccountName,
+    ).toBe('ICBC Master');
   });
 
   it('marca DEBIN preacordado contra CUIT de Mercado Libre como transfer a Mercado Pago', () => {
@@ -65,7 +73,9 @@ describe('icbcBancoParser.parseCsv', () => {
 
   it('sugiere categoría para conceptos sistemáticos', () => {
     const { lines } = parse(CSV);
-    expect(lines.find((l) => l.description === 'COMISION CUSTODIA MENSUAL')!.suggestedCategory).toBe('Gastos bancarios');
+    expect(
+      lines.find((l) => l.description === 'COMISION CUSTODIA MENSUAL')!.suggestedCategory,
+    ).toBe('Gastos bancarios');
     expect(lines.find((l) => l.description === 'TRANS PAG SUEL')!.suggestedCategory).toBe('Sueldo');
   });
 
@@ -81,6 +91,8 @@ describe('icbcBancoParser.parseCsv', () => {
   });
 
   it('lanza CsvFormatError si el texto no es el layout ICBC (ej. CSV con header)', () => {
-    expect(() => parse('fecha,concepto,debito,credito\n2026-01-02,algo,10,0')).toThrow(CsvFormatError);
+    expect(() => parse('fecha,concepto,debito,credito\n2026-01-02,algo,10,0')).toThrow(
+      CsvFormatError,
+    );
   });
 });

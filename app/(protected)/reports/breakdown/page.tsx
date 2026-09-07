@@ -14,8 +14,18 @@ export const metadata = {
 };
 
 const MONTH_LABELS = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 function pad2(n: number): string {
@@ -71,8 +81,15 @@ function formatUsd(amount: string): string {
 
 /** Mismo arreglo de colores que donut.tsx — mantener sincronizado. */
 const FALLBACK_PALETTE = [
-  '#8fb89a', '#c9a96e', '#d97a4a', '#7fa3b5', '#a48bb5',
-  '#d4b85a', '#769d83', '#b56b53', '#8a9bc4',
+  '#8fb89a',
+  '#c9a96e',
+  '#d97a4a',
+  '#7fa3b5',
+  '#a48bb5',
+  '#d4b85a',
+  '#769d83',
+  '#b56b53',
+  '#8a9bc4',
 ];
 
 function colorForRow(row: { color: string | null }, i: number): string {
@@ -133,16 +150,16 @@ export default async function BreakdownReportPage({
             {monthLabel} · USD. Click en una hoja para ver las transacciones.
           </Body>
         </div>
-        <nav className="flex items-baseline gap-5 font-display">
+        <nav className="font-display flex items-baseline gap-5">
           <Link
             href={`/reports/breakdown?year=${prev.year}&month=${pad2(prev.month)}&level=${level}`}
-            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-sm italic transition-colors"
           >
             ◀ {MONTH_LABELS[prev.month - 1]}
           </Link>
           <Link
             href={`/reports/breakdown?year=${next.year}&month=${pad2(next.month)}&level=${level}`}
-            className="text-sm italic text-muted-foreground transition-colors hover:text-primary"
+            className="text-muted-foreground hover:text-primary text-sm italic transition-colors"
           >
             {MONTH_LABELS[next.month - 1]} ▶
           </Link>
@@ -160,7 +177,7 @@ export default async function BreakdownReportPage({
       </div>
 
       {data.rows.length === 0 ? (
-        <div className="border border-dashed border-border p-12 text-center">
+        <div className="border-border border border-dashed p-12 text-center">
           <Display size="sm">Sin gastos este mes</Display>
           <Body className="mt-3">No hay transacciones tipo gasto en {monthLabel}.</Body>
         </div>
@@ -170,13 +187,13 @@ export default async function BreakdownReportPage({
 
           {/* Detail list — same style as dashboard "Las cinco del mes" */}
           <div>
-            <div className="flex items-baseline justify-between border-b border-border pb-2">
+            <div className="border-border flex items-baseline justify-between border-b pb-2">
               <Display size="sm">Detalle</Display>
               <Label>
                 {data.rows.length} {level === 'leaf' ? 'hojas' : 'padres'}
               </Label>
             </div>
-            <ol className="divide-y divide-border/40">
+            <ol className="divide-border/40 divide-y">
               {data.rows.map((row, i) => {
                 const swatch = colorForRow(row, i);
                 return (
@@ -193,16 +210,16 @@ export default async function BreakdownReportPage({
                       {row.isLeaf ? (
                         <Link
                           href={drillHref(row.id)}
-                          className="font-display text-base text-foreground transition-colors hover:text-primary hover:underline"
+                          className="font-display text-foreground hover:text-primary text-base transition-colors hover:underline"
                         >
                           {row.name}
                         </Link>
                       ) : (
-                        <span className="font-display text-base font-semibold text-foreground">
+                        <span className="font-display text-foreground text-base font-semibold">
                           {row.name}
                         </span>
                       )}
-                      <div className="mt-1 h-[3px] w-full bg-muted/60">
+                      <div className="bg-muted/60 mt-1 h-[3px] w-full">
                         <div
                           className="h-full"
                           style={{
@@ -214,18 +231,18 @@ export default async function BreakdownReportPage({
                       </div>
                     </div>
                     <div className="text-right">
-                      <Num className="block text-sm text-foreground">{formatUsd(row.amount)}</Num>
-                      <Num className="block text-[10px] text-muted-foreground">
+                      <Num className="text-foreground block text-sm">{formatUsd(row.amount)}</Num>
+                      <Num className="text-muted-foreground block text-[10px]">
                         {row.pct.toFixed(1)}%
                       </Num>
                     </div>
                   </li>
                 );
               })}
-              <li className="grid grid-cols-[18px_1fr_auto] items-center gap-3 border-t-2 border-border pt-3">
+              <li className="border-border grid grid-cols-[18px_1fr_auto] items-center gap-3 border-t-2 pt-3">
                 <span aria-hidden />
-                <span className="font-display text-base font-semibold text-foreground">Total</span>
-                <Num className="text-base font-semibold text-primary">{formatUsd(data.total)}</Num>
+                <span className="font-display text-foreground text-base font-semibold">Total</span>
+                <Num className="text-primary text-base font-semibold">{formatUsd(data.total)}</Num>
               </li>
             </ol>
           </div>
@@ -248,10 +265,10 @@ function FilterPill({
     <Link
       href={href}
       className={cn(
-        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+        'inline-block px-3 py-1.5 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase transition-colors',
         active
-          ? 'border-b-2 border-primary text-primary'
-          : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+          ? 'border-primary text-primary border-b-2'
+          : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent',
       )}
     >
       {children}

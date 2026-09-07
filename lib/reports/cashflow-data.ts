@@ -36,11 +36,7 @@ export async function loadCashflowData(
     .select({ categoryId: budgets.categoryId, amountUsd: budgets.amountUsd })
     .from(budgets)
     .where(
-      and(
-        eq(budgets.householdId, householdId),
-        eq(budgets.year, year),
-        eq(budgets.month, month),
-      ),
+      and(eq(budgets.householdId, householdId), eq(budgets.year, year), eq(budgets.month, month)),
     );
 
   const range = monthRange(year, month);

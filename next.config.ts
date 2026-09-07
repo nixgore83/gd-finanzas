@@ -1,4 +1,4 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // mupdf carga un binario WASM (mupdf-wasm.wasm) en runtime. Si Next lo bundlea, la

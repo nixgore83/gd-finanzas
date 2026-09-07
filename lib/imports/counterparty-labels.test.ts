@@ -20,9 +20,7 @@ describe('mergeCounterpartyLabels', () => {
   });
 
   it('trimea y descarta vacíos, null y undefined', () => {
-    expect(mergeCounterpartyLabels(['  Niñera  ', '', '   ', null, undefined])).toEqual([
-      'Niñera',
-    ]);
+    expect(mergeCounterpartyLabels(['  Niñera  ', '', '   ', null, undefined])).toEqual(['Niñera']);
   });
 
   it('devuelve lista vacía sin fuentes o con fuentes vacías', () => {

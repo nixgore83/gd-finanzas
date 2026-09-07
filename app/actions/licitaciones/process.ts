@@ -23,9 +23,7 @@ export type ProcessLicitacionResult =
  * reaper lo marca 'error' (ver isLicitacionStale). `processLicitacionesJobInternal`
  * maneja su propio estado final.
  */
-export async function processLicitacionesJob(
-  jobId: string,
-): Promise<ProcessLicitacionResult> {
+export async function processLicitacionesJob(jobId: string): Promise<ProcessLicitacionResult> {
   let session;
   try {
     session = await requireHouseholdSession();

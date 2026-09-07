@@ -10,13 +10,7 @@ import { Label as TypoLabel } from '@/components/ui/typography';
  * En lugar de un Select de shadcn, usamos pill-buttons — la lista de años es
  * acotada (6) y mucho más rápido de scanear visualmente.
  */
-export function ExportsClient({
-  years,
-  defaultYear,
-}: {
-  years: number[];
-  defaultYear: number;
-}) {
+export function ExportsClient({ years, defaultYear }: { years: number[]; defaultYear: number }) {
   const [year, setYear] = useState<number>(defaultYear);
   const href = `/api/exports/ganancias?year=${year}`;
 
@@ -38,8 +32,8 @@ export function ExportsClient({
                 onClick={() => setYear(y)}
                 className={
                   active
-                    ? 'border border-primary bg-primary/[0.12] px-3 py-2.5 text-center font-mono text-base text-primary transition-colors'
-                    : 'border border-border bg-transparent px-3 py-2.5 text-center font-mono text-base text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground'
+                    ? 'border-primary bg-primary/[0.12] text-primary border px-3 py-2.5 text-center font-mono text-base transition-colors'
+                    : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground border bg-transparent px-3 py-2.5 text-center font-mono text-base transition-colors'
                 }
               >
                 {y}

@@ -18,12 +18,7 @@ export type BulkSetCategoryResult =
   | { ok: true; updated: number; skipped: number; skippedReason?: string }
   | {
       ok: false;
-      error:
-        | 'session'
-        | 'invalid_input'
-        | 'not_found'
-        | 'category_mismatch_all'
-        | 'unknown';
+      error: 'session' | 'invalid_input' | 'not_found' | 'category_mismatch_all' | 'unknown';
     };
 
 /**
@@ -53,9 +48,7 @@ export async function bulkSetCategory(input: {
   const [imp] = await db
     .select({ id: imports.id })
     .from(imports)
-    .where(
-      and(eq(imports.id, parsed.data.importId), eq(imports.householdId, session.householdId)),
-    )
+    .where(and(eq(imports.id, parsed.data.importId), eq(imports.householdId, session.householdId)))
     .limit(1);
   if (!imp) return { ok: false, error: 'not_found' };
 
@@ -118,10 +111,7 @@ export async function bulkSetCategory(input: {
       .update(importLines)
       .set({ proposedCategoryId: parsed.data.categoryId, status: 'edited' })
       .where(
-        and(
-          eq(importLines.importId, parsed.data.importId),
-          inArray(importLines.id, targetIds),
-        ),
+        and(eq(importLines.importId, parsed.data.importId), inArray(importLines.id, targetIds)),
       )
       .returning({ id: importLines.id });
 
@@ -130,12 +120,7 @@ export async function bulkSetCategory(input: {
       await db
         .update(importLines)
         .set({ parsedData: t.parsed })
-        .where(
-          and(
-            eq(importLines.importId, parsed.data.importId),
-            eq(importLines.id, t.id),
-          ),
-        );
+        .where(and(eq(importLines.importId, parsed.data.importId), eq(importLines.id, t.id)));
     }
 
     revalidatePath(`/imports/${parsed.data.importId}`);

@@ -21,10 +21,10 @@ export function counterpartyHasIdentity(cp: Counterparty | null | undefined): bo
   if (!cp) return false;
   return Boolean(
     cp.cuil?.trim() ||
-      cp.cbu?.trim() ||
-      cp.accountRef?.trim() ||
-      cp.alias?.trim() ||
-      cp.name?.trim(),
+    cp.cbu?.trim() ||
+    cp.accountRef?.trim() ||
+    cp.alias?.trim() ||
+    cp.name?.trim(),
   );
 }
 

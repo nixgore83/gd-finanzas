@@ -51,7 +51,20 @@ function resolveThemeColors() {
 
 function shortDate(iso: string): string {
   const parts = iso.split('-');
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   const mi = Number.parseInt(parts[1]!, 10) - 1;
   return `${months[mi]} ${parts[0]?.slice(2)}`;
 }

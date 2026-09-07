@@ -33,7 +33,8 @@ async function main() {
       limit 5
     `;
     console.warn('[fx:count] últimos 5:');
-    for (const r of latest) console.warn(`  ${r.date}  source=${r.source}  fetched=${r.fetched_at}`);
+    for (const r of latest)
+      console.warn(`  ${r.date}  source=${r.source}  fetched=${r.fetched_at}`);
   } finally {
     await sql.end();
   }

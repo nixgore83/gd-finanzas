@@ -45,9 +45,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   {
     key: 'patrimonio',
     title: 'Patrimonio',
-    links: [
-      { href: '/patrimonio', label: 'Net worth', matchPrefix: '/patrimonio' },
-    ],
+    links: [{ href: '/patrimonio', label: 'Net worth', matchPrefix: '/patrimonio' }],
   },
   {
     key: 'tools',
