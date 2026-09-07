@@ -1,0 +1,6 @@
+# Commits que solo tocan formato. `git blame` los saltea con:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub lo respeta automáticamente.)
+
+# chore(format): correr prettier en todo el repo
+4031f19f8cecc5b7b04705c3a5209a9a9fcac713
