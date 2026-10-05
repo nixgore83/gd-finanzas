@@ -132,6 +132,9 @@ describe('cuotaDateAtClose', () => {
     expect(cuotaDateAtClose(parsed({ date: '2026-09-20', description: 'X 03/06' }), c)).toBe('2026-09-24');
     expect(cuotaDateAtClose(parsed({ date: '2026-09-24', description: 'X 03/06' }), c)).toBeNull();
     expect(cuotaDateAtClose(parsed({ date: '2026-03-25', description: 'X' }), c)).toBeNull();
+    // Número de póliza, no cuota: se cobra todos los meses con el mismo texto.
+    expect(cuotaDateAtClose(parsed({ date: '2026-09-01', description: 'ALLIANZ 0210/18' }), c)).toBeNull();
+    expect(cuotaDateAtClose(parsed({ date: '2026-09-01', description: 'MERPAGO*X 5 de 6' }), c)).toBe('2026-09-24');
     expect(cuotaDateAtClose(parsed({ date: '2026-03-25', description: 'X 03/06' }), ctx(GALICIA_ARS_PAU))).toBeNull();
   });
 });

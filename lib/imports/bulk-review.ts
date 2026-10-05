@@ -56,8 +56,13 @@ export type Decision =
 /** Nombres de categoría que las reglas de concepto necesitan resolver. */
 export const KNOWN_CATEGORIES = ['intereses', 'promos bancarias'] as const;
 
-/** Marca de cuota en la descripción: "C.03/06", "03/06", "5 de 6". */
-const CUOTA_RE = /(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})/;
+/**
+ * Marca de cuota en la descripción: "C.03/06", "03/06", "5 de 6". Los dígitos
+ * no pueden venir pegados a otros: "ALLIANZ 0210/18" es un número de póliza
+ * que se cobra todos los meses, y leído como "10/18" aparecía como una cuota
+ * con 8 meses por delante.
+ */
+const CUOTA_RE = /(?<!\d)(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})(?!\d)/;
 
 const DUPLICATE_MARK = '[DUPLICADA] Ya existe como transacción en esta cuenta';
 
