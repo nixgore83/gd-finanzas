@@ -267,8 +267,13 @@ async function main() {
     // pendientes, que traen sugerencias sin validar). Categoría más frecuente de
     // los movimientos no-transfer a esa contraparte.
     const historyCache = new Map<string, string | null>();
-    const historyFor = async (cp: NonNullable<LineInput['parsed']['counterparty']>): Promise<string | null> => {
-      const key = `${cp.cuil ?? ''}|${cp.cbu ?? ''}|${cp.accountRef ?? ''}|${cp.alias ?? ''}`;
+    // Solo movimientos del MISMO tipo: si esa persona alguna vez nos transfirió
+    // (ingreso), su categoría no sirve para lo que le pagamos (gasto) y viceversa.
+    const historyFor = async (
+      cp: NonNullable<LineInput['parsed']['counterparty']>,
+      kind: 'income' | 'expense',
+    ): Promise<string | null> => {
+      const key = `${kind}|${cp.cuil ?? ''}|${cp.cbu ?? ''}|${cp.accountRef ?? ''}|${cp.alias ?? ''}`;
       if (historyCache.has(key)) return historyCache.get(key)!;
       const conds = [
         cp.cuil ? sql`${transactions.meta}->'counterparty'->>'cuil' = ${cp.cuil}` : null,
@@ -279,7 +284,7 @@ async function main() {
       const rows = await db
         .select({ categoryId: transactions.categoryId, kind: transactions.kind, n: sql<number>`count(*)::int` })
         .from(transactions)
-        .where(and(eq(transactions.householdId, householdId), ne(transactions.kind, 'transfer'), or(...conds)))
+        .where(and(eq(transactions.householdId, householdId), eq(transactions.kind, kind), or(...conds)))
         .groupBy(transactions.categoryId, transactions.kind)
         .orderBy(desc(sql`count(*)`));
       const best = rows.find((r) => r.categoryId)?.categoryId ?? null;
@@ -308,7 +313,7 @@ async function main() {
         counterpartyHasStrongId(parsed.data.counterparty) &&
         !counterpartyIsHousehold(line, ctx)
       ) {
-        line.historyCategoryId = await historyFor(parsed.data.counterparty);
+        line.historyCategoryId = await historyFor(parsed.data.counterparty, parsed.data.kind);
       }
       decisions.push({ id: row.id, descr: parsed.data.description, decision: decideLine(ctx, line) });
     }
