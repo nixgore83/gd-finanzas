@@ -102,13 +102,26 @@ describe('decideLine — tarjetas', () => {
     if (d.action === 'edit') expect(d.parsed.date).toBe('2026-09-24');
   });
 
-  it('NO toca la fecha de una cuota ya fechada dentro del período', () => {
+  it('NO toca la fecha de una cuota ya fechada al cierre, ni la de un consumo sin cuotas', () => {
+    const c = ctx(GALICIA_VISA_PAU_2, '2026-09-24');
+    expect(
+      decideLine(c, line({ proposedCategoryId: CAT_X, parsed: { date: '2026-09-24', description: 'MERPAGO*X 03/06' } })).action,
+    ).toBe('accept');
+    expect(
+      decideLine(c, line({ proposedCategoryId: CAT_X, parsed: { date: '2026-09-10', description: 'FARMACIA' } })).action,
+    ).toBe('accept');
+  });
+
+  it('mueve al cierre también la cuota reciente: la 2/3 del 12/08 en el resumen de sep no es la 1/3 del de ago', () => {
+    // Con la fecha del consumo, el chequeo de duplicados las tomaba por la misma
+    // transacción (mismo monto, misma fecha) y rechazaba una cuota real.
     const c = ctx(GALICIA_VISA_PAU_2, '2026-09-24');
     const d = decideLine(
       c,
-      line({ proposedCategoryId: CAT_X, parsed: { date: '2026-09-24', description: 'MERPAGO*X 03/06' } }),
+      line({ proposedCategoryId: CAT_X, parsed: { date: '2026-08-12', description: 'MERPAGO*TILA 02/03' } }),
     );
-    expect(d.action).toBe('accept');
+    expect(d).toMatchObject({ action: 'edit', reason: 'cuota fechada al cierre' });
+    if (d.action === 'edit') expect(d.parsed.date).toBe('2026-09-24');
   });
 });
 
@@ -116,7 +129,8 @@ describe('cuotaDateAtClose', () => {
   it('solo mueve cuotas de tarjeta fechadas lejos del cierre', () => {
     const c = ctx(GALICIA_VISA_PAU_2, '2026-09-24');
     expect(cuotaDateAtClose(parsed({ date: '2026-03-25', description: 'X 03/06' }), c)).toBe('2026-09-24');
-    expect(cuotaDateAtClose(parsed({ date: '2026-09-20', description: 'X 03/06' }), c)).toBeNull();
+    expect(cuotaDateAtClose(parsed({ date: '2026-09-20', description: 'X 03/06' }), c)).toBe('2026-09-24');
+    expect(cuotaDateAtClose(parsed({ date: '2026-09-24', description: 'X 03/06' }), c)).toBeNull();
     expect(cuotaDateAtClose(parsed({ date: '2026-03-25', description: 'X' }), c)).toBeNull();
     expect(cuotaDateAtClose(parsed({ date: '2026-03-25', description: 'X 03/06' }), ctx(GALICIA_ARS_PAU))).toBeNull();
   });

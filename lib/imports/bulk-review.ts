@@ -59,14 +59,7 @@ export const KNOWN_CATEGORIES = ['intereses', 'promos bancarias'] as const;
 /** Marca de cuota en la descripción: "C.03/06", "03/06", "5 de 6". */
 const CUOTA_RE = /(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})/;
 
-/** Una cuota fechada más de esto antes del cierre está fechada al consumo original. */
-const CUOTA_MAX_DAYS_BEFORE_CLOSE = 45;
-
 const DUPLICATE_MARK = '[DUPLICADA] Ya existe como transacción en esta cuenta';
-
-function daysBetween(a: string, b: string): number {
-  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
-}
 
 function digits(s: string | null | undefined): string {
   return (s ?? '').replace(/\D/g, '');
@@ -191,15 +184,20 @@ export function counterpartyHasStrongId(cp: ParsedTxLine['counterparty']): boole
 
 /**
  * Fecha de cierre a la que hay que mover una cuota de TC que vino fechada al
- * consumo original (regla de negocio: en imports cada cuota va al cierre del
- * resumen). Null si la línea no es cuota o ya está dentro del período. Se usa
- * también para el chequeo de duplicados: con la fecha original, la cuota 3 de
- * una compra parece la cuota 1 ya cargada (mismo monto, misma fecha).
+ * consumo original. Regla de negocio (CLAUDE.md): en imports cada resumen
+ * aporta únicamente la cuota de ese mes, fechada al cierre — TODA línea con
+ * marca de cuota, no solo las viejas. Null si la línea no es cuota o ya está
+ * fechada al cierre.
+ *
+ * Se usa también para el chequeo de duplicados, y por eso no puede haber
+ * umbral de días: la cuota 2/3 de una compra del 12/08 llega en el resumen de
+ * sep con fecha 12/08, igual que la cuota 1/3 del resumen de ago — mismo monto,
+ * misma fecha — y se rechazaba como duplicada siendo otra cuota.
  */
 export function cuotaDateAtClose(parsed: ParsedTxLine, ctx: ReviewContext): string | null {
   if (ctx.account.type !== 'credit_card' || !ctx.periodEnd) return null;
   if (!CUOTA_RE.test(parsed.description)) return null;
-  return daysBetween(parsed.date, ctx.periodEnd) > CUOTA_MAX_DAYS_BEFORE_CLOSE ? ctx.periodEnd : null;
+  return parsed.date === ctx.periodEnd ? null : ctx.periodEnd;
 }
 
 /** ¿La contraparte es uno de los dos miembros del household o una cuenta propia? */

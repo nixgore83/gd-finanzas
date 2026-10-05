@@ -159,7 +159,12 @@ async function main() {
     .where(
       and(
         eq(imports.householdId, householdId),
-        inArray(imports.status, ['parsed', 'reviewing']),
+        // Un import ya confirmado puede volver a tener líneas pendientes (se
+        // des-rechazó una); por id se admite, por fecha no se lo vuelve a tocar.
+        inArray(
+          imports.status,
+          IMPORT_IDS.length > 0 ? ['parsed', 'reviewing', 'confirmed'] : ['parsed', 'reviewing'],
+        ),
         IMPORT_IDS.length > 0
           ? inArray(imports.id, IMPORT_IDS)
           : gte(imports.createdAt, new Date(`${SINCE}T00:00:00Z`)),
