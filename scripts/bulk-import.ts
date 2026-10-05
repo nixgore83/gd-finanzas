@@ -317,8 +317,15 @@ async function main() {
       continue;
     }
 
+    // Para un CSV/XLSX no hay "primera página": se usa el comienzo del archivo
+    // tal cual (un CSV de Galicia armado a mano puede traer en la cabecera
+    // "Caja de Ahorro en Pesos" para que la moneda no vaya a CONFLICTO).
     const isPdf = entry.relPath.toLowerCase().endsWith('.pdf');
-    const pageText = isPdf ? await firstPageText(bytes) : null;
+    const pageText = isPdf
+      ? await firstPageText(bytes)
+      : entry.relPath.toLowerCase().endsWith('.csv')
+        ? new TextDecoder('utf-8').decode(bytes.subarray(0, 4096))
+        : null;
 
     // Moneda resuelta por contenido cuando el nombre del archivo no la
     // determina (consolidados de Galicia: mismo patrón para pesos y dólares).
