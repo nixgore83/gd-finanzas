@@ -9,6 +9,7 @@ type Currency = (typeof CURRENCIES)[number];
 import {
   accountNumberMatchesHint,
   buildPlan,
+  extractStatementAccountRef,
   extractStatementDate,
   routeFile,
   type PlanEntry,
@@ -157,6 +158,15 @@ function contentConflict(text: string | null, target: RouteTarget): string | nul
         return `el PDF dice titular ${owner}, la regla ruteó a ${target.ownerTag}`;
       }
     }
+  }
+
+  // Nº de cuenta: las dos Visas Galicia de Pau tienen resúmenes con el mismo
+  // nombre y el mismo cierre; sólo el "N° Cuenta" del encabezado las separa.
+  // Si el PDF lo trae y no coincide con el hint de la regla, el archivo está en
+  // la carpeta equivocada. Si no lo trae (otro banco), no se puede verificar.
+  const ref = extractStatementAccountRef(text);
+  if (ref && target.accountHint && !accountNumberMatchesHint(ref, target.accountHint)) {
+    return `el PDF dice N° Cuenta …${ref.slice(-4)}, la regla ruteó a [${target.accountHint}]`;
   }
 
   // La moneda NO se chequea acá: cuando el nombre no la determina, la regla
