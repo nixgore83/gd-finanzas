@@ -30,6 +30,7 @@
     "db:seed:recurrences": "tsx scripts/seed-recurrences.ts",
     "imports:reparse": "tsx scripts/reparse-imports.ts",
     "imports:bulk": "tsx scripts/bulk-import.ts",
+    "imports:confirm": "tsx scripts/bulk-confirm.ts",
     "imports:organize": "tsx scripts/organize-statements.ts",
     "db:confirm-emails": "tsx scripts/confirm-emails.ts",
     "dev:login": "tsx scripts/dev-login.ts",

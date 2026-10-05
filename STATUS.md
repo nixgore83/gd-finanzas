@@ -65,6 +65,29 @@ salió bien al reintentar.)
   caja ARS (…0729996 = 5148307-2), 04/03→04/09, cubierto entero por el PDF del 22/09.
 - [ ] `02-07-2026` de Galicia Nico: "Sin Movimientos" (cubre sólo 01→02/07); no se subió.
 
+**Confirmación masiva (`scripts/bulk-confirm.ts`, `npm run imports:confirm`).** Nico pidió que la
+revisión no sea a mano. El confirm de la UI se partió en `lib/imports/confirm-internal.ts` (núcleo
+sin sesión ni `revalidatePath`) + la Server Action como wrapper, y el script toma las decisiones
+mecánicas con reglas explícitas en `lib/imports/bulk-review.ts` (15 tests) y confirma con la MISMA
+función que la pantalla. Solo toca líneas `pending`; lo que alguien editó/aceptó se respeta.
+Reglas: TC con categoría → acepta (cuota fechada al consumo original → la mueve al cierre);
+duplicada contra transacciones de la cuenta (monto + fecha ±1 día) → rechaza con `[DUPLICADA]`;
+FIMA → transfer a Inversiones Galicia del mismo dueño; "PAGO TARJETA X" → transfer a esa tarjeta
+(Pau tiene dos Visas ⇒ queda sin contracuenta); intereses / promos → categoría; contraparte del
+household (CUIT de miembro o refs de una cuenta propia) → transfer; tercero con historial en
+`transactions` → gasto/ingreso con esa categoría; **tercero sin historial, o sin categoría → queda
+`pending` y el import NO se confirma.** El historial se mira SOLO en transacciones confirmadas: el
+`lookupCounterpartyHistory` del parse cae a otras líneas pendientes y arrastra sugerencias sin validar.
+- Dry-run sobre los 23 imports de hoy: **acepta 556 · corrige 176 · duplicadas 10 · quedan 84** en
+  6 imports (Galicia Nico 01-10: 13; Galicia Pau 09-22: 52, casi todo "TRANSFERENCIA A/DE TERCEROS"
+  sin historial; Master Galicia sep: 6 Google Cloud/MERPAGO sin categoría; Visa Galicia Nico sep: 2;
+  Visa Pau feb: 8 cuotas sin categoría; BIND ARS: 2 "Crédito por Transferencia" sin contraparte).
+- [ ] **La corrida real no se ejecutó**: el modo automático de permisos bloqueó el script porque
+  escribe transacciones en prod. La corre Nico: `npm run imports:confirm -- --since 2026-10-05`
+  (antes, `--dry-run` muestra el plan sin tocar nada). Después quedan ~84 líneas para la UI.
+- [ ] Deuda: `bulkDeleteImports` no deja borrar un import `reviewing` aunque tenga 1 sola
+  transacción espuria (MP agosto se borró por SQL).
+
 **Falta en Drive (no se puede cargar hasta que aparezca):**
 - Visa Galicia **Más** may/jun/jul 2026 (en Drive sólo hay copias de la común para esos meses).
 - Galicia Nico CA ARS: 10/06→30/06 y 04/08→31/08 (hay resumen 03-08 y 01-10, falta el de sep-01…).
