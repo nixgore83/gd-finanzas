@@ -135,6 +135,26 @@ async function main() {
     ),
   ];
 
+  // Nombres completos de los miembros tal como los imprimen los bancos, para
+  // reconocer "Transferencia enviada <yo>" donde no viene CUIT. Salen de las
+  // contrapartes ya confirmadas cuyo CUIT es de un miembro (`imports.
+  // statement_holder` está vacío en toda la base, no sirve de fuente).
+  const nameRows =
+    householdCuits.length === 0
+      ? []
+      : ((await db.execute(
+          sql`select distinct meta->'counterparty'->>'name' as name
+              from transactions
+              where household_id = ${householdId}
+                and regexp_replace(coalesce(meta->'counterparty'->>'cuil', ''), '\\D', '', 'g') in (${sql.join(
+                  householdCuits.map((c) => sql`${c}`),
+                  sql`, `,
+                )})
+                and coalesce(meta->'counterparty'->>'name', '') <> ''`,
+        )) as unknown as Array<{ name: string }>);
+  const householdNames = [...new Set(nameRows.map((r) => r.name.trim()).filter(Boolean))];
+  console.warn(`[confirm] miembros reconocidos por nombre: ${householdNames.length}`);
+
   const catRows = await db
     .select({ id: categories.id, name: categories.name })
     .from(categories)
@@ -194,6 +214,7 @@ async function main() {
       account,
       accounts: reviewAccounts,
       householdCuits,
+      householdNames,
       categoryIdByName,
       periodEnd: imp.periodEnd,
     };

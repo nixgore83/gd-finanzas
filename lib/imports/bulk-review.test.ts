@@ -4,6 +4,7 @@ import {
   counterpartyIsHousehold,
   cuotaDateAtClose,
   decideLine,
+  mentionsHouseholdMember,
   type LineInput,
   type ReviewAccount,
   type ReviewContext,
@@ -14,6 +15,7 @@ const CAT_INTERESES = '11111111-1111-4111-8111-111111111111';
 const CAT_PROMOS = '22222222-2222-4222-8222-222222222222';
 const CAT_X = '33333333-3333-4333-8333-333333333333';
 const CAT_HIST = '44444444-4444-4444-8444-444444444444';
+const CAT_BANCO = '55555555-5555-4555-8555-555555555555';
 
 const acct = (over: Partial<ReviewAccount> & { id: string }): ReviewAccount => ({
   institutionName: 'Galicia',
@@ -33,6 +35,8 @@ const GALICIA_VISA_PAU_1 = acct({ id: 'a-galicia-visa-pau-1', type: 'credit_card
 const GALICIA_VISA_PAU_2 = acct({ id: 'a-galicia-visa-pau-2', type: 'credit_card', cardBrand: 'visa', ownerTag: 'Pau' });
 const BIND_ARS_PAU = acct({ id: 'a-bind-ars-pau', institutionName: 'Banco Industrial', ownerTag: 'Pau' });
 const BIND_USD_PAU = acct({ id: 'a-bind-usd-pau', institutionName: 'Banco Industrial', ownerTag: 'Pau', currency: 'USD' });
+const MP_WALLET = acct({ id: 'a-mp-wallet', institutionName: 'Mercado Pago', type: 'ewallet' });
+const MP_MASTER = acct({ id: 'a-mp-master', institutionName: 'Mercado Pago', type: 'credit_card', cardBrand: 'master' });
 
 const ACCOUNTS = [
   GALICIA_ARS_NICO,
@@ -43,6 +47,8 @@ const ACCOUNTS = [
   GALICIA_VISA_PAU_2,
   BIND_ARS_PAU,
   BIND_USD_PAU,
+  MP_WALLET,
+  MP_MASTER,
 ];
 
 function ctx(account: ReviewAccount, periodEnd: string | null = '2026-09-24'): ReviewContext {
@@ -50,9 +56,11 @@ function ctx(account: ReviewAccount, periodEnd: string | null = '2026-09-24'): R
     account,
     accounts: ACCOUNTS,
     householdCuits: ['20111111112', '27111111113'],
+    householdNames: ['NICOLAS MARIO GORE', 'DALMASSO PAULA CECILIA'],
     categoryIdByName: new Map([
       ['intereses', CAT_INTERESES],
       ['promos bancarias', CAT_PROMOS],
+      ['gastos bancarios', CAT_BANCO],
     ]),
     periodEnd,
   };
@@ -199,6 +207,39 @@ describe('decideLine — conceptos bancarios inequívocos', () => {
     );
     // Ya venía como transfer sin contracuenta y sin categoría: no hay nada que corregir.
     expect(e.action).toBe('accept');
+  });
+});
+
+describe('decideLine — comisiones, bursátil y billetera MP', () => {
+  it('comisión bancaria → gasto bancario; compra bursátil → inversiones del mismo dueño', () => {
+    const com = decideLine(ctx(GALICIA_ARS_NICO), line({ parsed: { description: 'COMISION SERVICIO EMINENT PARCIAL' } }));
+    expect(com).toMatchObject({ action: 'edit', proposedCategoryId: CAT_BANCO });
+
+    const bur = decideLine(ctx(GALICIA_ARS_NICO), line({ parsed: { description: 'COMPRA BURSATIL XLE CEDEAR ENERGY SE' } }));
+    expect(bur.action).toBe('edit');
+    if (bur.action === 'edit') expect(bur.parsed.transferAccountId).toBe(GALICIA_BROKER_NICO.id);
+  });
+
+  it('billetera MP: pago de tarjeta → la Master de MP; ingreso de dinero y transferencia a uno mismo → transfer propia', () => {
+    const c = ctx(MP_WALLET, null);
+    const pago = decideLine(c, line({ parsed: { description: 'Pago automático Tarjeta de crédito' } }));
+    expect(pago.action).toBe('edit');
+    if (pago.action === 'edit') expect(pago.parsed.transferAccountId).toBe(MP_MASTER.id);
+
+    const ingreso = decideLine(c, line({ parsed: { description: 'Ingreso de dinero', kind: 'income' } }));
+    expect(ingreso.action).toBe('edit');
+    if (ingreso.action === 'edit') expect(ingreso.parsed.isTransfer).toBe(true);
+
+    const propia = decideLine(c, line({ parsed: { description: 'Transferencia enviada Nicolas Mario Gore', isTransfer: true } }));
+    expect(propia).toMatchObject({ action: 'accept' });
+  });
+
+  it('billetera MP: transferencia a un hijo NO es propia (comparte apellido) → queda para revisión', () => {
+    const c = ctx(MP_WALLET, null);
+    const hijo = decideLine(c, line({ parsed: { description: 'Transferencia enviada Benicio Gore De Freitas', isTransfer: true } }));
+    expect(hijo.action).toBe('pending');
+    expect(mentionsHouseholdMember('Transferencia enviada Benicio Gore De Freitas', c)).toBe(false);
+    expect(mentionsHouseholdMember('TRANSFERENCIA A TERCEROS - PAULA CECILIA DALMASSO', c)).toBe(true);
   });
 });
 

@@ -31,6 +31,13 @@ export type ReviewContext = {
   accounts: readonly ReviewAccount[];
   /** CUIT/CUIL (solo dígitos) de los miembros del household. */
   householdCuits: readonly string[];
+  /**
+   * Nombres completos de los miembros tal como los imprimen los bancos
+   * ("NICOLAS MARIO GORE", "DALMASSO PAULA CECILIA"). Para extractos que no
+   * traen CUIT de contraparte (billetera MP: "Transferencia enviada Nicolas
+   * Mario Gore") es la única forma de saber que el otro lado es propio.
+   */
+  householdNames: readonly string[];
   /** Categorías por nombre (minúsculas) → id. Solo se usan las de `KNOWN_CATEGORIES`. */
   categoryIdByName: ReadonlyMap<string, string>;
   /** Fecha de cierre del resumen (`imports.period_end`), para fechar cuotas. */
@@ -54,7 +61,31 @@ export type Decision =
   | { action: 'pending'; reason: string };
 
 /** Nombres de categoría que las reglas de concepto necesitan resolver. */
-export const KNOWN_CATEGORIES = ['intereses', 'promos bancarias'] as const;
+export const KNOWN_CATEGORIES = ['intereses', 'promos bancarias', 'gastos bancarios'] as const;
+
+/** Tokens de un nombre: mayúsculas, sin acentos, sin puntuación. */
+function nameTokens(s: string): string[] {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .split(/[^A-Z]+/)
+    .filter((t) => t.length > 1);
+}
+
+/**
+ * ¿El texto nombra a un miembro del household? Exige TODOS los tokens de un
+ * nombre completo (en cualquier orden): "Gore" solo no alcanza, porque los
+ * hijos también se apellidan Gore y una transferencia a un hijo es un gasto.
+ */
+export function mentionsHouseholdMember(text: string | null | undefined, ctx: ReviewContext): boolean {
+  if (!text) return false;
+  const have = new Set(nameTokens(text));
+  return ctx.householdNames.some((n) => {
+    const need = nameTokens(n);
+    return need.length >= 2 && need.every((t) => have.has(t));
+  });
+}
 
 /**
  * Marca de cuota en la descripción: "C.03/06", "03/06", "5 de 6". Los dígitos
@@ -129,6 +160,46 @@ function knownConcept(d: string, line: LineInput, ctx: ReviewContext): Concept {
   if (/REINTEGRO\s+PROMOCI[OÓ]N/.test(d)) {
     const id = ctx.categoryIdByName.get('promos bancarias');
     return id ? { kind: 'category', categoryId: id, why: 'promo bancaria' } : null;
+  }
+
+  // Comisiones y mantenimiento de cuenta: gasto bancario, nunca transferencia.
+  if (/\bCOMISI[OÓ]N\b|\bCOM\.?\s*MANT/.test(d) && line.parsed.kind === 'expense') {
+    const id = ctx.categoryIdByName.get('gastos bancarios');
+    return id ? { kind: 'category', categoryId: id, why: 'comisión bancaria' } : null;
+  }
+
+  // Operaciones bursátiles / FCI desde la caja: el otro lado es la cuenta de
+  // inversión de la misma institución y dueño.
+  if (/\b(COMPRA|VENTA)\s+BURS[AÁ]TIL\b|\b(SUSCRIPCI[OÓ]N|RESCATE)\s+FCI\b/.test(d)) {
+    const accountId = onlyOne(
+      accounts,
+      (a) =>
+        a.type === 'broker' &&
+        (a.institutionName ?? '').toLowerCase() === inst &&
+        sameOwner(a, account),
+    );
+    return { kind: 'transfer', accountId, why: 'operación bursátil → inversiones' };
+  }
+
+  // Billetera de Mercado Pago.
+  if (account.type === 'ewallet') {
+    if (/PAGO\s+(AUTOM[AÁ]TICO\s+)?(DE\s+)?TARJETA\s+DE\s+CR[EÉ]DITO/.test(d)) {
+      const accountId = onlyOne(
+        accounts,
+        (a) =>
+          a.type === 'credit_card' &&
+          (a.institutionName ?? '').toLowerCase() === inst &&
+          sameOwner(a, account),
+      );
+      return { kind: 'transfer', accountId, why: 'pago tarjeta MP' };
+    }
+    // Fondeo desde un banco propio: el extracto no dice cuál.
+    if (/^INGRESO\s+DE\s+DINERO\b/.test(d)) {
+      return { kind: 'transfer', accountId: null, why: 'ingreso de dinero (fondeo propio)' };
+    }
+    if (/^TRANSFERENCIA\s+(ENVIADA|RECIBIDA)\b/.test(d) && mentionsHouseholdMember(d, ctx)) {
+      return { kind: 'transfer', accountId: null, why: 'transferencia a/de cuenta propia' };
+    }
   }
 
   // BIND: movimientos entre sub-cuentas propias del mismo resumen consolidado.
@@ -211,6 +282,7 @@ export function counterpartyIsHousehold(line: LineInput, ctx: ReviewContext): bo
   if (!cp) return false;
   const cuil = digits(cp.cuil);
   if (cuil && ctx.householdCuits.includes(cuil)) return true;
+  if (mentionsHouseholdMember(cp.name, ctx)) return true;
   const refs = new Set(counterpartyBankRefs(cp));
   return ctx.accounts.some((a) => (a.transferRefs ?? []).some((r) => refs.has(digits(r) || r)));
 }
