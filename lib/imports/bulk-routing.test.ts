@@ -191,6 +191,18 @@ describe('routeFile', () => {
     });
   });
 
+  it('separa la billetera de MP (Cuentas) de la tarjeta de MP (TC)', () => {
+    expect(routeFile('Cuentas\\MercadoPago\\MP billetera 2026-07.pdf')?.targets[0]).toMatchObject({
+      institutionName: 'Mercado Pago',
+      accountType: 'ewallet',
+      importType: 'banco',
+    });
+    expect(routeFile('TC\\MercadoPago\\202608 - credit-card-mp-statement.pdf')?.targets[0]).toMatchObject({
+      accountType: 'credit_card',
+      cardBrand: 'master',
+    });
+  });
+
   it('devuelve null para lo que no está en la tabla', () => {
     expect(routeFile('TC\\Proyeccion Financiera.gsheet')).toBeNull();
     expect(routeFile('Otra carpeta\\algo.pdf')).toBeNull();

@@ -436,6 +436,24 @@ export const ROUTE_RULES: RouteRule[] = [
     match: startsWith('tc/mercadopago/'),
     targets: [tcTarget('Mercado Pago', 'Nico', 'master')],
   },
+  {
+    // Billetera de MP: el "RESUMEN DE CUENTA EN PESOS" (PDF mensual) o el
+    // account_statement en Excel. MP nombra los PDF con la fecha de DESCARGA
+    // (account_statement_YYYYMMDDhhmmss_xxxx.pdf), así que conviene renombrarlos
+    // al mes del período antes de subirlos, si no el dedup los toma por copias.
+    id: 'nico-mp-billetera',
+    folder: 'Cuentas/MercadoPago',
+    match: startsWith('cuentas/mercadopago/'),
+    targets: [
+      {
+        institutionName: 'Mercado Pago',
+        importType: 'banco',
+        ownerTag: 'Nico',
+        accountType: 'ewallet',
+        currency: 'ARS',
+      },
+    ],
+  },
 
   // --- Cuentas bancarias de Nico. ICBC se desambigua por el sufijo del nro de
   // cuenta que el propio banco pone en el nombre del archivo.
