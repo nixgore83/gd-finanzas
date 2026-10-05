@@ -44,6 +44,8 @@ function flagValues(name: string): string[] {
   return out;
 }
 const DRY_RUN = FLAGS.includes('--dry-run');
+/** Con --dry-run: escribe un JSON con las líneas que quedarían pendientes (id, motivo). */
+const PENDING_OUT = flagValues('--pending-out')[0] ?? null;
 const IMPORT_IDS = flagValues('--import');
 const SINCE = flagValues('--since')[0] ?? new Date().toISOString().slice(0, 10);
 const AS_EMAIL = flagValues('--as')[0] ?? null;
@@ -199,6 +201,7 @@ async function main() {
   let totalConfirmed = 0;
   let totalCreated = 0;
   const totals = { accept: 0, edit: 0, reject: 0, pending: 0 };
+  const pendingOut: Array<{ id: string; importId: string; file: string | null; reason: string }> = [];
 
   for (const imp of importRows) {
     if (!imp.accountId) {
@@ -333,6 +336,7 @@ async function main() {
     for (const [reason, items] of pendByReason) {
       console.warn(`     queda · ${reason}: ${items.length}  (${[...new Set(items)].slice(0, 4).join(' | ')})`);
     }
+    for (const p of pend) pendingOut.push({ id: p.id, importId: imp.id, file: imp.fileName, reason: p.decision.reason });
 
     if (DRY_RUN) continue;
 
@@ -382,6 +386,11 @@ async function main() {
   );
   if (!DRY_RUN) {
     console.warn(`[confirm] imports confirmados: ${totalConfirmed} · transacciones creadas: ${totalCreated}`);
+  }
+  if (DRY_RUN && PENDING_OUT) {
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(PENDING_OUT, JSON.stringify(pendingOut, null, 1));
+    console.warn(`[confirm] ${pendingOut.length} línea(s) pendientes escritas en ${PENDING_OUT}`);
   }
   // Para que el reporte sea legible, los nombres de categoría usados en correcciones:
   void categoryName;
