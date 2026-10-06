@@ -224,6 +224,13 @@ const GALICIA = 'Galicia';
 const BIND = 'Banco Industrial';
 const ICBC = 'ICBC';
 
+/**
+ * Últimos 4 del "N° Cuenta" que Galicia imprime en el encabezado de cada
+ * resumen de tarjeta. Misma convención que ICBC: sufijo, no el número entero.
+ */
+const GALICIA_VISA_PAU = '2615';
+const GALICIA_VISA_MAS_PAU = '1127';
+
 function tcTarget(
   institutionName: string,
   ownerTag: OwnerTag,
@@ -269,14 +276,39 @@ const inFolderOrCanonical = (sourceFolder: string, filePattern: RegExp, canonica
  * reglas específicas tienen que ir antes que cualquier regla de carpeta.
  */
 export const ROUTE_RULES: RouteRule[] = [
-  // --- Carpetas mixtas: Visa de Pau son DOS tarjetas de dos bancos distintos.
-  // Verificado abriendo los PDFs: RESUMEN_VISA* dice "galicia"; 27288643119_*
-  // es Banco Industrial (www.bind.com.ar / pagoslink.com.ar).
+  // --- Carpetas mixtas: Visa de Pau son TRES tarjetas: dos de Galicia y una de
+  // Banco Industrial. Verificado abriendo los PDFs: RESUMEN_VISA* dice
+  // "galicia"; 27288643119_* es Banco Industrial (www.bind.com.ar /
+  // pagoslink.com.ar).
+  //
+  // Las DOS Visas de Galicia ("Visa Galicia" y "Visa Galicia Más", la ex-HSBC)
+  // cierran el MISMO día y el banco les pone el MISMO nombre de archivo
+  // (RESUMEN_VISA<dd>_<m>_<yyyy>pdf.pdf); sólo el "N° Cuenta" del encabezado
+  // las distingue. Por eso cada una tiene su carpeta canónica y su
+  // `accountHint` (últimos 4 del N° Cuenta): sin el hint, el dedup por
+  // (cuenta, cierre) tomaba el resumen de una tarjeta como copia del de la otra
+  // y se perdía uno de los dos todos los meses (pasó en la carga 2026-08-13).
+  // El script contrasta el hint contra el "N° Cuenta" del PDF, así que un
+  // resumen de la Más archivado en la carpeta de la otra va a CONFLICTO.
+  {
+    // Un "<CUIL>_Visa_*" guardado por error en la carpeta de Galicia sigue
+    // siendo de BIND: va ANTES que la regla de Galicia para que no lo trague.
+    id: 'pau-visa-bind-misfiled',
+    folder: 'TC/Visa BIND Pau',
+    match: inFolder('tc/visa galicia pau/', /^\d{11}_visa/i),
+    targets: [tcTarget(BIND, 'Pau', 'visa')],
+  },
+  {
+    id: 'pau-visa-galicia-mas',
+    folder: 'TC/Visa Galicia Mas Pau',
+    match: (p) => /^tc\/visa galicia m[aá]s pau\//.test(p),
+    targets: [{ ...tcTarget(GALICIA, 'Pau', 'visa'), accountHint: GALICIA_VISA_MAS_PAU }],
+  },
   {
     id: 'pau-visa-galicia',
     folder: 'TC/Visa Galicia Pau',
     match: inFolderOrCanonical('tc/visa pau/', /^resumen_visa/i, 'tc/visa galicia pau'),
-    targets: [tcTarget(GALICIA, 'Pau', 'visa')],
+    targets: [{ ...tcTarget(GALICIA, 'Pau', 'visa'), accountHint: GALICIA_VISA_PAU }],
   },
   {
     // El portal de BIND nombra los archivos "<CUIL>_<producto>_<YYYYMMDD>". Se
@@ -290,7 +322,7 @@ export const ROUTE_RULES: RouteRule[] = [
     id: 'pau-visa-galicia-dup',
     folder: 'TC/Visa Galicia Pau',
     match: inFolderOrCanonical('pau/', /^resumen_visa/i, 'tc/visa galicia pau'),
-    targets: [tcTarget(GALICIA, 'Pau', 'visa')],
+    targets: [{ ...tcTarget(GALICIA, 'Pau', 'visa'), accountHint: GALICIA_VISA_PAU }],
   },
   {
     id: 'pau-visa-bind-dup',
@@ -415,6 +447,24 @@ export const ROUTE_RULES: RouteRule[] = [
     match: startsWith('tc/mercadopago/'),
     targets: [tcTarget('Mercado Pago', 'Nico', 'master')],
   },
+  {
+    // Billetera de MP: el "RESUMEN DE CUENTA EN PESOS" (PDF mensual) o el
+    // account_statement en Excel. MP nombra los PDF con la fecha de DESCARGA
+    // (account_statement_YYYYMMDDhhmmss_xxxx.pdf), así que conviene renombrarlos
+    // al mes del período antes de subirlos, si no el dedup los toma por copias.
+    id: 'nico-mp-billetera',
+    folder: 'Cuentas/MercadoPago',
+    match: startsWith('cuentas/mercadopago/'),
+    targets: [
+      {
+        institutionName: 'Mercado Pago',
+        importType: 'banco',
+        ownerTag: 'Nico',
+        accountType: 'ewallet',
+        currency: 'ARS',
+      },
+    ],
+  },
 
   // --- Cuentas bancarias de Nico. ICBC se desambigua por el sufijo del nro de
   // cuenta que el propio banco pone en el nombre del archivo.
@@ -502,6 +552,20 @@ export function normalizeRelPath(relPath: string): string {
 export function routeFile(relPath: string): RouteRule | null {
   const p = normalizeRelPath(relPath);
   return ROUTE_RULES.find((r) => r.match(p)) ?? null;
+}
+
+/**
+ * "N° Cuenta" del encabezado de un resumen de tarjeta de Galicia
+ * ("N° Cuenta: 0499222615 Sucursal: 999"). Es lo único que distingue dos
+ * tarjetas del mismo banco cuyos resúmenes se llaman igual y cierran el mismo
+ * día. Devuelve null si el texto no trae ese rótulo (otros bancos, o PDF
+ * ilegible): no es evidencia de nada, y el caller no debe tratarlo como
+ * contradicción.
+ */
+export function extractStatementAccountRef(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = /N[°º]\s*Cuenta:\s*(\d{6,})/i.exec(text);
+  return m?.[1] ?? null;
 }
 
 /**

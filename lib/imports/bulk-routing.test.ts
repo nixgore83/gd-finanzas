@@ -3,6 +3,7 @@ import {
   ROUTE_RULES,
   accountNumberMatchesHint,
   buildPlan,
+  extractStatementAccountRef,
   extractStatementDate,
   preferredCopy,
   routeFile,
@@ -148,6 +149,29 @@ describe('routeFile', () => {
     expect(routeFile(`TC\\Visa Pau\\${CUIL}_Visa_20260723.pdf`)?.id).toBe('pau-visa-bind');
   });
 
+  it('separa las DOS Visas Galicia de Pau por carpeta, con hint de nº de cuenta', () => {
+    // Mismo banco, mismo nombre de archivo, mismo cierre: sólo la carpeta (y el
+    // "N° Cuenta" del PDF, que el script contrasta) las distingue.
+    const comun = routeFile('TC\\Visa Galicia Pau\\RESUMEN_VISA23_4_2026pdf (2).pdf');
+    const mas = routeFile('TC\\Visa Galicia Mas Pau\\RESUMEN_VISA23_4_2026pdf (1).pdf');
+    expect(comun?.id).toBe('pau-visa-galicia');
+    expect(mas?.id).toBe('pau-visa-galicia-mas');
+    expect(comun?.targets[0]?.accountHint).toBeDefined();
+    expect(mas?.targets[0]?.accountHint).toBeDefined();
+    expect(comun?.targets[0]?.accountHint).not.toBe(mas?.targets[0]?.accountHint);
+    // La carpeta con tilde (como la nombra el banco) también rutea.
+    expect(routeFile('TC\\Visa Galicia Más Pau\\Resumen Visa Galicia Más - Sep 2026.pdf')?.id).toBe(
+      'pau-visa-galicia-mas',
+    );
+  });
+
+  it('un resumen de BIND archivado en la carpeta de Galicia sigue siendo de BIND', () => {
+    const rule = routeFile(`TC\\Visa Galicia Pau\\${CUIL}_Visa_20260820.pdf`);
+    expect(rule?.id).toBe('pau-visa-bind-misfiled');
+    expect(rule?.targets[0]?.institutionName).toBe('Banco Industrial');
+    expect(rule?.folder).toBe('TC/Visa BIND Pau');
+  });
+
   it('rutea los consolidados de la carpeta Pau por titular según la convención', () => {
     // "CAJA DE AHORRO DD-MM-YYYY" es de Nico aunque viva en la carpeta de Pau.
     const nico = routeFile('Pau\\RESUMEN_EXTRACTOS CONSOLIDADOS - CAJA DE AHORRO 02-07-2026.pdf');
@@ -186,6 +210,18 @@ describe('routeFile', () => {
     expect(routeFile('TC\\Master HSBC Us\\2026-06-26_Statement.pdf')?.targets[0]).toMatchObject({
       institutionName: 'HSBC US',
       currency: 'USD',
+    });
+  });
+
+  it('separa la billetera de MP (Cuentas) de la tarjeta de MP (TC)', () => {
+    expect(routeFile('Cuentas\\MercadoPago\\MP billetera 2026-07.pdf')?.targets[0]).toMatchObject({
+      institutionName: 'Mercado Pago',
+      accountType: 'ewallet',
+      importType: 'banco',
+    });
+    expect(routeFile('TC\\MercadoPago\\202608 - credit-card-mp-statement.pdf')?.targets[0]).toMatchObject({
+      accountType: 'credit_card',
+      cardBrand: 'master',
     });
   });
 
@@ -274,6 +310,24 @@ describe('routeFile', () => {
   });
 });
 
+describe('extractStatementAccountRef', () => {
+  it('lee el "N° Cuenta" del encabezado de una TC Galicia', () => {
+    const header =
+      'Tarjeta Crédito VISA | TITULAR Consumidor Final CUIT Banco: 30-50000173-5 | ' +
+      'N° Cuenta: 0499222615 Sucursal: 999 | Resumen de tarjeta de credito VISA';
+    expect(extractStatementAccountRef(header)).toBe('0499222615');
+    expect(accountNumberMatchesHint(extractStatementAccountRef(header), '2615')).toBe(true);
+    expect(accountNumberMatchesHint(extractStatementAccountRef(header), '1127')).toBe(false);
+  });
+
+  it('devuelve null cuando el PDF no trae ese rótulo (BIND, PDF ilegible)', () => {
+    // BIND imprime "N DE CUENTA:" con el número en otra línea: no es el mismo dato.
+    expect(extractStatementAccountRef('N DE CUENTA: | LIQ.: | 1106733522 - CR1002')).toBeNull();
+    expect(extractStatementAccountRef(null)).toBeNull();
+    expect(extractStatementAccountRef('')).toBeNull();
+  });
+});
+
 describe('preferredCopy', () => {
   it('prefiere el nombre sin sufijo de copia', () => {
     expect(
@@ -310,6 +364,21 @@ describe('buildPlan — dedup local', () => {
     for (const dup of entries.filter((e) => e.status === 'DUP_LOCAL')) {
       expect(dup.supersededBy).toBe('TC\\Visa Pau\\RESUMEN_VISA25_6_2026pdf.pdf');
     }
+  });
+
+  it('REGRESIÓN: NO colapsa las dos Visas GALICIA de Pau aunque se llamen igual y cierren el mismo día', () => {
+    // Carga 2026-08-13: el dedup tomó el resumen de la "Visa Galicia Más" como
+    // copia del de la "Visa Galicia" (mismo banco, mismo nombre, mismo cierre) y
+    // se cargó UNA tarjeta por mes, alternando cuál. El hint de nº de cuenta
+    // entra en la clave de identidad, así que ahora son dos resúmenes.
+    const entries = plan([
+      'TC\\Visa Galicia Pau\\RESUMEN_VISA23_4_2026pdf (2).pdf',
+      'TC\\Visa Galicia Mas Pau\\RESUMEN_VISA23_4_2026pdf (1).pdf',
+    ]);
+    expect(entries.filter((e) => e.status === 'NUEVO')).toHaveLength(2);
+    expect(entries.filter((e) => e.status === 'DUP_LOCAL')).toHaveLength(0);
+    const hints = entries.map((e) => e.target?.accountHint);
+    expect(new Set(hints).size).toBe(2);
   });
 
   it('NO colapsa las dos Visas de Pau aunque cierren el mismo día', () => {
