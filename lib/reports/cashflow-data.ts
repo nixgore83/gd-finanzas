@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, isNotNull, lte, sum } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { budgets, transactions } from '@/db/schema';
 import { loadCategoryTree } from '@/lib/categories/tree';
+import { householdExcludedIds } from '@/lib/categories/household-exclusion';
 import { buildCashflowReport, type CashflowReport } from './cashflow';
 
 function lastDayOfMonth(year: number, month1: number): number {
@@ -58,13 +59,18 @@ export async function loadCashflowData(
     )
     .groupBy(transactions.categoryId);
 
+  // Lo que no es gasto de la casa (Mario, RH, Tijeritas) no entra al cashflow.
+  const excluded = householdExcludedIds(tree);
   const reals = txRows
     .filter((r): r is { categoryId: string; realUsd: string } => r.categoryId !== null)
+    .filter((r) => !excluded.has(r.categoryId))
     .map((r) => ({ categoryId: r.categoryId, realUsd: r.realUsd ?? '0' }));
 
   const report = buildCashflowReport(
-    tree,
-    budgetRows.map((b) => ({ categoryId: b.categoryId, amountUsd: b.amountUsd })),
+    tree.filter((c) => !excluded.has(c.id)),
+    budgetRows
+      .filter((b) => !excluded.has(b.categoryId))
+      .map((b) => ({ categoryId: b.categoryId, amountUsd: b.amountUsd })),
     reals,
   );
 

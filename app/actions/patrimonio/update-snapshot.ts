@@ -118,6 +118,7 @@ export async function updateSnapshot(
     }
 
     revalidatePath('/patrimonio');
+    revalidatePath('/runway');
     revalidatePath(`/patrimonio/${snapshotId}`);
     return { ok: true };
   } catch (err) {

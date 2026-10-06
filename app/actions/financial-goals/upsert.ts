@@ -48,6 +48,7 @@ export async function upsertFinancialGoals(
         numeroRetiroUsd: parsed.data.numeroRetiroUsd,
         numeroEducacionUsd: parsed.data.numeroEducacionUsd,
         bufferUsd: parsed.data.bufferUsd,
+        topeGastoMensualArs: parsed.data.topeGastoMensualArs,
         notas: parsed.data.notas,
         updatedBy: session.userId,
       })
@@ -60,6 +61,7 @@ export async function upsertFinancialGoals(
           numeroRetiroUsd: parsed.data.numeroRetiroUsd,
           numeroEducacionUsd: parsed.data.numeroEducacionUsd,
           bufferUsd: parsed.data.bufferUsd,
+          topeGastoMensualArs: parsed.data.topeGastoMensualArs,
           notas: parsed.data.notas,
           updatedAt: sql`now()`,
           updatedBy: session.userId,
@@ -67,6 +69,8 @@ export async function upsertFinancialGoals(
       });
 
     revalidatePath('/settings/metas');
+    revalidatePath('/runway');
+    revalidatePath('/dashboard');
     return { ok: true };
   } catch (err) {
     console.error('[financial-goals] upsert failed', {

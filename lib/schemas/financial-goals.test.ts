@@ -54,3 +54,25 @@ describe('financialGoalsInputSchema', () => {
     expect(() => financialGoalsInputSchema.parse({ ...valid, notas: 'x'.repeat(2001) })).toThrow();
   });
 });
+
+describe('financialGoalsInputSchema · techo de gasto mensual', () => {
+  it('vacío o ausente = sin techo', () => {
+    expect(financialGoalsInputSchema.parse(valid).topeGastoMensualArs).toBeNull();
+    expect(
+      financialGoalsInputSchema.parse({ ...valid, topeGastoMensualArs: '' }).topeGastoMensualArs,
+    ).toBeNull();
+  });
+
+  it('un monto válido se normaliza a 2 decimales', () => {
+    expect(
+      financialGoalsInputSchema.parse({ ...valid, topeGastoMensualArs: '16000000' })
+        .topeGastoMensualArs,
+    ).toBe('16000000.00');
+  });
+
+  it('un techo negativo es inválido', () => {
+    expect(
+      financialGoalsInputSchema.safeParse({ ...valid, topeGastoMensualArs: '-1' }).success,
+    ).toBe(false);
+  });
+});

@@ -1,4 +1,5 @@
 import { counterpartyBankRefs, counterpartyHasIdentity, matchAccountByRefs } from './counterparty-identity';
+import { CUOTA_RE } from '@/lib/runway/cuotas';
 import type { ParsedTxLine } from './parsers/types';
 
 /**
@@ -87,13 +88,6 @@ export function mentionsHouseholdMember(text: string | null | undefined, ctx: Re
   });
 }
 
-/**
- * Marca de cuota en la descripción: "C.03/06", "03/06", "5 de 6". Los dígitos
- * no pueden venir pegados a otros: "ALLIANZ 0210/18" es un número de póliza
- * que se cobra todos los meses, y leído como "10/18" aparecía como una cuota
- * con 8 meses por delante.
- */
-const CUOTA_RE = /(?<!\d)(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})(?!\d)/;
 
 const DUPLICATE_MARK = '[DUPLICADA] Ya existe como transacción en esta cuenta';
 

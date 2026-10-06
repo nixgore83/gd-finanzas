@@ -9,6 +9,8 @@ export type CategoryNode = {
   depth: 0 | 1;
   parentId: string | null;
   isInvestment: boolean;
+  /** Gasto que no es de la casa: fuera del runway, del techo y de los reportes. */
+  excludedFromHousehold: boolean;
 };
 
 /**
@@ -28,6 +30,7 @@ export async function loadCategoryTree(householdId: string): Promise<CategoryNod
       kind: categories.kind,
       parentId: categories.parentId,
       isInvestment: categories.isInvestment,
+      excludedFromHousehold: categories.excludedFromHousehold,
     })
     .from(categories)
     .where(and(eq(categories.householdId, householdId), eq(categories.archived, false)))
@@ -56,6 +59,7 @@ export async function loadCategoryTree(householdId: string): Promise<CategoryNod
       depth: 0,
       parentId: null,
       isInvestment: p.isInvestment,
+      excludedFromHousehold: p.excludedFromHousehold,
     });
     const children = (childrenByParent.get(p.id) ?? []).sort((a, b) =>
       a.name.localeCompare(b.name, 'es'),
@@ -68,6 +72,7 @@ export async function loadCategoryTree(householdId: string): Promise<CategoryNod
         depth: 1,
         parentId: p.id,
         isInvestment: c.isInvestment,
+        excludedFromHousehold: c.excludedFromHousehold,
       });
     }
   }

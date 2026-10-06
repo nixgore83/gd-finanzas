@@ -34,6 +34,12 @@ function buildItems(data: PendingActions): SummaryItem[] {
   if (data.budgetMissing) {
     items.push({ label: 'presupuesto del mes sin definir', tone: 'attn' });
   }
+  if (data.spendCapExceeded) {
+    items.push({ label: 'gasto del mes por encima del techo', tone: 'bad' });
+  }
+  if (data.netWorthSnapshotStale) {
+    items.push({ label: 'snapshot de patrimonio para actualizar', tone: 'attn' });
+  }
   if (data.unmatchedTransfers && data.unmatchedTransfers.length > 0) {
     items.push({
       label: `${data.unmatchedTransfers.length} transferencia${data.unmatchedTransfers.length > 1 ? 's' : ''} sin parear`,

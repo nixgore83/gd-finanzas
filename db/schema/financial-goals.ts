@@ -17,6 +17,8 @@ export const financialGoals = pgTable('financial_goals', {
   numeroRetiroUsd: numeric('numero_retiro_usd', { precision: 18, scale: 2 }).notNull(),
   numeroEducacionUsd: numeric('numero_educacion_usd', { precision: 18, scale: 2 }).notNull(),
   bufferUsd: numeric('buffer_usd', { precision: 18, scale: 2 }).notNull(),
+  /** Techo de gasto mensual de la casa en ARS (sin cuotas de TC). Null = sin techo. */
+  topeGastoMensualArs: numeric('tope_gasto_mensual_ars', { precision: 18, scale: 2 }),
   notas: text('notas'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   updatedBy: uuid('updated_by').references(() => authUsers.id, { onDelete: 'set null' }),

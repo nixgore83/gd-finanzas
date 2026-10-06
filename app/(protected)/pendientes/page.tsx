@@ -272,6 +272,39 @@ export default async function PendientesPage() {
             </PendingSection>
           )}
 
+          {/* ===== Runway: techo y snapshot ===== */}
+          {data.spendCapExceeded && (
+            <PendingSection title="Techo de gasto" hint="superado">
+              <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <Body className="max-w-md">
+                  El gasto de la casa de este mes ya pasó el techo configurado.
+                </Body>
+                <Link
+                  href="/runway"
+                  className="link font-display text-muted-foreground text-sm italic"
+                >
+                  Ver runway →
+                </Link>
+              </div>
+            </PendingSection>
+          )}
+          {data.netWorthSnapshotStale && (
+            <PendingSection title="Snapshot de patrimonio" hint="para actualizar">
+              <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <Body className="max-w-md">
+                  El runway parte del último snapshot de patrimonio, que no existe o tiene más de un
+                  mes. Cargá los saldos de hoy (cuentas, FIMA, títulos, Balanz, efectivo).
+                </Body>
+                <Link
+                  href="/patrimonio/nuevo"
+                  className="link font-display text-muted-foreground text-sm italic"
+                >
+                  Nuevo snapshot →
+                </Link>
+              </div>
+            </PendingSection>
+          )}
+
           {/* ===== Presupuesto del mes ===== */}
           {data.budgetMissing && (
             <PendingSection title="Presupuesto del mes" hint="sin definir">

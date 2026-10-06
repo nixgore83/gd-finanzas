@@ -99,6 +99,7 @@ export async function createSnapshot(input: unknown): Promise<CreateSnapshotResu
     }
 
     revalidatePath('/patrimonio');
+    revalidatePath('/runway');
     return { ok: true, id: snapshot.id };
   } catch (err) {
     const code = (err as { code?: string }).code;
