@@ -12,6 +12,7 @@ import {
 import { detectImportGaps, type ImportGap } from '@/lib/imports/detect-gaps';
 import type { ImportType } from '@/lib/schemas/import';
 import { formatAccount, type AccountForDisplay } from '@/lib/accounts/format';
+import { loadCurrentSpendCap, loadSnapshotFreshness } from '@/lib/runway/runway-data';
 
 export type OverdueKind = 'missed' | 'grace';
 
@@ -99,6 +100,10 @@ export type PendingActions = {
   importGaps: ImportGap[];
   budgetMissing: boolean;
   unmatchedTransfers: UnmatchedTransfer[];
+  /** El gasto de la casa del mes ya pasó el techo de /settings/metas. */
+  spendCapExceeded: boolean;
+  /** No hay snapshot de patrimonio, o tiene más de 35 días: el runway queda viejo. */
+  netWorthSnapshotStale: boolean;
   /** Cantidad de ítems accionables, para el badge del nav y el resumen del dashboard. */
   totalCount: number;
 };
@@ -262,6 +267,13 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
 
   const budgetMissing = (budgetRows[0]?.c ?? 0) === 0;
 
+  const [capNow, snapFresh] = await Promise.all([
+    loadCurrentSpendCap(householdId),
+    loadSnapshotFreshness(householdId),
+  ]);
+  const spendCapExceeded = capNow.status?.level === 'over';
+  const netWorthSnapshotStale = snapFresh.stale;
+
   const unmatchedTransfers: UnmatchedTransfer[] =
     unmatchedTransferRows.map(mapUnmatchedTransferRow);
 
@@ -271,7 +283,9 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
     overdueForecasts.length +
     importGaps.length +
     unmatchedTransfers.length +
-    (budgetMissing ? 1 : 0);
+    (budgetMissing ? 1 : 0) +
+    (spendCapExceeded ? 1 : 0) +
+    (netWorthSnapshotStale ? 1 : 0);
 
   return {
     importsToReview,
@@ -280,6 +294,8 @@ export async function loadPendingActions(householdId: string): Promise<PendingAc
     importGaps,
     budgetMissing,
     unmatchedTransfers,
+    spendCapExceeded,
+    netWorthSnapshotStale,
     totalCount,
   };
 }

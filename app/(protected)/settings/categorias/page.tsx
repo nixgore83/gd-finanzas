@@ -24,6 +24,7 @@ export default async function CategoriasPage() {
   const expenseRows = tree.filter((c) => c.kind === 'expense');
   const investCount = expenseRows.filter((c) => isLeaf(c) && c.isInvestment).length;
   const leafCount = expenseRows.filter((c) => isLeaf(c)).length;
+  const excludedCount = expenseRows.filter((c) => isLeaf(c) && c.excludedFromHousehold).length;
 
   // Group by parent for visual separation
   const groups: Array<{ parent: CategoryNode | null; rows: CategoryNode[] }> = [];
@@ -54,7 +55,10 @@ export default async function CategoriasPage() {
           <span className="text-foreground not-italic">
             {investCount} de {leafCount}
           </span>{' '}
-          marcadas.
+          marcadas. Las marcadas como{' '}
+          <span className="font-medium text-[color:var(--bad)] not-italic">fuera de la casa</span>{' '}
+          no cuentan en el runway, el techo mensual ni los reportes de gasto{' '}
+          <span className="text-foreground not-italic">({excludedCount})</span>.
         </Body>
       </header>
 
@@ -128,6 +132,14 @@ function CategoryRow({
     >
       <div className="flex items-center gap-3">
         <span className="font-display text-foreground text-base">{category.name}</span>
+        {category.excludedFromHousehold && (
+          <span
+            className="font-sans text-[9px] font-semibold tracking-[0.18em] uppercase"
+            style={{ color: 'var(--bad)' }}
+          >
+            · fuera de la casa
+          </span>
+        )}
         {category.isInvestment && (
           <span
             className="font-sans text-[9px] font-semibold tracking-[0.18em] uppercase"
@@ -138,7 +150,20 @@ function CategoryRow({
         )}
       </div>
       {isLeaf ? (
-        <InvestmentToggle categoryId={category.id} initial={category.isInvestment} />
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2">
+            <Label>Fuera casa</Label>
+            <InvestmentToggle
+              categoryId={category.id}
+              initial={category.excludedFromHousehold}
+              flag="household"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label>Inversión</Label>
+            <InvestmentToggle categoryId={category.id} initial={category.isInvestment} />
+          </div>
+        </div>
       ) : (
         <Label>Grupo</Label>
       )}

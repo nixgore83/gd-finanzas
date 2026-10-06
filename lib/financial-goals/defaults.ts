@@ -15,5 +15,6 @@ export const FINANCIAL_GOALS_DEFAULTS = {
   numeroRetiroUsd: '2230000',
   numeroEducacionUsd: '150000',
   bufferUsd: '72000',
+  topeGastoMensualArs: null as string | null,
   notas: null as string | null,
 } as const;

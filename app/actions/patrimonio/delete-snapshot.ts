@@ -34,6 +34,7 @@ export async function deleteSnapshot(snapshotId: string): Promise<DeleteSnapshot
     if (result.length === 0) return { ok: false, error: 'not_found' };
 
     revalidatePath('/patrimonio');
+    revalidatePath('/runway');
     return { ok: true };
   } catch (err) {
     console.error('[patrimonio] delete-snapshot failed', {

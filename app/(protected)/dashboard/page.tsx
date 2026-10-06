@@ -6,6 +6,8 @@ import { loadPendingActions } from '@/lib/reports/pending-actions';
 import { ALL_KIND_LABELS } from '@/lib/schemas/transaction';
 import { SparklineKpiCard } from '@/components/dashboard/sparkline-kpi-card';
 import { PendingActionsSummary } from '@/components/dashboard/pending-actions-summary';
+import { RunwayStrip } from '@/components/dashboard/runway-strip';
+import { loadRunwayData } from '@/lib/runway/runway-data';
 import { Display, Label, Num, Hair, Body } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
 
@@ -103,9 +105,10 @@ export default async function DashboardPage() {
   const month = now.getMonth() + 1;
   const monthLabel = `${MONTH_LABELS[month - 1]} ${year}`;
 
-  const [data, pending] = await Promise.all([
+  const [data, pending, runway] = await Promise.all([
     loadDashboardData(session.householdId, year, month),
     loadPendingActions(session.householdId),
+    loadRunwayData(session.householdId),
   ]);
 
   const last = data.monthly[data.monthly.length - 1];
@@ -197,6 +200,9 @@ export default async function DashboardPage() {
       </section>
 
       <Hair thick />
+
+      {/* ============ RUNWAY + TECHO ============ */}
+      <RunwayStrip data={runway} />
 
       {/* ============ KPI STRIP ============ */}
       <section className="bg-border grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-4">

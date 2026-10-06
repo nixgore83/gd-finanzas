@@ -25,6 +25,11 @@ export const financialGoalsInputSchema = z.object({
   numeroRetiroUsd: positiveMoneySchema,
   numeroEducacionUsd: positiveMoneySchema,
   bufferUsd: positiveMoneySchema,
+  /** Techo de gasto mensual de la casa (ARS, sin cuotas de TC). Vacío = sin techo. */
+  topeGastoMensualArs: z.preprocess(
+    (v) => (v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v),
+    positiveMoneySchema.nullable(),
+  ),
   notas: z
     .string()
     .trim()
@@ -44,6 +49,7 @@ export function parseFinancialGoalsFormData(formData: FormData) {
     numeroRetiroUsd: formData.get('numeroRetiroUsd'),
     numeroEducacionUsd: formData.get('numeroEducacionUsd'),
     bufferUsd: formData.get('bufferUsd'),
+    topeGastoMensualArs: formData.get('topeGastoMensualArs'),
     notas: formData.get('notas'),
   });
 }

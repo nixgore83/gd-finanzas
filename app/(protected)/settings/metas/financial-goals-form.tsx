@@ -20,6 +20,7 @@ type Initial = {
   numeroRetiroUsd: string;
   numeroEducacionUsd: string;
   bufferUsd: string;
+  topeGastoMensualArs: string | null;
   notas: string | null;
   updatedAt: string | null;
   updatedByEmail: string | null;
@@ -56,6 +57,7 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
   const [educacion, setEducacion] = useState<string>(initial.numeroEducacionUsd);
   const [buffer, setBuffer] = useState<string>(initial.bufferUsd);
   const [target, setTarget] = useState<string>(initial.targetAhorroMensualUsd);
+  const [tope, setTope] = useState<string>(initial.topeGastoMensualArs ?? '');
   const [edadNico, setEdadNico] = useState<number>(initial.edadTargetIfNico);
   const [edadPau, setEdadPau] = useState<number>(initial.edadTargetIfPau);
 
@@ -169,6 +171,15 @@ export function FinancialGoalsForm({ initial }: { initial: Initial }) {
             error={errors.targetAhorroMensualUsd}
             disabled={isPending}
             required
+          />
+          <FieldRow
+            label="Techo de gasto mensual · casa"
+            id="topeGastoMensualArs"
+            value={tope}
+            onChange={setTope}
+            unit="ARS"
+            error={errors.topeGastoMensualArs}
+            disabled={isPending}
           />
           <FieldRow
             label="Edad target IF · Nico"

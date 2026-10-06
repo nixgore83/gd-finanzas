@@ -15,6 +15,7 @@ const tree: CategoryNode[] = [
     depth: 0,
     parentId: null,
     isInvestment: false,
+    excludedFromHousehold: false,
   },
   {
     id: 'sueldo-nico',
@@ -23,6 +24,7 @@ const tree: CategoryNode[] = [
     depth: 1,
     parentId: 'sueldo',
     isInvestment: false,
+    excludedFromHousehold: false,
   },
   {
     id: 'sueldo-pau',
@@ -31,6 +33,7 @@ const tree: CategoryNode[] = [
     depth: 1,
     parentId: 'sueldo',
     isInvestment: false,
+    excludedFromHousehold: false,
   },
   {
     id: 'vivienda',
@@ -39,6 +42,7 @@ const tree: CategoryNode[] = [
     depth: 0,
     parentId: null,
     isInvestment: false,
+    excludedFromHousehold: false,
   },
   {
     id: 'alquiler',
@@ -47,6 +51,7 @@ const tree: CategoryNode[] = [
     depth: 1,
     parentId: 'vivienda',
     isInvestment: false,
+    excludedFromHousehold: false,
   },
   {
     id: 'expensas',
@@ -55,6 +60,7 @@ const tree: CategoryNode[] = [
     depth: 1,
     parentId: 'vivienda',
     isInvestment: false,
+    excludedFromHousehold: false,
   },
   {
     id: 'inv-rh',
@@ -63,6 +69,7 @@ const tree: CategoryNode[] = [
     depth: 0,
     parentId: null,
     isInvestment: true,
+    excludedFromHousehold: false,
   },
 ];
 

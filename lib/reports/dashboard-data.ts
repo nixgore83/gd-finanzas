@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, gte, isNotNull, lte, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, lte, notInArray, sql, sum } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { accounts, categories, forecasts, recurrences, transactions } from '@/db/schema';
 import { loadCashflowData, monthRange } from './cashflow-data';
+import { loadHouseholdExcludedIds } from '@/lib/categories/household-exclusion';
 import type { CashflowTotals } from './cashflow';
 
 export type DashboardMonthPoint = {
@@ -92,6 +93,11 @@ export async function loadDashboardData(
   const monthlyStart = `${first.year}-${pad2(first.month)}-01`;
   const monthlyEnd = `${last.year}-${pad2(last.month)}-${pad2(lastDay(last.year, last.month))}`;
 
+  // Lo que no es gasto de la casa (Mario, RH, Tijeritas) no entra al top ni a las sparklines.
+  const excludedIds = [...(await loadHouseholdExcludedIds(householdId))];
+  const notExcluded =
+    excludedIds.length > 0 ? notInArray(transactions.categoryId, excludedIds) : undefined;
+
   const [cashflow, topRows, forecastRows, recentRows, monthlyRows] = await Promise.all([
     loadCashflowData(householdId, year, month),
 
@@ -109,6 +115,7 @@ export async function loadDashboardData(
           eq(transactions.householdId, householdId),
           eq(transactions.kind, 'expense'),
           isNotNull(transactions.categoryId),
+          notExcluded,
           gte(transactions.date, range.from),
           lte(transactions.date, range.to),
         ),
@@ -171,6 +178,7 @@ export async function loadDashboardData(
         and(
           eq(transactions.householdId, householdId),
           isNotNull(transactions.categoryId),
+          notExcluded,
           gte(transactions.date, monthlyStart),
           lte(transactions.date, monthlyEnd),
         ),
