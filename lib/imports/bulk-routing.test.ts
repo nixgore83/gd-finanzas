@@ -62,6 +62,28 @@ describe('extractStatementDate', () => {
     ).toEqual({ precision: 'day', value: '2026-07-02' });
   });
 
+  it('lee el prefijo YYYYMM con el que se archivan a mano los resúmenes de MP', () => {
+    // MP baja TODOS los resúmenes con el mismo nombre y el PDF no imprime el año
+    // en ninguna parte, así que el prefijo del archivo es la única fuente del año.
+    expect(extractStatementDate('202607 - credit-card-mp-statement.pdf')).toEqual({
+      precision: 'month',
+      value: '2026-07',
+    });
+    // El sufijo de copia no debe estorbar.
+    expect(extractStatementDate('202601 - credit-card-mp-statement (4).pdf')).toEqual({
+      precision: 'month',
+      value: '2026-01',
+    });
+  });
+
+  it('el prefijo YYYYMM no le gana al YYYYMMDD ya soportado', () => {
+    // Regresión: una regla YYYYMM demasiado golosa truncaría "20260723" a 2026-07.
+    expect(extractStatementDate('20260723_Visa.pdf')).toEqual({
+      precision: 'day',
+      value: '2026-07-23',
+    });
+  });
+
   it('lee los statements de HSBC US', () => {
     expect(extractStatementDate('2026-01-27_Statement.pdf')).toEqual({
       precision: 'day',

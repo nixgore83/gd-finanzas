@@ -18,6 +18,7 @@ import {
 import { loadCategoryTree } from '@/lib/categories/tree';
 import { buildCategoryPromptBlock } from '@/lib/imports/parsers/category-prompt';
 import { buildTargetAccountBlock } from '@/lib/imports/target-account-block';
+import { buildStatementDateBlock } from '@/lib/imports/statement-date-block';
 import { detectTransfers } from '@/lib/imports/detect-transfers';
 import { matchAccountByRefs } from '@/lib/imports/counterparty-identity';
 import { computeImportPeriod } from '@/lib/imports/period';
@@ -87,6 +88,7 @@ export async function parseImportInternal(
       accountCurrency: accounts.currencyDefault,
       accountOwnerTag: accounts.ownerTag,
       accountNumber: accounts.accountNumber,
+      fileName: imports.fileName,
     })
     .from(imports)
     .leftJoin(institutions, eq(institutions.id, imports.institutionId))
@@ -233,7 +235,11 @@ export async function parseImportInternal(
   const tree = await loadCategoryTree(householdId);
   const categoryBlock = buildCategoryPromptBlock(tree);
   const enrichedSystemPrompt =
-    parser.systemPrompt + '\n\n' + categoryBlock + buildTargetAccountBlock(row.accountNumber);
+    parser.systemPrompt +
+    '\n\n' +
+    categoryBlock +
+    buildTargetAccountBlock(row.accountNumber) +
+    buildStatementDateBlock(row.fileName);
 
   const isCsv = ext === 'csv';
   const isXlsx = ext === 'xlsx';
