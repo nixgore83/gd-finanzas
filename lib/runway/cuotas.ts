@@ -5,8 +5,8 @@ import { addMonths, monthOf, type MonthKey } from './months';
  * Marca de cuota en la descripción de un consumo de TC: "C.03/06", "03/06",
  * "5 de 6". Los dígitos no pueden venir pegados a otros: "ALLIANZ 0210/18" es
  * un número de póliza que se cobra todos los meses, no una cuota.
- * (Mismo criterio que `lib/imports/bulk-review.ts`, en el PR #97; unificar
- * cuando entre.)
+ * Único lugar donde se define: lo usan el runway y la revisión asistida de
+ * imports (`lib/imports/bulk-review.ts`).
  */
 export const CUOTA_RE = /(?<!\d)(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})(?!\d)/;
 

@@ -46,8 +46,101 @@ Pendientes / para discutir:
 - [ ] Balanz USD 29k se cargó en "Balanz Argentina": confirmar si es "Internacional".
 - [ ] Cargar un snapshot por mes (Pendientes avisa a los 35 días).
 - [ ] Inflación no modelada: todo nominal; con inflación el runway real es más corto.
-- [ ] Unificar `CUOTA_RE` con `lib/imports/bulk-review.ts` cuando entre el PR #97.
+- [x] `CUOTA_RE` unificado en `lib/runway/cuotas.ts` (lo importa `bulk-review.ts`).
 - [ ] Sync PRD Notion (módulo nuevo + reglas de negocio aprobadas).
+### Sesión 2026-10-05 — Carga de los resúmenes nuevos de Drive + las DOS Visas Galicia de Pau
+
+Pedido de Nico: "en Drive están todos los resúmenes nuevos de cuenta y TC; revisalos y cargá la info
+que falta". Se usó `scripts/bulk-import.ts` sobre el Drive sincronizado (`G:\My Drive\Finanzas
+Personales\Resumenes de Cuenta Personales\2026`), armando una carpeta de staging con sólo lo que
+había que subir (así no hubo que tocar la carpeta de Drive ni el filtro `--only`).
+
+**Hallazgo 1 — 21 de los 41 imports de la carga del 08-13 fueron borrados después.** Storage tiene
+los 41 PDFs, la DB conserva 20. El dry-run marcaba esos 21 archivos viejos como `NUEVO` otra vez
+(ICBC CC 5727 02/04/05/06-26 y los `EXT.DE.MOVIMIENTOS` sin fecha, 9430 y 0413 06-26, Galicia Nico
+USD 02-01/02-02/02-03, BIND Visa 0122/0723, Master ICBC 2026-05, MP `Resumen_MercadoPago_Junio2026`).
+**No se volvieron a subir**: se asume que se borraron a propósito. Si alguno hacía falta, decirlo y
+se sube (el ICBC CC 5727 no tiene nada en mar/abr/may; la Visa BIND nada en jun/jul).
+
+**Hallazgo 2 — Pau tiene DOS Visas en Galicia** ("Visa Galicia", N° Cuenta …2615, y "Visa Galicia
+Más", …1127, la ex-HSBC) **y una caja de ahorro en USD** (4033501-0) además de la ARS. El banco
+nombra igual los resúmenes de las dos tarjetas y cierran el mismo día; los consolidados de caja ARS
+y USD también se llaman igual. El dedup por (cuenta, fecha de cierre) de la carga del 08-13 —que
+corre ANTES de leer el PDF— tomó una como copia de la otra: en la app había UNA Visa de Pau con
+ene–abr de la Más y may–jul de la común, y los USD de la caja estaban en `_duplicados/`.
+- [x] Cuentas nuevas en prod: `Galicia Visa Más · Pau · ARS` (`6be769cc…`, rótulo "Más") y
+  `Galicia Caja de ahorro · Pau · USD` (`af76f6bd…`). `account_number` seteado en las dos Visas.
+- [x] Los 4 imports ene–abr (`336e6e69`, `6a6c8b65`, `c3154b3e`, `67430d29`) y sus **39
+  transacciones** pasaron a la Visa Más (revertible: `update … set account_id='9d4021d5…'`).
+- [x] Ruteo (`lib/imports/bulk-routing.ts`): carpeta canónica `TC/Visa Galicia Mas Pau` (con o sin
+  tilde) + `accountHint` (últimos 4 del N° Cuenta) en las reglas de Galicia; el hint entra en la
+  clave de dedup. `extractStatementAccountRef` lee el "N° Cuenta" del PDF y el script lo contrasta:
+  archivo en la carpeta equivocada ⇒ `CONFLICTO`. Un `<CUIL>_Visa_*` (BIND) guardado por error en la
+  carpeta de Galicia rutea a BIND (`pau-visa-bind-misfiled`). Suite 741 → **746**.
+
+**Hallazgo 3 — MP agosto estaba mal parseado** (fechas 2024, 1 transacción confirmada con fecha
+2024-09-05): el fix del año está en la **PR #95, todavía sin mergear**. Se borró ese import y la
+transacción espuria y se re-subió parseando con la rama del fix: período 05/08→05/09/2026, 2 líneas
+(el PDF trae sólo una cuota y el impuesto de sellos; el "Pago del resumen" se ignora por diseño).
+
+**Cargado: 24 imports / 832 líneas, 0 en error, todo en `parsed` esperando revisión.** Por cuenta:
+Galicia Visa Pau ene/feb/mar/abr (los que faltaban de la común) + ago + sep; Visa Más ago + sep;
+Galicia CA ARS Pau 26/05→22/09; Galicia CA USD Pau ×3 (ene, may, sep); BIND CA ARS+USD 1er semestre;
+BIND Visa ago + sep; Galicia Nico CA ARS 01-10 y 02-10; Visa/Master Galicia sep; Master ICBC ago +
+sep; Visa ICBC sep; MP TC ago. (El USD 09-22 de Pau falló una vez por `schema_invalid` del LLM y
+salió bien al reintentar.)
+
+**Para mirar en la revisión:**
+- [ ] **BIND Visa 0820 y 0924: 0 líneas.** Verificado en el PDF: 2 páginas, ni una línea con fecha —
+  la tarjeta no tuvo movimientos. Confirmarlos vacíos para que el gap no reclame.
+- [ ] **Visa Más sep**: 19 líneas y casi todas son cuotas fechadas al consumo original (03-25, 04-15,
+  …) en vez del cierre 09-24 como manda la regla. El de agosto sí las fechó al cierre (18 en 08-20,
+  correcto: son todas cuotas). Corregir fechas en la review o re-parsear.
+- [ ] Master ICBC ago (11 de 13 líneas en 08-20) y sep (8 de 9 en 09-24), Visa ICBC sep (6 de 10 en
+  10-01): probablemente cuotas, pero son las firmas del colapso de fechas; vistazo.
+- [ ] El xlsx `Cuentas/Galicia Pau/082026 - Extracto_00028864311.xlsx` NO se subió: es la misma
+  caja ARS (…0729996 = 5148307-2), 04/03→04/09, cubierto entero por el PDF del 22/09.
+- [ ] `02-07-2026` de Galicia Nico: "Sin Movimientos" (cubre sólo 01→02/07); no se subió.
+
+**Confirmación masiva (`scripts/bulk-confirm.ts`, `npm run imports:confirm`).** Nico pidió que la
+revisión no sea a mano. El confirm de la UI se partió en `lib/imports/confirm-internal.ts` (núcleo
+sin sesión ni `revalidatePath`) + la Server Action como wrapper, y el script toma las decisiones
+mecánicas con reglas explícitas en `lib/imports/bulk-review.ts` (15 tests) y confirma con la MISMA
+función que la pantalla. Solo toca líneas `pending`; lo que alguien editó/aceptó se respeta.
+Reglas: TC con categoría → acepta (cuota fechada al consumo original → la mueve al cierre);
+duplicada contra transacciones de la cuenta (monto + fecha ±1 día) → rechaza con `[DUPLICADA]`;
+FIMA → transfer a Inversiones Galicia del mismo dueño; "PAGO TARJETA X" → transfer a esa tarjeta
+(Pau tiene dos Visas ⇒ queda sin contracuenta); intereses / promos → categoría; contraparte del
+household (CUIT de miembro o refs de una cuenta propia) → transfer; tercero con historial en
+`transactions` → gasto/ingreso con esa categoría; **tercero sin historial, o sin categoría → queda
+`pending` y el import NO se confirma.** El historial se mira SOLO en transacciones confirmadas: el
+`lookupCounterpartyHistory` del parse cae a otras líneas pendientes y arrastra sugerencias sin validar.
+- Dry-run sobre los 23 imports de hoy: **acepta 556 · corrige 176 · duplicadas 10 · quedan 84** en
+  6 imports (Galicia Nico 01-10: 13; Galicia Pau 09-22: 52, casi todo "TRANSFERENCIA A/DE TERCEROS"
+  sin historial; Master Galicia sep: 6 Google Cloud/MERPAGO sin categoría; Visa Galicia Nico sep: 2;
+  Visa Pau feb: 8 cuotas sin categoría; BIND ARS: 2 "Crédito por Transferencia" sin contraparte).
+- [ ] **La corrida real no se ejecutó**: el modo automático de permisos bloqueó el script porque
+  escribe transacciones en prod. La corre Nico: `npm run imports:confirm -- --since 2026-10-05`
+  (antes, `--dry-run` muestra el plan sin tocar nada). Después quedan ~84 líneas para la UI.
+- [ ] Deuda: `bulkDeleteImports` no deja borrar un import `reviewing` aunque tenga 1 sola
+  transacción espuria (MP agosto se borró por SQL).
+
+**Falta en Drive (no se puede cargar hasta que aparezca):**
+- Visa Galicia **Más** may/jun/jul 2026 (en Drive sólo hay copias de la común para esos meses).
+- Galicia Nico CA ARS: 10/06→30/06 y 04/08→31/08 (hay resumen 03-08 y 01-10, falta el de sep-01…).
+  CA USD de Nico: nada desde jun (y los de ene/feb se borraron).
+- HSBC US (cuenta y Master) desde agosto; MP billetera jul/ago/sep; ICBC caja 0926, caja USD 0413 y
+  CC 5727 jul/ago/sep (¿Gmail?); Amex Galicia y Visa BNA sep; brokers (Balanz/Cocos/ICBC) todo 2026 H2.
+
+**Deuda / pendientes:**
+- [ ] **Dedup antes de leer el PDF** (`buildPlan`): dos productos del mismo banco con el mismo nombre
+  de archivo y fecha se colapsan si la regla no tiene hint (pasó con las Visas y con ARS/USD de la
+  caja de Pau). Workaround de hoy: dos corridas separadas. Ticket: https://github.com/nixgore83/gd-finanzas/issues/96
+- [ ] Carpeta de Drive: conviene crear `TC/Visa Galicia Mas Pau` y mover ahí los dos "Mas"; el
+  `27288643119_Visa_20260820.pdf` vive en la carpeta de Galicia (ya rutea bien igual).
+- [ ] PR #95 (año de MP) sigue abierta: hasta que se mergee, cualquier MP subido por la UI vuelve a
+  salir con año 2024.
+- [x] PRD Notion sincronizado: changelog v1.16 + BIND y Mercado Pago en §12.
 
 ### Sesión 2026-08-13/14 — Carga masiva desde Drive + alta de Banco Industrial (PRs #84, #85)
 

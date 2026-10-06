@@ -9,6 +9,7 @@ type Currency = (typeof CURRENCIES)[number];
 import {
   accountNumberMatchesHint,
   buildPlan,
+  extractStatementAccountRef,
   extractStatementDate,
   routeFile,
   type PlanEntry,
@@ -159,6 +160,15 @@ function contentConflict(text: string | null, target: RouteTarget): string | nul
     }
   }
 
+  // Nº de cuenta: las dos Visas Galicia de Pau tienen resúmenes con el mismo
+  // nombre y el mismo cierre; sólo el "N° Cuenta" del encabezado las separa.
+  // Si el PDF lo trae y no coincide con el hint de la regla, el archivo está en
+  // la carpeta equivocada. Si no lo trae (otro banco), no se puede verificar.
+  const ref = extractStatementAccountRef(text);
+  if (ref && target.accountHint && !accountNumberMatchesHint(ref, target.accountHint)) {
+    return `el PDF dice N° Cuenta …${ref.slice(-4)}, la regla ruteó a [${target.accountHint}]`;
+  }
+
   // La moneda NO se chequea acá: cuando el nombre no la determina, la regla
   // marca `currencyByContent` y el target se corrige con el contenido antes de
   // resolver la cuenta (ver resolveCurrency). Tratarla como contradicción
@@ -307,8 +317,15 @@ async function main() {
       continue;
     }
 
+    // Para un CSV/XLSX no hay "primera página": se usa el comienzo del archivo
+    // tal cual (un CSV de Galicia armado a mano puede traer en la cabecera
+    // "Caja de Ahorro en Pesos" para que la moneda no vaya a CONFLICTO).
     const isPdf = entry.relPath.toLowerCase().endsWith('.pdf');
-    const pageText = isPdf ? await firstPageText(bytes) : null;
+    const pageText = isPdf
+      ? await firstPageText(bytes)
+      : entry.relPath.toLowerCase().endsWith('.csv')
+        ? new TextDecoder('utf-8').decode(bytes.subarray(0, 4096))
+        : null;
 
     // Moneda resuelta por contenido cuando el nombre del archivo no la
     // determina (consolidados de Galicia: mismo patrón para pesos y dólares).
