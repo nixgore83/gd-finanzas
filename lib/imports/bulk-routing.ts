@@ -206,6 +206,17 @@ export function extractStatementDate(fileName: string): StatementDate | null {
     if (v) return { precision: 'month', value: v };
   }
 
+  // 8) YYYYMM compacto al principio: "202607 - credit-card-mp-statement". Es la
+  //    convención con la que se archivan a mano los resúmenes que el banco baja
+  //    todos con el MISMO nombre (Mercado Pago manda siempre
+  //    "credit-card-mp-statement.pdf", sin mes ni año). Va ÚLTIMA y anclada en
+  //    `^` para no comerse el YYYYMMDD de la regla 1).
+  const ymCompact = /^(20\d{2})(\d{2})(?:[^\d]|$)/.exec(base);
+  if (ymCompact?.[1] && ymCompact[2]) {
+    const v = isoMonth(ymCompact[1], ymCompact[2]);
+    if (v) return { precision: 'month', value: v };
+  }
+
   return null;
 }
 

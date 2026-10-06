@@ -4,6 +4,7 @@ import { galiciaTcParser } from './galicia-tc';
 import { bnaTcParser } from './bna-tc';
 import { icbcTcParser } from './icbc-tc';
 import { icbcMastercardTcParser } from './icbc-mastercard-tc';
+import { mercadoPagoTcParser } from './mercado-pago-tc';
 
 /**
  * Regresión del bug de 2026-07: los prompts de TC solo hablaban de fechas para
@@ -16,6 +17,7 @@ const TC_LLM_PARSERS = [
   ['bna-tc', bnaTcParser],
   ['icbc-tc', icbcTcParser],
   ['icbc-mastercard-tc', icbcMastercardTcParser],
+  ['mercado-pago-tc', mercadoPagoTcParser],
 ] as const;
 
 describe('TC_DATE_RULES_BLOCK', () => {
