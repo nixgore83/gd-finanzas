@@ -3,13 +3,51 @@
 > Estado vivo. Se actualiza al cierre de cada hito.
 > Sesión nueva: leer `CLAUDE.md`, leer este archivo, leer el PRD V1.1 (Notion) si la sesión toca un módulo nuevo.
 
-**Última actualización:** 2026-08-14 por Claude
+**Última actualización:** 2026-10-06 por Claude
 
 ---
 
 ## Hito en curso
 
 **PRD V1.1 completo + en producción. Mejoras UX: panel de pendientes + pantalla de imports.**
+
+### Sesión 2026-10-06 — Runway + techo de gasto mensual (rama `feat/runway`)
+
+Contexto: Nico se quedó sin sueldo fijo (último cobro ICBC 07/08: 16,2M de sueldo + 48,4M de
+liquidación) y el gasto de la casa supera los ingresos. El runway se había calculado a mano con
+SQL el 05–06/10; ahora lo calcula la app. Decisiones de Nico (06/10): saldo por snapshot mensual
+de patrimonio, flag de categoría "fuera de la casa", un techo mensual total con semáforo, y
+actualizar las recurrencias.
+
+- [x] **`/runway`** (nav › Patrimonio): líquido del último snapshot (ARS al oficial de hoy),
+  proyección 18 meses en dos escenarios (ritmo actual / con techo), mes en que se termina la plata,
+  gráfico, tabla mes a mes y supuestos. `lib/runway/` (puro, 24 tests): gasto base = promedio de
+  los 3 meses cerrados sin cuotas TC, sin categorías fuera de la casa y sin las de gastos
+  anuales; ingresos/puntuales desde recurrencias activas (`computeForecastDates`, NO la tabla
+  `forecasts`, que se encoge sin cron); cuotas pendientes del último resumen confirmado de cada TC
+  por mes de pago; gastos mensuales que terminan (auto) liberan su monto.
+- [x] **Techo**: `financial_goals.tope_gasto_mensual_ars` (Settings › Metas). Semáforo 80/100% +
+  ritmo prorrateado en el dashboard; "techo superado" y "snapshot de más de 35 días" en Pendientes.
+- [x] **`categories.excluded_from_household`** (Settings › Categorías): Mario, Rabbit Hole,
+  Tijeritas. Cashflow, top y sparklines del dashboard dejan de contarlas.
+- [x] Migración **0022** aplicada a prod (aditiva, sin tablas nuevas).
+- [x] **Datos en prod**: flags en las 3 categorías; techo 16M; Sueldo Nico con fin 31/08
+  (previsiones futuras canceladas); Sueldo Pau 8,9M; Alquiler Marconi 1,86M; Nahir/Claudia a
+  Empleadas domésticas; nuevas: Recupero Beni 0,5M/mes, Aguinaldo Pau jun+dic 4M, **Alquiler
+  anual USD 28k (marzo)**, Vacaciones 26M (enero; desactivarla = escenario sin vacaciones), Auto
+  1,18M hasta dic-26 (con previsiones); cuentas "A cobrar · Mario" (USD 5k) y "A cobrar ·
+  Tijeritas" (5,6M); **primer snapshot 2026-10-06: USD 70.146 ≈ 108,2M**. El arreglo de Hernán
+  González (1,675M, lo reintegra el dueño) pasó a transferencia: no es gasto.
+- **Validación**: la app da saldo fin de marzo 10,2M con vacaciones (mismo número que el cálculo
+  manual) y runway **hasta jul-2027** en ambos escenarios. Build de prod OK (webpack; Turbopack no
+  acepta el `node_modules` linkeado del worktree).
+
+Pendientes / para discutir:
+- [ ] Balanz USD 29k se cargó en "Balanz Argentina": confirmar si es "Internacional".
+- [ ] Cargar un snapshot por mes (Pendientes avisa a los 35 días).
+- [ ] Inflación no modelada: todo nominal; con inflación el runway real es más corto.
+- [ ] Unificar `CUOTA_RE` con `lib/imports/bulk-review.ts` cuando entre el PR #97.
+- [ ] Sync PRD Notion (módulo nuevo + reglas de negocio aprobadas).
 
 ### Sesión 2026-08-13/14 — Carga masiva desde Drive + alta de Banco Industrial (PRs #84, #85)
 
